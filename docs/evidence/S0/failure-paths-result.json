@@ -1,5 +1,5 @@
 {
-  "date": "2026-08-17",
+  "date": "2026-08-18",
   "environment": "Playwright Chromium with the production IIFE bundle",
   "sensitiveDataUsed": false,
   "failureCases": [
@@ -29,6 +29,24 @@
       "fallback": "download"
     }
   ],
+  "untrustedEventBlocked": {
+    "injectionOkBeforeObservation": true,
+    "inputFilesVerified": true,
+    "eventsDispatched": ["input", "change"],
+    "manualSubmitResult": {
+      "ok": false,
+      "fallback": "manual-submit",
+      "errorCode": "UNTRUSTED_EVENT_BLOCKED",
+      "userAction": "USE_ORIGINAL_UPLOAD_BUTTON"
+    },
+    "downloadResult": {
+      "ok": false,
+      "fallback": "download",
+      "errorCode": "UNTRUSTED_EVENT_BLOCKED",
+      "userAction": "USE_ORIGINAL_UPLOAD_BUTTON"
+    },
+    "scope": "S0 result conversion only; page-response observation remains an S3 responsibility."
+  },
   "cleanup": {
     "firstCleanupActive": false,
     "hostCountAfterCleanup": 0,
@@ -41,7 +59,7 @@
   },
   "testSummary": {
     "command": "npm run test:e2e -- --reporter=line --workers=1",
-    "passed": 4,
+    "passed": 6,
     "failed": 0,
     "testServerPort": 8765,
     "testServerClosed": true

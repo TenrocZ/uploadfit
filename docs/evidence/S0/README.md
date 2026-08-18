@@ -76,11 +76,29 @@
 
 - 日期：2026-08-18
 - 验证：日志默认关闭；启用诊断时只保留允许的顶层字段，文件名、内容、页面正文和 Token 字段不会进入日志条目。
-- 结果：`npm run check` 中 6 个单测全部通过。
+- 结果：`npm run check` 中 7 个单测全部通过。
 - 代码：`src/utils/logger.js`、`tests/unit/logger.test.js`
+
+### E-S0-009：Tabbit 当前 bundle 能力与生命周期
+
+- 日期：2026-08-18
+- 环境：Tabbit Browser 1.9.22.0；`test-pages/probe.html`；本地临时服务端口 8768。
+- 当前 `dist/uploadfit.js` 加载成功；File、Blob、DataTransfer、`input.files`、Canvas/toBlob、createImageBitmap、Worker、Blob Worker、OffscreenCanvas 均为 `true`。
+- 重复 `bootstrap()` 复用同一 session 和一个 host；cleanup 后 host/session 清除；再次 bootstrap 创建新 session。
+- Tabbit “创建妙招”页面实际展示了脚本编辑、手动/自动执行选项和全部/部分网页范围选项；本次未创建或发布草稿。
+- 证据：`tabbit-platform-result.json`。
+- 限制：上述 UI 观察不能替代官方安装、更新、分享、发布生命周期契约；这些项仍为 `UNKNOWN`。
+
+### E-S0-010：不可信事件降级与日志嵌套脱敏
+
+- 日期：2026-08-18
+- `injectFile()` 成功但进入不可信事件边界后，产品结果改为 `ok=false`、`errorCode=UNTRUSTED_EVENT_BLOCKED`，同时保留 `inputFilesVerified=true`，并给出 `USE_ORIGINAL_UPLOAD_BUTTON` 操作提示；`manual-submit` 与 `download` 两种 fallback 均受控。
+- `markUntrustedEventBlocked()` 只负责 S0 结果转换；页面响应观察器仍留给 S3，不在 S0 扩展实现。
+- 日志现在同时约束顶层字段和嵌套规则字段，调用者不能覆盖 `time`/`event`；测试覆盖敏感文件名、页面正文、Token、规则证据和伪造时间/事件字段。
+- 证据：`failure-paths-result.json`、`tests/integration/failure-paths.test.js`、`tests/unit/logger.test.js`。
 
 ## 待补证据
 
-- Tabbit AI 官方调用路径或阻塞证据。
+- Tabbit 官方 AI 调用路径的正式示例或技术支持结论；当前阻塞证据见 `tabbit-platform-result.json`。
 
 不在仓库中保存真实照片、完整文件名、Base64、Cookie、Token 或敏感网页文本。

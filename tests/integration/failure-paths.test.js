@@ -111,3 +111,42 @@ test('cleanupSession is idempotent and permits a clean rebootstrap', async ({ pa
 
   await page.evaluate(() => globalThis.__uploadfit_debug_bundle__.cleanupSession());
 });
+
+test('reports an untrusted event block without claiming upload success', async ({ page }) => {
+  await page.goto('/test-pages/probe.html');
+  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+
+  const result = await page.evaluate(() => {
+    const api = globalThis.__uploadfit_debug_bundle__;
+    const input = document.querySelector('#probe-file');
+    const injected = api.injectFile(
+      input,
+      new File(['ready'], 'ready.jpg', { type: 'image/jpeg' }),
+      { dispatchEvents: true, reason: 'processed' }
+    );
+    return {
+      injected,
+      blocked: api.markUntrustedEventBlocked(injected, { fallback: 'manual-submit' }),
+      downloadBlocked: api.markUntrustedEventBlocked(injected, { fallback: 'download' })
+    };
+  });
+
+  expect(result.injected.ok).toBe(true);
+  expect(result.blocked).toEqual({
+    ok: false,
+    inputFilesVerified: true,
+    eventsDispatched: ['input', 'change'],
+    fallback: 'manual-submit',
+    errorCode: 'UNTRUSTED_EVENT_BLOCKED',
+    userAction: 'USE_ORIGINAL_UPLOAD_BUTTON'
+  });
+  expect(result.downloadBlocked).toMatchObject({
+    ok: false,
+    inputFilesVerified: true,
+    fallback: 'download',
+    errorCode: 'UNTRUSTED_EVENT_BLOCKED',
+    userAction: 'USE_ORIGINAL_UPLOAD_BUTTON'
+  });
+
+  await page.evaluate(() => globalThis.__uploadfit_debug_bundle__.cleanupSession());
+});

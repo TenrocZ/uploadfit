@@ -8,7 +8,7 @@
 - 需求事实来源：`C:\Users\蔡天乐\Desktop\黑客松\UploadFit-PRD-v1.0.md`
 - 执行任务书：`C:\Users\蔡天乐\Desktop\黑客松\UploadFit-开发任务书-v1.0`
 - 当前阶段：S0：平台能力探针与工程骨架
-- 当前状态：核心门禁完成，交接条件通过；Tabbit 官方 AI provider 待确认
+- 当前状态：S0-R1 至 R6 的本地整改、证据和回归已完成；整体 S0 保持 BLOCKED，原因是 Tabbit 官方 AI provider 与官方脚本生命周期契约仍需外部确认。
 - 记录日期：2026-08-18
 
 ## 2026-08-17：S0 / 平台连接确认
@@ -233,3 +233,68 @@
 - `tests/integration/file-injector.test.js`
 
 下一步：处理 S0-R4 不可信事件降级结果与受控测试；完成后暂停。
+
+## 2026-08-18：S0-R4 / 不可信事件降级结果
+
+状态：已完成，未进入 S1/S2/S3 实现。
+
+完成事项：
+
+- 增加 `markUntrustedEventBlocked()`，把“文件已写入但网页未接受合成事件”的结果明确转换为 `ok=false` 和 `UNTRUSTED_EVENT_BLOCKED`。
+- 固定用户动作 `USE_ORIGINAL_UPLOAD_BUTTON`，仅允许 `manual-submit` 和 `download` 两个 fallback。
+- 增加浏览器集成测试，验证不声称上传成功且保留 `inputFilesVerified=true`。
+- 明确 S0 只提供结果转换；页面响应观察器仍属于 S3。
+
+验证结果：`npm run check` 和 E2E 均通过；证据见 `docs/evidence/S0/failure-paths-result.json`。
+
+## 2026-08-18：S0-R5 / 日志字段边界修正
+
+状态：已完成，未进入其他板块。
+
+完成事项：
+
+- 日志顶层字段仅保留契约允许的标量字段，调用者不能覆盖 `time` 或 `event`。
+- 嵌套规则只保留格式、大小、尺寸、宽高比和置信度等受控字段，过滤文件名、页面正文、Token、证据文本和未知键。
+- 对日志条目执行深冻结，避免后续引用修改已记录内容。
+- 增加嵌套脱敏和伪造时间/事件字段测试。
+
+验证结果：`npm run check` 中 7 个单测通过；证据见 `docs/evidence/S0/README.md` 的 E-S0-010。
+
+## 2026-08-18：S0-R1/R2 / Tabbit 能力与外部阻塞证据
+
+状态：本地能力修复完成；官方脚本生命周期和 AI provider 仍保持 `UNKNOWN/BLOCKED`，没有写入猜测性 API。
+
+完成事项：
+
+- 在 Tabbit Browser 1.9.22.0 中加载当前 `dist/uploadfit.js`，重新验证 Blob Worker、单例 bootstrap、cleanup 和 rebootstrap。
+- 实际观察 Tabbit 创建妙招页面的脚本编辑、执行方式和页面范围控件；未创建、发布或分享任何 UploadFit 草稿。
+- 实际观察 AI Panel 当前状态，并查阅 Tabbit 官方公开材料；未找到可供网页脚本调用的 AI 方法、参数、权限、超时和返回契约。
+- 将已观察事实、官方链接、限制和阻塞结论写入 `docs/evidence/S0/tabbit-platform-result.json`。
+
+验证结果：本地 Tabbit bundle 能力与生命周期 PASS；官方脚本安装/更新/分享契约 UNKNOWN，官方 AI provider BLOCKED。
+
+下一步：完成 R6 交接文档、能力测试、Git 终点提交和全量回归；不进入 S1。
+
+## 2026-08-18：S0-R6 / 交接、能力测试与全量回归
+
+状态：本地整改完成，S0 交接状态保持 `BLOCKED`；未进入 S1。
+
+完成事项：
+
+- `docs/handoffs/S0-handoff.md` 改为合法状态 `BLOCKED`，补齐 Start commit、End commit 待回填、Agent、Node/npm/Tabbit 环境、产物 SHA-256、T01–T12 和外部阻塞项。
+- 新增 `tests/integration/capabilities.test.js`，验证产品版 `detectCapabilities()` 的 File、DataTransfer、`input.files`、Canvas、Worker、Blob Worker、OffscreenCanvas 和 AI UNKNOWN 状态。
+- `docs/tabbit-capabilities.md` 修正 Blob Worker 矛盾记录，并索引当前 Tabbit 平台证据。
+- 执行 `npm ci`，随后完成单测、构建、静态检查和 7 个浏览器测试；临时测试端口均已关闭。
+- 初始化并保留 Git 整改留痕；最终 End commit 在提交后回填。
+
+最终验证摘要：
+
+| 项目 | 结果 |
+|---|---|
+| `npm ci` | PASS |
+| `npm run check` | PASS：7 个单测；构建 8711 bytes；静态检查通过 |
+| `npm run test:e2e -- --reporter=line --workers=1` | PASS：7 个浏览器测试 |
+| `dist/uploadfit.js` | SHA-256 `44351FECB57784C90C3F8F4AECD7EF14C64FDCCA7C27721668FC3A494BA6B04F` |
+| Tabbit 临时端口 8768/8765 | CLOSED |
+
+停止条件：R1/R2 仍需要 Tabbit 官方脚本生命周期契约及 AI provider 官方示例或技术支持回复；在此之前不把 S0 改成 `READY_FOR_ACCEPTANCE`，也不开始依赖 AI 的后续阶段。

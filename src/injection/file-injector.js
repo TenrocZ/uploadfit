@@ -13,6 +13,9 @@ function failure(errorCode, fallback = 'download') {
   };
 }
 
+const ALLOWED_FALLBACKS = new Set(['manual-submit', 'download']);
+const UNTRUSTED_EVENT_ACTION = 'USE_ORIGINAL_UPLOAD_BUTTON';
+
 function isFileForInput(input, file) {
   const FileConstructor = input.ownerDocument?.defaultView?.File ?? globalThis.File;
   return typeof FileConstructor === 'function' && file instanceof FileConstructor;
@@ -96,6 +99,29 @@ export function injectFile(input, file, options = {}) {
   }
 }
 
+/**
+ * Convert a successful file write into an explicit untrusted-event fallback
+ * after the page fails to respond to synthetic events.
+ * S0 exposes this result conversion; S3 owns the page-response observer.
+ * @param {ReturnType<typeof injectFile>} injectionResult
+ * @param {{fallback?: 'manual-submit'|'download'}} options
+ */
+export function markUntrustedEventBlocked(injectionResult, options = {}) {
+  const fallback = options.fallback ?? 'manual-submit';
+  if (!ALLOWED_FALLBACKS.has(fallback)) return failure('INJECTION_FAILED');
+  if (!injectionResult?.ok || !injectionResult.inputFilesVerified) {
+    return failure('INJECTION_FAILED', fallback);
+  }
+
+  return {
+    ...injectionResult,
+    ok: false,
+    fallback,
+    errorCode: 'UNTRUSTED_EVENT_BLOCKED',
+    userAction: UNTRUSTED_EVENT_ACTION
+  };
+}
+
 export function restoreOriginal(task) {
   if (!task?.inputElement || !task?.originalFile) return failure('INJECTION_FAILED');
   return injectFile(task.inputElement, task.originalFile, {
@@ -103,4 +129,3 @@ export function restoreOriginal(task) {
     reason: 'restore'
   });
 }
-

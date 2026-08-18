@@ -1,0 +1,84 @@
+{
+  "date": "2026-08-18",
+  "browser": "Tabbit Browser 1.9.22.0",
+  "connection": "DevToolsActivePort complete WebSocket endpoint",
+  "sensitiveDataUsed": false,
+  "localBundleProbe": {
+    "page": "test-pages/probe.html",
+    "temporaryServerPort": 8768,
+    "bundle": "dist/uploadfit.js",
+    "bundleLoaded": true,
+    "capabilities": {
+      "file": true,
+      "blob": true,
+      "dataTransfer": true,
+      "inputFilesAssignable": true,
+      "canvasToBlob": true,
+      "createImageBitmap": true,
+      "worker": true,
+      "offscreenCanvas": true,
+      "blobWorkerAllowed": true,
+      "tabbitAi": {
+        "available": false,
+        "officialApi": null,
+        "notes": "Official Tabbit AI provider path has not been confirmed."
+      }
+    },
+    "lifecycle": {
+      "sameSessionAfterRepeatedBootstrap": true,
+      "hostCountBeforeCleanup": 1,
+      "sessionPresentBeforeCleanup": true,
+      "activeAfterCleanup": false,
+      "hostCountAfterCleanup": 0,
+      "sessionPresentAfterCleanup": false,
+      "newSessionAfterRebootstrap": true,
+      "newHostCountAfterRebootstrap": 1
+    },
+    "temporaryServerClosedAfterProbe": true
+  },
+  "officialUiProbe": {
+    "scriptAuthoringUrl": "https://web.tabbit.com/skill/new",
+    "scriptAuthoringObserved": true,
+    "fieldsObserved": ["name", "description", "prompt", "script", "task"],
+    "executionModesObserved": [
+      "每次都自动运行",
+      "打开可生效的网址即运行"
+    ],
+    "pageScopesObserved": [
+      "全部网页",
+      "仅对部分网页生效"
+    ],
+    "draftCreated": false,
+    "mySkillsUrl": "https://skills.tabbit.com/plaza/skills?view=my-skills",
+    "mySkillsAndPlazaObserved": true,
+    "existingScriptEntryObserved": true,
+    "officialScriptInstallUpdateShareLifecycle": "UNKNOWN",
+    "limitation": "The authoring UI was inspected without creating or publishing a skill; this proves visible controls, not the complete official lifecycle contract."
+  },
+  "officialAiPanelProbe": {
+    "url": "https://web.tabbit.com/panel?mode=mi&hl=zh-CN",
+    "observedState": "正在连接 AI Panel 运行时... 重试",
+    "publicPageCallableApiConfirmed": false,
+    "limitation": "Direct panel inspection did not expose a documented webpage-callable AI method, parameters, permissions, timeout, or return schema. No guessed global API was added."
+  },
+  "officialPublicMaterialsInspected": [
+    {
+      "url": "https://go.tabbit.com/browser-automation/zh-cn",
+      "observation": "Official material describes browser-resident Agent automation and reusable workflows, not a developer API contract for a page script."
+    },
+    {
+      "url": "https://go.tabbit.com/ai-browser-cn",
+      "observation": "Official material lists scripts, agents, and macros as user-facing capabilities; it does not provide an AI provider call example for UploadFit."
+    },
+    {
+      "url": "https://go.tabbit.com/liulanqi-zidonghua",
+      "observation": "Official material emphasizes task results and natural-language interaction; it does not specify a webpage-callable AI interface."
+    }
+  ],
+  "conclusion": {
+    "tabbitBrowserPageApiAndBundleLifecycle": "PASS",
+    "officialScriptInstallUpdateShareContract": "UNKNOWN",
+    "officialAiProvider": "BLOCKED",
+    "productAction": "Keep tabbitAi unavailable and do not claim AI-rule parsing success until an official example or support decision is available."
+  }
+}

@@ -4,99 +4,96 @@
 - 工程目录：`C:\Users\蔡天乐\Desktop\黑客松\main`
 - 对应任务书：`10-S0-平台能力探针与工程骨架.md`
 - 目录决策：见 `docs/decisions/ADR-001-工程输出目录.md`
-- 交接状态：`CORE_READY / CONDITIONAL`
+- Status：`BLOCKED`
 - 核心门禁：`PASS`
-- 整体 S0：未宣称无条件 PASS；Tabbit 官方 AI provider 路径仍待确认。
+- Start commit：`edbdce2`（S0 整改前的可核验基线）
+- End commit（实质整改范围）：`PENDING`（最终 Git 提交完成后回填）
+- Agent：`Codex / UploadFit S0 Agent`
+- Environment：Windows；Node `v22.20.0`；npm `10.9.3`；Tabbit Browser `1.9.22.0`；Playwright Chromium
+- Build artifact：`dist/uploadfit.js`，8711 bytes，SHA-256 `44351FECB57784C90C3F8F4AECD7EF14C64FDCCA7C27721668FC3A494BA6B04F`
 
 ## 1. 阶段结论
 
-UploadFit 已完成 S0 的核心浏览器闭环和可复现工程骨架：在真实 Tabbit Browser 1.9.22.0 页面中，内存 `File` 可通过 `DataTransfer` 写入真实 `input.files`，产品 bundle 可复核元信息并按 `input` → `change` 顺序分发事件。重复启动、一次性 injection guard、原文件恢复、失败降级和 cleanup 幂等均有自动测试或实机证据。
+S0 的本地工程、生产 IIFE、浏览器注入闭环、原始 File 恢复、失败降级、cleanup 幂等、能力检测和日志安全边界已完成整改，并通过自动测试；当前生产 bundle 已在真实 Tabbit 页面中重新验证。
 
-当前不把合成事件伪装成可信事件：实测 `isTrusted=false`，产品不尝试绕过浏览器安全边界。文件写入失败时返回稳定错误码并使用 `download` fallback；后续正式 UI 需要提供明确的下载/手动操作指引。
+产品明确保留浏览器可信边界：合成 `input/change` 事件实测 `isTrusted=false`，不尝试伪造可信事件。文件写入成功不等于网页已经接受或提交上传；当页面未响应合成事件时，结果使用 `UNTRUSTED_EVENT_BLOCKED`，提示用户使用网页原上传按钮，并只允许 `manual-submit` 或 `download` fallback。
 
-S0 的唯一未闭合事项是 Tabbit 官方 AI provider 的安装/调用入口、权限、超时和返回格式尚未由官方示例确认。当前未创建假 API、未增加 `window.tabbit` 等猜测性全局方法，也未把 AI 成功写入产品结论。
+S0 不能改为 `READY_FOR_ACCEPTANCE` 的原因是外部平台契约仍未闭合：Tabbit 官方脚本安装/更新/分享完整生命周期没有被创建并发布的实机流程证明；Tabbit AI 官方网页调用入口、参数、权限、超时、返回和错误契约也没有官方示例或技术支持回复。已保存可复查的本地 UI、真实 bundle 和官方公开材料观察，未添加猜测性 API 或模拟 AI 成功。
 
-## 2. 交付物状态
+## 2. R1–R6 整改结果
+
+| 整改项 | 结果 | 说明 |
+|---|---|---|
+| S0-R1 Tabbit 平台探针 | BLOCKED | 当前 bundle、Blob Worker、单例生命周期和脚本编辑页控件已实测；官方脚本安装/更新/分享完整契约保持 UNKNOWN，见 `docs/evidence/S0/tabbit-platform-result.json` |
+| S0-R2 Tabbit AI 结论 | BLOCKED | 直接面板观察和官方公开材料未形成网页可调用 API 契约；等待官方示例或技术支持结论 |
+| S0-R3 原始 File 恢复 | PASS | 保存同一原始 A → 注入 B → `restoreOriginal(task)` 恢复 A；名称、MIME、字节和事件顺序有自动测试及 Tabbit 证据 |
+| S0-R4 不可信事件降级 | PASS | `UNTRUSTED_EVENT_BLOCKED`、用户动作提示和受控 fallback 已实现并测试；页面响应观察仍留给 S3 |
+| S0-R5 日志脱敏 | PASS | 顶层/嵌套字段白名单、`time/event` 防伪造、深冻结和敏感值测试已完成 |
+| S0-R6 工程留痕 | PASS（本交接状态仍受 R1/R2 阻塞） | Git 基线、环境、能力测试、证据索引和最终回归均留档 |
+
+## 3. 交付物与门禁
 
 | 交付物 | 状态 | 证据/说明 |
 |---|---|---|
-| S0-D1 可复现 npm 工程 | PASS | `npm ci`、`npm run check` 通过 |
-| S0-D2 单文件 IIFE | PASS | `dist/uploadfit.js`，6785 bytes，无 ESM import/export |
-| S0-D3 防重复启动 | PASS | Playwright 集成 + Tabbit 实机 E-S0-005 |
-| S0-D4 能力检测 | PASS | `src/capabilities.js` 覆盖 File、Blob、DataTransfer、input.files、Canvas、createImageBitmap、Worker、Blob Worker、OffscreenCanvas、AI 状态 |
-| S0-D5 File 回填闭环 | PASS | Tabbit 实机 E-S0-002/E-S0-005 |
-| S0-D6 递归保护与恢复 | PASS | guard 单测；探针 A 文件恢复证据 |
-| S0-D7 降级路径 | PASS | E-S0-006：稳定错误码与 `download` fallback |
-| S0-D8 Tabbit 实机证据 | PASS | 版本、步骤、诊断 JSON、截图已留档 |
-| S0-D9 AI 能力结论 | CONDITIONAL | 官方调用路径未确认，保持 UNKNOWN，不造假实现 |
+| S0-D1 可复现 npm 工程 | PASS | `npm ci`、`npm run check` |
+| S0-D2 单文件 IIFE | PASS | `dist/uploadfit.js`，当前构建 8711 bytes，无 ESM `import/export`，低于 150000 bytes |
+| S0-D3 防重复启动 | PASS | Playwright 集成测试 + Tabbit 实机 `tabbit-platform-result.json` |
+| S0-D4 能力检测 | PASS | `src/capabilities.js`、`tests/integration/capabilities.test.js`、Tabbit 实机 Blob Worker 结果 |
+| S0-D5 File 回填闭环 | PASS | `probe-result.json`、`tabbit-bundle-result.json` |
+| S0-D6 递归保护与恢复 | PASS | guard 单测、原始 File 恢复集成测试和实机证据 |
+| S0-D7 降级路径 | PASS | `failure-paths-result.json`；含 `UNTRUSTED_EVENT_BLOCKED` |
+| S0-D8 Tabbit 实机证据 | PASS（范围受限） | 当前 bundle 实机通过；官方脚本完整发布生命周期仍 UNKNOWN |
+| S0-D9 AI 能力结论 | BLOCKED | 保持 `tabbitAi.available=false`；没有猜测性全局 API |
 
-## 3. 自动测试与构建结果
-
-### S0-T01–T12
+## 4. S0-T01–T12
 
 | 用例 | 状态 | 证据 |
 |---|---|---|
-| T01 同页两次 bootstrap | PASS | `tests/integration/file-injector.test.js`、E-S0-005 |
+| T01 同页两次 bootstrap | PASS | `tests/integration/file-injector.test.js`、Tabbit 实机证据 |
 | T02/T03 guard 一次消费 | PASS | `tests/unit/injection-guard.test.js` |
 | T04 两个 input 独立 | PASS | `tests/unit/injection-guard.test.js` |
-| T05 注入新 File | PASS | E-S0-002/E-S0-005 |
-| T06 input/change 顺序 | PASS | E-S0-002/E-S0-005 |
-| T07 恢复原 File | PASS | `probe-result.json` |
+| T05 注入新 File | PASS | `file-injector.test.js`、Tabbit 实机证据 |
+| T06 input/change 顺序 | PASS | `probe-result.json`、Tabbit 实机证据 |
+| T07 恢复原 File | PASS | `probe-result.json`、`file-injector.test.js` |
 | T08 detached input | PASS | `failure-paths.test.js` |
-| T09 无 DataTransfer | PASS（受控故障） | `failure-paths.test.js`；不代表 Tabbit 当前缺少 API |
-| T10 cleanup 两次 | PASS | `failure-paths.test.js` |
-| T11 构建产物 | PASS | `npm run build`、static-check |
-| T12 日志脱敏 | PASS | `tests/unit/logger.test.js` |
+| T09 无 DataTransfer | PASS（受控故障） | `failure-paths.test.js`；不宣称 Tabbit 当前缺少 API |
+| T10 cleanup 两次 | PASS | `failure-paths.test.js`、Tabbit 生命周期证据 |
+| T11 构建产物 | PASS | `npm run build`、`static-check` |
+| T12 日志脱敏 | PASS | `logger.test.js`；顶层、嵌套、时间/事件伪造均覆盖 |
 
-### 命令结果
+## 5. 自动验证结果
 
 | 命令 | 结果 |
 |---|---|
-| `npm ci` | PASS，依赖锁定且可安装 |
-| `npm run check` | PASS：3 个测试文件、6 个单测；构建 6785 bytes；静态检查通过 |
-| `npm run test:e2e -- --reporter=line --workers=1` | PASS：4 个浏览器测试；服务退出后 8765 端口关闭 |
+| `npm ci` | PASS |
+| `npm test -- --run` | PASS：3 个测试文件、7 个单测 |
+| `npm run build` | PASS：8711 bytes；单文件 IIFE；无 ESM import/export |
+| `npm run static-check` | PASS |
+| `npm run check` | PASS |
+| `npm run test:e2e -- --reporter=line --workers=1` | PASS：7 个浏览器测试；测试服务退出后 8765 端口关闭 |
 
-## 4. Tabbit 实机结论
+## 6. Tabbit 实机与外部证据
 
-环境：Tabbit Browser 1.9.22.0，使用 `DevToolsActivePort` 提供的完整 WebSocket 连接；测试页为本地 `test-pages/probe.html`，只生成内存测试文件，不读取真实照片。
+当前真实 Tabbit 已确认：
 
-已确认 `PASS`：
-
-- File、Blob、DataTransfer、Canvas/toBlob、createImageBitmap、Worker、OffscreenCanvas 基础能力。
-- `input.files` 写入、元信息复核和 input/change 事件链。
-- 当前生产 bundle 的单例 host、cleanup 和 rebootstrap。
-
-仍为 `UNKNOWN`：
-
-- Tabbit 官方“使用脚本”的安装、更新、分享、匹配页面范围和完整生命周期。
-- Tabbit 官方 AI API 的入口、权限、调用参数、超时和返回格式。
-- Tabbit 发布平台的最终 CSP/脚本限制；当前构建本身无运行时 CDN 依赖。
+- File、Blob、DataTransfer、`input.files` 写入与元信息复核；input 在 change 之前；合成事件 `isTrusted=false`。
+- Canvas/toBlob、createImageBitmap、Worker、Blob Worker、OffscreenCanvas 能力探针为 true。
+- 当前 `dist/uploadfit.js` 加载成功；重复 bootstrap 复用一个 session/host；cleanup 后清除；rebootstrap 可建立新 session。
+- “创建妙招”页面实际展示脚本编辑、执行方式和全部/部分网页范围控件；本次草稿已取消，未创建或发布外部妙招。
 
 证据索引：
 
 - `docs/evidence/S0/probe-result.json`
 - `docs/evidence/S0/tabbit-bundle-result.json`
-- `docs/evidence/S0/tabbit-bundle.png`
+- `docs/evidence/S0/tabbit-platform-result.json`
 - `docs/evidence/S0/failure-paths-result.json`
 - `docs/evidence/S0/README.md`
 - `docs/tabbit-capabilities.md`
 
-## 5. S1 前置条件与边界
+## 7. 未闭合事项与最小外部动作
 
-在不改变 S0 注入契约的前提下，下一阶段可以实现 DOM 上传控件发现、上下文提取和确定性规则解析。S1 不应：
+1. 需要 Tabbit 官方示例或技术支持/官方渠道回复，确认 AI provider 的入口、参数、权限、超时、返回和错误形态。
+2. 需要官方脚本安装、更新、分享、页面匹配和发布 CSP/依赖契约，或明确说明这些能力无法提供给本工程。
+3. 在上述外部事实确认前，不进入依赖 AI provider 的 S1/S4 正式实现，不把本地规则或 mock 结果当作 AI 结果。
 
-- 假造 Tabbit AI 全局方法或 provider 成功；
-- 把 Playwright/Chromium 结果替代 Tabbit 实机结果；
-- 读取或记录完整文件名、文件内容、Base64、Cookie、Token 或页面完整文本；
-- 将 `input.files` 写入成功夸大为网页已经提交成功。
-
-进入正式评审前，必须补齐一条真实 Tabbit AI 自然语言规则理解路径，或由赛道技术支持给出明确的官方调用/阻塞结论，并把结果追加到 `docs/tabbit-capabilities.md`。
-
-## 6. 待用户/外部确认事项
-
-当前存在一个外部决策点：
-
-1. 继续推进 S1 的本地 DOM/确定性规则能力，同时把 AI provider 保持为明确的待接入项；或
-2. 暂停后续阶段，先获得 Tabbit 官方 AI 示例、接口说明或技术支持结论。
-
-本交接不替用户做该外部决定；在决定前不进入依赖 AI provider 的正式实现。
+本交接不保存真实照片、完整文件名、Base64、Cookie、Token 或完整页面文本。

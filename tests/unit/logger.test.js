@@ -12,7 +12,15 @@ describe('diagnostic logger', () => {
       height: 567,
       durationMs: 12,
       errorCode: null,
-      rules: { formats: ['jpg'], maxBytes: 120 },
+      rules: {
+        formats: ['jpg', 'private-id-card.jpg'],
+        minSize: { value: 30, unit: 'KB', evidence: 'full page text' },
+        maxSize: { value: 120, unit: 'KB' },
+        width: { exact: 390, note: 'private page text' },
+        evidence: ['private page text'],
+        pageText: 'full page text with private information',
+        token: 'secret-token'
+      },
       fileName: 'private-id-card.jpg',
       content: 'base64-or-pixels',
       pageText: 'full page text with private information',
@@ -29,7 +37,12 @@ describe('diagnostic logger', () => {
       height: 567,
       durationMs: 12,
       errorCode: null,
-      rules: { formats: ['jpg'], maxBytes: 120 }
+      rules: {
+        formats: ['jpg'],
+        minSize: { value: 30, unit: 'KB' },
+        maxSize: { value: 120, unit: 'KB' },
+        width: { exact: 390 }
+      }
     });
     expect(entry.time).toEqual(expect.any(Number));
     expect(entry).not.toHaveProperty('fileName');
@@ -45,5 +58,19 @@ describe('diagnostic logger', () => {
     const logger = createLogger();
     logger.emit('SESSION_STARTED', { taskId: 'task-2' });
     expect(logger.getEntries()).toEqual([]);
+  });
+
+  it('does not allow callers to forge event or time fields', () => {
+    const logger = createLogger({ enabled: true });
+    logger.emit('ACTUAL_EVENT', {
+      event: 'FORGED_EVENT',
+      time: 0,
+      taskId: 'task-3'
+    });
+
+    const [entry] = logger.getEntries();
+    expect(entry.event).toBe('ACTUAL_EVENT');
+    expect(entry.time).not.toBe(0);
+    expect(entry.taskId).toBe('task-3');
   });
 });
