@@ -1,0 +1,16 @@
+{
+  "stage": "S2-D1/D2",
+  "status": "PASS",
+  "checks": [
+    { "id": "I01", "mime": "image/jpeg", "bytes": 50000, "width": 390, "height": 567, "decodable": true, "result": "valid/passthrough" },
+    { "id": "I12", "mime": "image/jpeg", "orientation": 6, "encoded": [100, 50], "display": [50, 100], "result": "detected" },
+    { "id": "I13", "mime": "image/png", "decodable": false, "errorCode": "DECODE_FAILED" },
+    { "id": "I14", "signatureMime": "image/jpeg", "declaredMime": "image/png", "result": "MIME_SIGNATURE_MISMATCH+EXTENSION_MISMATCH" },
+    { "id": "I17-bytes", "size": 52428801, "errorCode": "FILE_TOO_LARGE_TO_PROCESS" },
+    { "id": "I17-pixels", "width": 20001, "height": 1, "errorCode": "PIXEL_LIMIT_EXCEEDED" },
+    { "id": "I07/I15", "mime": "image/png", "hasAlpha": true, "result": "FLATTEN_BACKGROUND confirmation" }
+  ],
+  "signatureWhitelist": ["image/jpeg", "image/png", "image/webp"],
+  "privacy": "No personal files or pixel payloads persisted"
+}
+

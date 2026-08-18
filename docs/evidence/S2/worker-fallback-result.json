@@ -1,0 +1,19 @@
+{
+  "stage": "S2-D7",
+  "status": "PASS",
+  "workerSuccess": {
+    "workerUsed": true,
+    "outputMime": "image/jpeg",
+    "outputDimensions": [120, 80],
+    "validationValid": true
+  },
+  "workerFailure": {
+    "failureMode": "Worker constructor throws CSP_BLOCKED",
+    "fallback": "one main-thread retry",
+    "warning": "WORKER_FALLBACK_MAIN_THREAD",
+    "workerUsed": false,
+    "outputStillValidated": true
+  },
+  "cleanup": ["worker.terminate", "URL.revokeObjectURL", "bitmap.close", "canvas release"]
+}
+

@@ -1,0 +1,16 @@
+{
+  "stage": "S2-D2/D3",
+  "status": "PASS",
+  "fixedOperationOrder": ["ORIENT", "CONVERT", "CROP", "RESIZE", "UPSCALE", "FLATTEN_BACKGROUND", "ENCODE", "COMPRESS"],
+  "checks": [
+    { "id": "I05", "source": [390, 567], "target": [390, 567], "operations": [], "passthrough": true },
+    { "id": "I06", "confirmation": "CROP", "executableBeforeResolution": false, "resolvedBy": "exact proposed crop payload" },
+    { "id": "I07", "confirmation": "FLATTEN_BACKGROUND", "defaultPreview": "white", "executableBeforeResolution": false },
+    { "id": "I08", "confirmation": "UPSCALE", "executableBeforeResolution": false },
+    { "id": "I09", "allowUpscale": false, "unfixable": "UPSCALE_NOT_ALLOWED", "executable": false },
+    { "id": "I11", "exactDimensions": true, "tinyMaximum": true, "result": "fails without dimension relaxation" },
+    { "id": "I04", "source": [4000, 3000], "max": [2000, 2000], "target": [2000, 1500], "result": "proportional" }
+  ],
+  "immutability": "resolveProcessingConfirmation returns a new plan and does not mutate the unresolved plan"
+}
+

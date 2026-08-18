@@ -1,0 +1,16 @@
+{
+  "generatedBy": "tests/fixtures/generate-fixtures.js",
+  "command": "npm run fixtures:generate",
+  "privacy": "deterministic canvas-only; no user files or network",
+  "samples": [
+    { "name": "png-1170x1701.png", "mime": "image/png", "width": 1170, "height": 1701, "targetApproxBytes": 2000000 },
+    { "name": "jpeg-390x567-medium.jpg", "mime": "image/jpeg", "width": 390, "height": 567, "targetApproxBytes": 500000 },
+    { "name": "jpeg-390x567-small.jpg", "mime": "image/jpeg", "width": 390, "height": 567, "targetApproxBytes": 20000 },
+    { "name": "jpeg-4000x3000.jpg", "mime": "image/jpeg", "width": 4000, "height": 3000, "targetApproxBytes": 5000000 },
+    { "name": "jpeg-orientation-6.jpg", "mime": "image/jpeg", "width": 100, "height": 50, "orientation": 6 },
+    { "name": "transparent.png", "mime": "image/png", "width": 390, "height": 567, "hasAlpha": true },
+    { "name": "corrupt.png", "mime": "image/png", "decodable": false },
+    { "name": "sample.webp", "mime": "image/webp", "width": 390, "height": 567 }
+  ]
+}
+

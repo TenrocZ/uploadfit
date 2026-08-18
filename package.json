@@ -14,6 +14,7 @@
     "test": "vitest",
     "pretest:e2e": "npm run build",
     "test:e2e": "node scripts/run-e2e.js",
+    "fixtures:generate": "node tests/fixtures/generate-fixtures.js",
     "serve:test": "node scripts/serve-test.js",
     "static-check": "node scripts/static-check.js",
     "check": "npm test -- --run && npm run build && npm run static-check"

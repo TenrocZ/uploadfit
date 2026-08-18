@@ -1,0 +1,18 @@
+{
+  "stage": "S2-D8",
+  "status": "PASS",
+  "generator": "tests/fixtures/generate-fixtures.js",
+  "privacy": "Canvas-only deterministic synthetic pixels; no user input or network",
+  "samples": [
+    { "mime": "image/jpeg", "bytes": 141471, "width": 390, "height": 567 },
+    { "mime": "image/jpeg", "bytes": 74472, "width": 390, "height": 567 },
+    { "mime": "image/jpeg", "bytes": 9155188, "width": 4000, "height": 3000 },
+    { "mime": "image/png", "bytes": 53077, "width": 1170, "height": 1701 },
+    { "mime": "image/png", "bytes": 11560, "width": 390, "height": 567, "hasAlpha": true },
+    { "mime": "image/jpeg", "bytes": 5501, "width": 50, "height": 100, "orientation": 6 },
+    { "mime": "image/png", "bytes": 7, "decodable": false },
+    { "mime": "image/webp", "bytes": 162128, "width": 390, "height": 567 }
+  ],
+  "largeBoundary": "80MP is constructed from a small PNG header in tests; no huge binary is stored"
+}
+

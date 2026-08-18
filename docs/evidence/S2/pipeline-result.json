@@ -1,0 +1,32 @@
+{
+  "stage": "S2-D4/D5/D6/D8",
+  "status": "PASS",
+  "scenarioCoverage": {
+    "I01": "compliant JPEG passthrough",
+    "I02": "PNG to allowed JPEG",
+    "I03": "large JPEG compresses within safe target",
+    "I04": "max dimensions resize proportionally",
+    "I05": "exact same ratio has no crop",
+    "I06": "exact aspect mismatch requires CROP",
+    "I07": "transparent PNG to JPEG requires FLATTEN_BACKGROUND",
+    "I08": "small image requires UPSCALE",
+    "I09": "upscale prohibited is unfixable",
+    "I10": "minimum/maximum byte interval via injected optimizer tests",
+    "I11": "exact dimensions plus tiny maximum fails honestly",
+    "I12": "EXIF orientation 6 normalized once",
+    "I13": "corrupt image returns DECODE_FAILED",
+    "I14": "MIME/signature/extension mismatch is recorded",
+    "I15": "flattened JPEG has white background pixels",
+    "I16": "Worker success and main-thread fallback",
+    "I17": "50MiB/20k/80MP input guards",
+    "I18": "output is re-decoded and final validated before success"
+  },
+  "performance": {
+    "environment": "Chromium headless, Windows, Node 22.20.0, Playwright 1.62.1",
+    "input": "synthetic local 4000x3000 JPEG, <=10MiB",
+    "assertion": "processing durationMs and wall elapsedMs <=5000",
+    "result": "PASS"
+  },
+  "outputInvariant": "Only a non-empty File with real signature/MIME/extension, decodable dimensions and valid RuleSet result is returned"
+}
+

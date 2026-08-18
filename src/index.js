@@ -20,6 +20,9 @@ import {
   markUntrustedEventBlocked,
   restoreOriginal
 } from './injection/file-injector.js';
+import { inspectImage, validateFile } from './image/metadata.js';
+import { createProcessingPlan, resolveProcessingConfirmation } from './image/planner.js';
+import { processImage } from './image/canvas-pipeline.js';
 
 const BUILD_INFO = Object.freeze({
   version: __UPLOADFIT_VERSION__,
@@ -46,14 +49,19 @@ export {
   findFileInputFromEvent,
   genericAdapter,
   injectFile,
+  inspectImage,
   isImageMime,
   isImageUploader,
   markUntrustedEventBlocked,
   normalizeRuleText,
   parseRulesDeterministically,
+  processImage,
   restoreOriginal,
+  resolveProcessingConfirmation,
   resolveRules,
-  selectAiRelevantText
+  createProcessingPlan,
+  selectAiRelevantText,
+  validateFile
 };
 
 if (typeof document !== 'undefined') bootstrap();

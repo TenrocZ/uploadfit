@@ -7,8 +7,8 @@
 - 工程目录：`C:\Users\蔡天乐\Desktop\黑客松\main`
 - 需求事实来源：`C:\Users\蔡天乐\Desktop\黑客松\UploadFit-PRD-v1.0.md`
 - 执行任务书：`C:\Users\蔡天乐\Desktop\黑客松\UploadFit-开发任务书-v1.0`
-- 当前阶段：S1：DOM 发现与规则引擎
-- 当前状态：S0 已验收并放行；S1-D1～D7 本地实现与全量自动验证已完成，等待 S1 验收。
+- 当前阶段：S2：图像处理引擎
+- 当前状态：S0、S1 已验收并放行；S2-D1～D8 开发中。
 - 记录日期：2026-08-18
 
 ## 2026-08-17：S0 / 平台连接确认
@@ -487,3 +487,58 @@ Q-S1-001～026 均有纯函数或真实浏览器自动覆盖；返工实质提�
 | `npm run check` | PASS：9 个测试文件、75 个单测；生产 IIFE 40961 bytes；静态检查通过 |
 | `npm run test:e2e -- --reporter=line --workers=1` | PASS：19 个浏览器测试；8765 端口已关闭 |
 | 产物 SHA-256 | `956E13F9BF8CA887C04488904DCCE12E56735BA6024CBACF86393D21F80C8B2B` |
+
+## 2026-08-18：S1 用户验收与 S2 启动
+
+状态：S1 已由用户确认验收通过；按任务书启动 S2 图像处理引擎全流程。
+
+验收登记：
+
+- 用户确认：`s1已验收，启动s2板块开发`。
+- S1 交接状态保持 `READY_FOR_ACCEPTANCE`，不将用户验收与本地自动门禁混写；本条记录用户已放行进入下一阶段。
+- S1 本地验收基线：实质实现提交 `4e4d89c`，后续文档留痕提交见 Git 历史；本地工作区在 S2 开工前保持清洁。
+
+S2 范围：
+
+- 仅实现 `File + RuleSet → ProcessResult` 的本地图像处理引擎，不进入 S3 任务编排/拒收观察、S4 UI/Tabbit AI 或业务上传。
+- 覆盖真实元数据、签名与输入防护、纯校验、固定处理计划、确认边界、Canvas/编码、大小优化、最终复检、Worker/主线程降级、非敏感 fixtures 与 S2 交接证据。
+- 保留合规文件原样放行；未获确认的 `CROP`、`FLATTEN_BACKGROUND`、`UPSCALE` 不执行；输出未通过复检不得作为成功结果返回。
+
+下一步：完成 S2-D1～D8、全量验证、证据和本地 Git 留痕后，再停止并汇报。
+
+## 2026-08-18：S2-D1～D8 / 图像处理引擎完成
+
+状态：S2-D1～D8 已完成，自动门禁全绿，交接状态 `READY_FOR_ACCEPTANCE`，等待用户验收。
+
+完成事项：
+
+- D1：新增 `src/image/metadata.js`、`src/image/exif.js`、`src/utils/mime.js`，完成 JPEG/PNG/WebP 签名、真实 MIME/扩展名一致性、宽高/比例、EXIF Orientation、实际透明度、可解码检查，以及 50MiB/20k/80MP 防护。
+- D2：`validateFile()` 对格式、字节、尺寸、比例、透明度和官方工具语义进行稳定分类，区分 `violations`、`safeAutoFixes`、独立确认项和 `unfixable`。
+- D3：`createProcessingPlan()` 固定方向/格式/裁剪/缩放/扁平化/编码/体积优化顺序；`resolveProcessingConfirmation()` 不可变校验确认，未确认的 CROP/FLATTEN_BACKGROUND/UPSCALE 不可执行。
+- D4：新增 Canvas/OffscreenCanvas 绘制、方向归一、等比裁剪/缩放、白底扁平化和 `toBlob`/`convertToBlob` 编码；Canvas 不插入业务 DOM。
+- D5：新增 JPEG/WebP 0.45–0.95 质量搜索、最多 8 步、目标最大体积安全余量和最多 3 轮等比缩小；PNG 不伪用 quality、不加垃圾字节。
+- D6：输出使用本地安全命名，创建新 File 后再次检查真实 MIME/签名/扩展名/字节/宽高/可解码/RuleSet；复检失败不返回成功结果。
+- D7：新增 Blob Worker + OffscreenCanvas 后台路径；Worker 构造、CSP 或运行失败时主线程只重试一次，并 terminate/revoke/close/释放资源。
+- D8：新增非敏感 Canvas fixture 生成器、I01–I18 单测/浏览器测试、S2 evidence 和 handoff；生产入口只增加公共图像 API 导出，没有进入 S3/S4。
+
+最终验证：
+
+| 命令 | 结果 |
+|---|---|
+| `npm ci` | PASS |
+| `npm run check` | PASS：12 个文件、92 个单测；构建 80652 bytes；静态检查通过 |
+| `npm run test:e2e -- --reporter=line --workers=1` | PASS：24 个 Chromium 测试；8765 端口关闭 |
+| `npm run fixtures:generate` | PASS：8 个非敏感样本；生成目录未纳入 Git |
+| 产物 SHA-256 | `FC24CC793CB62E25F83630A16A80932A2837B81ED61E9C7990ECE8C48ED0758E` |
+
+证据与交接：
+
+- `docs/evidence/S2/README.md`
+- `docs/evidence/S2/metadata-result.json`
+- `docs/evidence/S2/planner-result.json`
+- `docs/evidence/S2/pipeline-result.json`
+- `docs/evidence/S2/worker-fallback-result.json`
+- `docs/evidence/S2/fixtures-result.json`
+- `docs/handoffs/S2-handoff.md`
+
+性能与边界：合成 4000×3000、≤10MiB JPEG 在 Chromium 参考环境通过处理总耗时 ≤5 秒断言；最大尺寸输出保持等比。MVP 不引入 PNG 量化；DPI 只展示；Worker/OffscreenCanvas/createImageBitmap/Blob Worker 能力不可用时按证据降级。S2 本地 Git End commit 在最终提交后回填到交接文档。
