@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('reports the S0 capability probe and keeps AI provider unknown', async ({ page }) => {
+test('reports browser capabilities without claiming Tabbit AI outside its script runtime', async ({ page }) => {
   await page.goto('/test-pages/probe.html');
   await page.addScriptTag({ url: '/dist/uploadfit.js' });
 
@@ -23,6 +23,28 @@ test('reports the S0 capability probe and keeps AI provider unknown', async ({ p
       available: false,
       officialApi: null
     }
+  });
+
+  await page.evaluate(() => globalThis.__uploadfit_debug_bundle__.cleanupSession());
+});
+
+test('detects the documented LLMBridge.chat entry in a Tabbit-like script runtime', async ({ page }) => {
+  await page.goto('/test-pages/probe.html');
+  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+
+  const tabbitAi = await page.evaluate(() => {
+    globalThis.LLMBridge = { chat() {} };
+    try {
+      return globalThis.__uploadfit_debug_bundle__.detectCapabilities().tabbitAi;
+    } finally {
+      delete globalThis.LLMBridge;
+    }
+  });
+
+  expect(tabbitAi).toEqual({
+    available: true,
+    officialApi: 'LLMBridge.chat',
+    notes: 'LLMBridge.chat is available in the Tabbit official script runtime.'
   });
 
   await page.evaluate(() => globalThis.__uploadfit_debug_bundle__.cleanupSession());

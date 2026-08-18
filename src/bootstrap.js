@@ -72,9 +72,7 @@ export function bootstrap({
   const attachInput = (input) => {
     if (!isFileInput(input) || session.inputs.has(input)) return false;
     const onChange = (event) => {
-      if (consumeInjectionGuard(input, event)) {
-        logger.emit('INJECTION_GUARD_CONSUMED');
-      }
+      consumeInjectionGuard(input, event);
     };
     input.addEventListener('change', onChange, true);
     session.inputs.add(input);
@@ -125,4 +123,3 @@ export function bootstrap({
 export function cleanupSession(globalRef = globalThis) {
   globalRef[SESSION_KEY]?.cleanup?.();
 }
-

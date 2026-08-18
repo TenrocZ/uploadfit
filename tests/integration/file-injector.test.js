@@ -51,7 +51,7 @@ test('restores the saved original File through the product API', async ({ page }
   await page.goto('/test-pages/probe.html');
   await page.addScriptTag({ url: '/dist/uploadfit.js' });
 
-  const result = await page.evaluate(() => {
+  const result = await page.evaluate(async () => {
     const api = globalThis.__uploadfit_debug_bundle__;
     const probe = globalThis.uploadFitS0Probe;
     const input = document.querySelector('#probe-file');
@@ -83,7 +83,10 @@ test('restores the saved original File through the product API', async ({ page }
       initial,
       processed,
       restored,
-      restoredFile: probe.getCurrentFile(),
+      restoredFile: {
+        ...probe.getCurrentFile(),
+        text: await input.files[0].text()
+      },
       eventTypes: events.map((event) => event.type),
       eventTrusted: events.map((event) => event.isTrusted)
     };
@@ -104,9 +107,11 @@ test('restores the saved original File through the product API', async ({ page }
     fallback: null,
     errorCode: null
   });
-  expect(result.restoredFile).toMatchObject({
+  expect(result.restoredFile).toEqual({
+    name: 'original-a.png',
     type: 'image/png',
-    size: 10
+    size: 10,
+    text: 'original-a'
   });
   expect(result.eventTypes).toEqual([
     'input', 'input', 'input', 'change', 'change', 'change',

@@ -17,7 +17,7 @@
 - 页面：`test-pages/probe.html`
 - 结果：File、Blob、DataTransfer、Canvas/toBlob、createImageBitmap、Worker、OffscreenCanvas 能力摘要为 true。
 - B 文件回填：`input.files` 元信息复核通过。
-- 当前修正版的 A 恢复：先在内存中保存原始 A File，再通过产品 `restoreOriginal(task)` 恢复；`input.files` 元信息复核通过。
+- 当前修正版的 A 恢复：先在内存中保存原始 A File，再通过产品 `restoreOriginal(task)` 恢复；名称、MIME、size 和字节内容复核通过。
 - 事件：`input` 在 `change` 之前；捕获、目标、冒泡各观察一次。
 - 可信边界：合成事件 `isTrusted=false`。
 - 证据：`probe-result.json`、`probe-after-restore.png`
@@ -76,7 +76,7 @@
 
 - 日期：2026-08-18
 - 验证：日志默认关闭；启用诊断时只保留允许的顶层字段，文件名、内容、页面正文和 Token 字段不会进入日志条目。
-- 结果：`npm run check` 中 7 个单测全部通过。
+- 结果：`npm run check` 中 9 个单测全部通过。
 - 代码：`src/utils/logger.js`、`tests/unit/logger.test.js`
 
 ### E-S0-009：Tabbit 当前 bundle 能力与生命周期
@@ -97,8 +97,20 @@
 - 日志现在同时约束顶层字段和嵌套规则字段，调用者不能覆盖 `time`/`event`；测试覆盖敏感文件名、页面正文、Token、规则证据和伪造时间/事件字段。
 - 证据：`failure-paths-result.json`、`tests/integration/failure-paths.test.js`、`tests/unit/logger.test.js`。
 
+### E-S0-011：Tabbit 官方脚本生命周期与 LLMBridge
+
+- 日期：2026-08-18。
+- 来源：用户提供的 `ai调用指南/SKILL.md` 明确 `LLMBridge.chat()`、`"json"` 简写和 `{ response_format: "json" }` 参数形式。
+- 官方脚本：私有探针创建、更新、指定网址匹配、自动运行开关、刷新触发和删除均成功；分享弹层生成私有链接且未分发。
+- 运行时边界：普通页面没有启用匹配脚本时 `LLMBridge` 为 `undefined`；官方脚本在匹配页面运行时为 object，`chat` 为 function。
+- 成功调用：固定无敏感文本使用对象 JSON 模式，1730ms 返回字符串；字符串可解析为 object，键为 formats/minKB/maxKB/width/height。
+- 错误调用：空参数调用拒绝为 `Error`，消息为 `content is required`，没有稳定平台 error code。
+- 超时：指南未声明平台内建超时；UploadFit 必须保留 3000ms `Promise.race` 并映射 `AI_TIMEOUT`。
+- 证据：`tabbit-llmbridge-result.json`、`tabbit-llmbridge-probe.png`。
+- 安全：没有读取用户文件、没有保存完整模型返回、Cookie 或 Token；临时妙招和 8768 服务均已删除/关闭。
+
 ## 待补证据
 
-- Tabbit 官方 AI 调用路径的正式示例或技术支持结论；当前阻塞证据见 `tabbit-platform-result.json`。
+- S0 无待补证据。正式公开安装链接、真实 provider 集成和产品 AI 降级属于 S4/S6。
 
 不在仓库中保存真实照片、完整文件名、Base64、Cookie、Token 或敏感网页文本。

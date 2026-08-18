@@ -4,6 +4,7 @@
  * @returns {Record<string, unknown>}
  */
 export function detectCapabilities(documentRef = globalThis.document) {
+  const tabbitAiAvailable = typeof globalThis.LLMBridge?.chat === 'function';
   const capabilities = {
     file: typeof globalThis.File === 'function',
     blob: typeof globalThis.Blob === 'function',
@@ -15,9 +16,11 @@ export function detectCapabilities(documentRef = globalThis.document) {
     offscreenCanvas: typeof globalThis.OffscreenCanvas === 'function',
     blobWorkerAllowed: false,
     tabbitAi: {
-      available: false,
-      officialApi: null,
-      notes: 'Official Tabbit AI provider path has not been confirmed.'
+      available: tabbitAiAvailable,
+      officialApi: tabbitAiAvailable ? 'LLMBridge.chat' : null,
+      notes: tabbitAiAvailable
+        ? 'LLMBridge.chat is available in the Tabbit official script runtime.'
+        : 'LLMBridge.chat is only exposed while an enabled Tabbit script runs on a matching page.'
     }
   };
 
@@ -70,4 +73,3 @@ export function detectCapabilities(documentRef = globalThis.document) {
 
   return capabilities;
 }
-

@@ -48,18 +48,18 @@
       "全部网页",
       "仅对部分网页生效"
     ],
-    "draftCreated": false,
+    "initialObservationDraftCreated": false,
     "mySkillsUrl": "https://skills.tabbit.com/plaza/skills?view=my-skills",
     "mySkillsAndPlazaObserved": true,
     "existingScriptEntryObserved": true,
-    "officialScriptInstallUpdateShareLifecycle": "UNKNOWN",
-    "limitation": "The authoring UI was inspected without creating or publishing a skill; this proves visible controls, not the complete official lifecycle contract."
+    "officialScriptInstallUpdateShareLifecycle": "PASS",
+    "followUpEvidence": "A private script probe was later created, updated, page-matched, privately shared, disabled, and deleted; see tabbit-llmbridge-result.json."
   },
   "officialAiPanelProbe": {
     "url": "https://web.tabbit.com/panel?mode=mi&hl=zh-CN",
     "observedState": "正在连接 AI Panel 运行时... 重试",
     "publicPageCallableApiConfirmed": false,
-    "limitation": "Direct panel inspection did not expose a documented webpage-callable AI method, parameters, permissions, timeout, or return schema. No guessed global API was added."
+    "limitation": "The AI Panel page itself does not expose the API. The later official script-runtime probe confirmed LLMBridge.chat only while an enabled Tabbit script runs on a matching page."
   },
   "officialPublicMaterialsInspected": [
     {
@@ -75,10 +75,23 @@
       "observation": "Official material emphasizes task results and natural-language interaction; it does not specify a webpage-callable AI interface."
     }
   ],
+  "officialScriptRuntimeProbe": {
+    "source": "User-provided LLMBridge chat guidance plus a private Tabbit script probe",
+    "entryPoint": "LLMBridge.chat",
+    "create": "PASS",
+    "update": "PASS",
+    "pageMatch": "PASS",
+    "automaticRefreshLifecycle": "PASS",
+    "privateSharePopover": "PASS",
+    "probeDeletedAfterEvidence": true,
+    "jsonCall": "PASS",
+    "details": "tabbit-llmbridge-result.json"
+  },
   "conclusion": {
     "tabbitBrowserPageApiAndBundleLifecycle": "PASS",
-    "officialScriptInstallUpdateShareContract": "UNKNOWN",
-    "officialAiProvider": "BLOCKED",
-    "productAction": "Keep tabbitAi unavailable and do not claim AI-rule parsing success until an official example or support decision is available."
+    "officialScriptInstallUpdateShareContract": "PASS",
+    "officialAiProvider": "PASS",
+    "officialAiApi": "LLMBridge.chat",
+    "productAction": "Detect LLMBridge.chat only in the official script runtime, enforce a 3000ms timeout, parse the JSON string, schema-validate it, and fall back locally on any error."
   }
 }

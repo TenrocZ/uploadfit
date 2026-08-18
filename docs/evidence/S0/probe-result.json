@@ -24,7 +24,12 @@
         "ok": true,
         "inputFilesVerified": true,
         "eventsDispatched": ["input", "change"],
-        "metadata": { "mime": "image/png", "size": 17 },
+        "metadata": {
+          "nameMatchesSavedOriginal": true,
+          "mime": "image/png",
+          "size": 17,
+          "bytesMatchSavedOriginal": true
+        },
         "errorCode": null
       },
       "note": "The File object is retained in memory as the originalFile passed to restoreOriginal."
@@ -70,7 +75,9 @@
     "inputFilesWrite": "PASS",
     "originalFileObjectSaved": true,
     "restoreOriginalApi": "PASS",
+    "restoredNameMatchesOriginal": true,
     "restoredMetadataMatchesOriginal": true,
+    "restoredBytesMatchOriginal": true,
     "eventOrder": "PASS: input before change; each observed once in capture, target, bubble phases",
     "trustedBoundary": "KNOWN: synthetic events have isTrusted=false",
     "sensitiveDataUsed": false

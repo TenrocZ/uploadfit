@@ -8,6 +8,28 @@ const SAFE_SCALAR_FIELDS = new Set([
   'errorCode'
 ]);
 
+const SAFE_EVENTS = new Set([
+  'SESSION_STARTED',
+  'CAPABILITY_DETECTED',
+  'UPLOADER_DISCOVERED',
+  'CONTEXT_EXTRACTED',
+  'RULES_PARSED_LOCAL',
+  'RULES_PARSED_AI',
+  'RULE_CONFLICT',
+  'FILE_SELECTED',
+  'FILE_VALID',
+  'FILE_INVALID',
+  'REJECTION_DETECTED',
+  'PROCESS_STARTED',
+  'CONFIRMATION_REQUIRED',
+  'PROCESS_COMPLETED',
+  'INJECTION_COMPLETED',
+  'RETRY_TRIGGERED',
+  'TASK_SUCCEEDED',
+  'TASK_STOPPED',
+  'SESSION_DISPOSED'
+]);
+
 const SAFE_FORMATS = new Set([
   'jpg',
   'jpeg',
@@ -40,7 +62,8 @@ function sanitizeScalar(key, value) {
       : undefined;
   }
   if (key === 'taskId') {
-    return typeof value === 'string' && /^[A-Za-z0-9._:-]{1,128}$/.test(value)
+    return typeof value === 'string'
+      && /^(?:task|session)-(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.test(value)
       ? value
       : undefined;
   }
@@ -129,7 +152,7 @@ export function createLogger({ enabled = false, sink = () => {} } = {}) {
 
   return {
     emit(event, fields = {}) {
-      if (!enabled) return;
+      if (!enabled || !SAFE_EVENTS.has(event)) return false;
       const entry = deepFreeze({
         time: Date.now(),
         event,
@@ -137,6 +160,7 @@ export function createLogger({ enabled = false, sink = () => {} } = {}) {
       });
       entries.push(entry);
       sink(entry);
+      return true;
     },
     getEntries() {
       return entries.slice();

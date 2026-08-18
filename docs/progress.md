@@ -8,7 +8,7 @@
 - 需求事实来源：`C:\Users\蔡天乐\Desktop\黑客松\UploadFit-PRD-v1.0.md`
 - 执行任务书：`C:\Users\蔡天乐\Desktop\黑客松\UploadFit-开发任务书-v1.0`
 - 当前阶段：S0：平台能力探针与工程骨架
-- 当前状态：S0-R1 至 R6 的本地整改、证据和回归已完成；整体 S0 保持 BLOCKED，原因是 Tabbit 官方 AI provider 与官方脚本生命周期契约仍需外部确认。
+- 当前状态：S0-R1 至 R6 已完成第二次整改与实机复验；官方脚本生命周期和 `LLMBridge.chat` 契约已闭合，S0 为 `READY_FOR_ACCEPTANCE`。
 - 记录日期：2026-08-18
 
 ## 2026-08-17：S0 / 平台连接确认
@@ -297,4 +297,36 @@
 | `dist/uploadfit.js` | SHA-256 `44351FECB57784C90C3F8F4AECD7EF14C64FDCCA7C27721668FC3A494BA6B04F` |
 | Tabbit 临时端口 8768/8765 | CLOSED |
 
-停止条件：R1/R2 仍需要 Tabbit 官方脚本生命周期契约及 AI provider 官方示例或技术支持回复；在此之前不把 S0 改成 `READY_FOR_ACCEPTANCE`，也不开始依赖 AI 的后续阶段。
+当时停止条件（现已解除）：R1/R2 需要 Tabbit 官方脚本生命周期契约及 AI provider 官方示例或技术支持回复；本条件已由后续 LLMBridge 指南和私有官方脚本实机证据闭合。
+
+## 2026-08-18：S0 / 第二次整改与 LLMBridge 实机闭环
+
+状态：剩余问题已修复，S0 改为 `READY_FOR_ACCEPTANCE`。
+
+完成事项：
+
+- 完整读取用户提供的 `ai调用指南/SKILL.md` 和压缩包，确认官方入口为 `LLMBridge.chat()`，支持字符串和对象 JSON 模式。
+- 在 Tabbit 1.9.22.0 创建私有脚本探针，验证创建、更新、指定网址、刷新自动执行、关闭自动执行、私有分享弹层和删除。
+- 固定无敏感文本使用 `{ response_format: "json" }`：1730ms 返回字符串，可解析为包含 formats/minKB/maxKB/width/height 的对象；不保存完整模型返回。
+- 空参数调用拒绝为 `Error: content is required`，没有稳定平台 error code；平台指南未声明内建超时，产品保留 3000ms 超时和错误归一化。
+- `detectCapabilities()` 只在 `LLMBridge.chat` 实际存在时报告 AI 可用；普通页面继续报告不可用。
+- logger 增加固定事件枚举和随机 task/session id 格式，阻断把文件名伪装成 event/taskId；补充深冻结测试。
+- 原文件恢复自动测试增加名称和字节内容断言；证据增加等值布尔字段，不保存完整文件名。
+- 临时 Tabbit 妙招已删除，私有分享链接未分发；临时 8768 服务已关闭。
+
+最终回归：
+
+| 项目 | 结果 |
+|---|---|
+| `npm ci` | PASS |
+| `npm run check` | PASS：9 个单测；构建 9308 bytes；静态检查通过 |
+| `npm run test:e2e -- --reporter=line --workers=1` | PASS：8 个浏览器测试 |
+| `dist/uploadfit.js` | SHA-256 `72E55E584CCA6E6B9992C7A42CBD6AB47139EF6F50E88C7D2C8CE63C893132B1` |
+| 临时端口 8765/8768 | CLOSED |
+
+证据：
+
+- `docs/evidence/S0/tabbit-llmbridge-result.json`
+- `docs/evidence/S0/tabbit-llmbridge-probe.png`
+- `docs/evidence/S0/probe-result.json`
+- `docs/handoffs/S0-handoff.md`

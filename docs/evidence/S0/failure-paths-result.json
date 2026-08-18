@@ -59,7 +59,7 @@
   },
   "testSummary": {
     "command": "npm run test:e2e -- --reporter=line --workers=1",
-    "passed": 6,
+    "passed": 8,
     "failed": 0,
     "testServerPort": 8765,
     "testServerClosed": true
