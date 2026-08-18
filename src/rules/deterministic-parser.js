@@ -1,5 +1,6 @@
-import { ASPECT_RATIO_TOLERANCE } from '../config.js';
+import { ASPECT_RATIO_TOLERANCE, CONTEXT_TEXT_LIMIT } from '../config.js';
 import { createRuleCandidate } from './schema.js';
+import { sanitizeEvidenceText } from '../utils/text.js';
 import {
   normalizeAspectRatio,
   normalizeDimension,
@@ -16,6 +17,9 @@ const RATIO_PATTERN = /(?:宽高比|比例)\s*(?:为|是|=|:)?\s*(\d+(?:[.,]\d+)
 const DIMENSION_QUALIFIER = /(?:不低于|至少|最低|>=|≥)/;
 const MAX_DIMENSION_QUALIFIER = /(?:不超过|最多|最高|<=|≤)/;
 const ADVISORY_PATTERN = /建议|推荐|最好|尽量/;
+const FORMAT_ALLOW_CONTEXT = /支持|允许|仅|只|格式|请使用|上传|图片|图像|照片|证件照|头像|封面|扫描件|建议|推荐|最好|尽量/;
+const FORMAT_NEGATIVE_CONTEXT = /(?:不支持|不允许|禁止|不能(?:使用|用)?|拒绝|不接受|不接收|排除)\s*$/;
+const FORMAT_EXAMPLE_CONTEXT = /示例|样例|文件名|文件路径|路径|下载|链接|网址|\burl\b|\b(?:avatar|photo|image|file)[-_\w]*\.(?:jpg|jpeg|png|webp)\b/i;
 const STOP_SEMANTICS = [
   ['SYSTEM_BUSY', /系统繁忙/],
   ['NETWORK_OR_TIMEOUT', /网络|超时/],
@@ -77,7 +81,20 @@ function assignDimension(rule, qualifier, first, second) {
 }
 
 function parseFormats(text, rules) {
-  const tokens = [...text.matchAll(FORMAT_PATTERN)].map((match) => match[0]);
+  const matches = [...text.matchAll(FORMAT_PATTERN)];
+  if (!matches.length || FORMAT_EXAMPLE_CONTEXT.test(text)) return;
+  const tokens = matches
+    .filter((match) => {
+      const prefix = text.slice(Math.max(0, match.index - 16), match.index);
+      return !FORMAT_NEGATIVE_CONTEXT.test(prefix);
+    })
+    .map((match) => match[0]);
+  if (!tokens.length) return;
+  const residual = text
+    .replace(FORMAT_PATTERN, '')
+    .replace(/[\s,，、/或和及&|:：()（）.[\]-]+/g, '')
+    .trim();
+  if (residual && !FORMAT_ALLOW_CONTEXT.test(text)) return;
   const formats = normalizeFormats(tokens);
   rules.formats.push(...formats.formats.filter((value) => !rules.formats.includes(value)));
   rules.extensions.push(...formats.extensions.filter((value) => !rules.extensions.includes(value)));
@@ -150,7 +167,8 @@ function parseDpi(text, rules) {
 }
 
 function parseClause(clause, sourceType, sentenceSafetyFlags) {
-  const text = normalizeRuleText(clause);
+  const evidence = sanitizeEvidenceText(clause);
+  const text = normalizeRuleText(evidence);
   if (!text) return null;
   const rules = emptyRules();
   parseFormats(text, rules);
@@ -165,7 +183,7 @@ function parseClause(clause, sourceType, sentenceSafetyFlags) {
   const advisoryOnly = ADVISORY_PATTERN.test(text);
   return createRuleCandidate({
     sourceType,
-    evidence: [text],
+    evidence: [evidence],
     confidence: advisoryOnly ? 0.75 : 0.90,
     rules,
     advisoryOnly,
@@ -174,11 +192,11 @@ function parseClause(clause, sourceType, sentenceSafetyFlags) {
 }
 
 function parseText(text, sourceType) {
-  const normalized = normalizeRuleText(text);
-  if (!normalized) return [];
+  const safeText = sanitizeEvidenceText(text);
+  if (!safeText) return [];
   const candidates = [];
-  for (const sentence of normalized.split(/[。！？!?]+/).filter(Boolean)) {
-    const safetyFlags = extractSafetyFlags(sentence);
+  for (const sentence of safeText.split(/[。！？!?]+/).filter(Boolean)) {
+    const safetyFlags = extractSafetyFlags(normalizeRuleText(sentence));
     for (const clause of sentence.split(/[，,；;]/).filter(Boolean)) {
       const candidate = parseClause(clause, sourceType, safetyFlags);
       if (candidate) candidates.push(candidate);
@@ -187,14 +205,46 @@ function parseText(text, sourceType) {
   return candidates;
 }
 
+function appendBoundedSource(values, state) {
+  const bounded = [];
+  for (const value of [...new Set(values.map(sanitizeEvidenceText).filter(Boolean))]) {
+    const separatorLength = state.hasText ? 1 : 0;
+    const available = CONTEXT_TEXT_LIMIT - state.used - separatorLength;
+    if (available <= 0) break;
+    const chunk = value.slice(0, available);
+    bounded.push(chunk);
+    state.used += separatorLength + chunk.length;
+    state.hasText = true;
+    if (chunk.length < value.length) break;
+  }
+  return bounded;
+}
+
+function getBoundedSourceTexts(context) {
+  const state = { used: 0, hasText: false };
+  const hasStructuredText = (Array.isArray(context.nearbyTexts) && context.nearbyTexts.length > 0)
+    || (Array.isArray(context.alertTexts) && context.alertTexts.length > 0)
+    || Boolean(context.selectedText);
+  const nearby = hasStructuredText
+    ? appendBoundedSource(context.nearbyTexts ?? [], state)
+    : appendBoundedSource([context.normalizedText ?? ''], state);
+  const alert = appendBoundedSource(context.alertTexts ?? [], state);
+  const selected = appendBoundedSource(
+    context.selectedText ? [context.selectedText] : [],
+    state
+  );
+  return { nearby, alert, selected };
+}
+
 function parseAcceptAttribute(accept) {
   if (typeof accept !== 'string') return null;
   const tokens = accept.split(',').map((token) => token.trim()).filter(Boolean);
   const formats = normalizeFormats(tokens);
   if (!formats.formats.length) return null;
+  const safeAccept = sanitizeEvidenceText(accept);
   return createRuleCandidate({
     sourceType: 'html-attribute',
-    evidence: [`accept: ${normalizeRuleText(accept)}`],
+    evidence: [`accept: ${safeAccept}`],
     confidence: 0.95,
     rules: {
       ...emptyRules(),
@@ -210,11 +260,9 @@ export function parseRulesDeterministically(context = {}) {
   const acceptCandidate = parseAcceptAttribute(context.attributes?.accept);
   if (acceptCandidate) candidates.push(acceptCandidate);
 
-  const nearbyText = Array.isArray(context.nearbyTexts) && context.nearbyTexts.length
-    ? context.nearbyTexts.join(' ')
-    : context.normalizedText;
-  candidates.push(...parseText(nearbyText, 'nearby-text'));
-  candidates.push(...parseText((context.alertTexts ?? []).join(' '), 'rejection'));
-  candidates.push(...parseText(context.selectedText ?? '', 'selected-text'));
+  const bounded = getBoundedSourceTexts(context);
+  candidates.push(...parseText(bounded.nearby.join(' '), 'nearby-text'));
+  candidates.push(...parseText(bounded.alert.join(' '), 'rejection'));
+  candidates.push(...parseText(bounded.selected.join(' '), 'selected-text'));
   return candidates;
 }

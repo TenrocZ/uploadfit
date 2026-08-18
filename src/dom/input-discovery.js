@@ -98,6 +98,11 @@ export function isImageUploader(input) {
     || getAssociatedTexts(input).some((text) => IMAGE_TEXT_PATTERN.test(text));
 }
 
+/** Validate only a caller-provided File.type/MIME string; no file bytes are read. */
+export function isImageMime(mime) {
+  return typeof mime === 'string' && /^image\/[^\s;]+$/i.test(mime.trim());
+}
+
 function createUploaderContext(input) {
   const documentRef = getOwnerDocument(input);
   const associatedTexts = getAssociatedTexts(input);
@@ -149,8 +154,10 @@ function scanTree(root, handlers, local = {}) {
     }
 
     if (element.localName === 'iframe') {
+      handlers.observeFrame?.(element);
       const frameDocument = getFrameDocument(element);
       if (frameDocument) {
+        handlers.frameDocument?.(element, frameDocument);
         scanTree(frameDocument, handlers, { seenNodes, seenDocuments, seenRoots });
       } else {
         handlers.protectedFrame(element);
@@ -235,8 +242,11 @@ export function createUploaderDiscovery({
   let contexts = new Map();
   let protectedFrames = [];
   let protectedFrameSet = new WeakSet();
-  let observedRoots = new WeakSet();
+  let observedRoots = new WeakMap();
   const mutationObservers = new Set();
+  const frameListeners = new Map();
+  const frameDocuments = new Map();
+  const eventListeners = [];
   let spaObserver = null;
 
   const rootDocument = getRootDocument(root);
@@ -250,8 +260,20 @@ export function createUploaderDiscovery({
     onProtectedFrame(detail);
   };
 
-  const registerInput = (input) => {
-    if (!active || !isImageUploader(input) || registeredInputs.has(input)) return null;
+  const isInputInRoot = (input) => {
+    if (!input?.isConnected) return false;
+    const isRootDocument = input.ownerDocument === rootDocument;
+    const isKnownFrameDocument = [...frameDocuments.values()].some(
+      (documentRef) => documentRef === input.ownerDocument
+    );
+    if (!isRootDocument && !isKnownFrameDocument) return false;
+    if (isDocument(root)) return true;
+    return Boolean(root?.contains?.(input) || input.getRootNode?.() === root);
+  };
+
+  const registerInput = (input, mime = null) => {
+    if (!active || !isFileInput(input) || registeredInputs.has(input)) return null;
+    if (!isInputInRoot(input) || (!isImageUploader(input) && !isImageMime(mime))) return null;
     registeredInputs.add(input);
     const context = createUploaderContext(input);
     contexts.set(input, context);
@@ -272,12 +294,53 @@ export function createUploaderDiscovery({
       }
     });
     observer.observe(mutationRoot, { childList: true, subtree: true });
-    observedRoots.add(mutationRoot);
+    observedRoots.set(mutationRoot, observer);
     mutationObservers.add(observer);
+  };
+
+  const disconnectRoot = (mutationRoot) => {
+    const observer = observedRoots.get(mutationRoot);
+    if (!observer) return;
+    observer.disconnect();
+    mutationObservers.delete(observer);
+    observedRoots.delete(mutationRoot);
+  };
+
+  const removeContextsFromDocument = (documentRef) => {
+    for (const [input] of contexts) {
+      if (input.ownerDocument === documentRef) contexts.delete(input);
+    }
+  };
+
+  const recordFrameDocument = (frame, documentRef) => {
+    const previous = frameDocuments.get(frame);
+    if (previous && previous !== documentRef) {
+      disconnectRoot(previous);
+      removeContextsFromDocument(previous);
+    }
+    frameDocuments.set(frame, documentRef);
+  };
+
+  const observeFrame = (frame) => {
+    if (!active || frameListeners.has(frame)) return;
+    const onLoad = () => {
+      if (!active) return;
+      const frameDocument = getFrameDocument(frame);
+      if (!frameDocument) {
+        reportProtectedFrame(frame);
+        return;
+      }
+      recordFrameDocument(frame, frameDocument);
+      scanTree(frameDocument, handlers);
+    };
+    frame.addEventListener?.('load', onLoad);
+    frameListeners.set(frame, onLoad);
   };
 
   const handlers = {
     observeRoot,
+    observeFrame,
+    frameDocument: recordFrameDocument,
     protectedFrame: reportProtectedFrame,
     visitElement: registerInput
   };
@@ -297,17 +360,31 @@ export function createUploaderDiscovery({
   };
 
   const cleanup = () => {
-    if (!active && mutationObservers.size === 0 && !spaObserver) return;
+    if (!active && mutationObservers.size === 0 && !spaObserver
+      && frameListeners.size === 0 && eventListeners.length === 0) return;
     active = false;
     for (const observer of mutationObservers) observer.disconnect();
     mutationObservers.clear();
+    for (const [frame, listener] of frameListeners) frame.removeEventListener?.('load', listener);
+    frameListeners.clear();
+    for (const { target, type, listener } of eventListeners) {
+      target.removeEventListener?.(type, listener, true);
+    }
+    eventListeners.length = 0;
     spaObserver?.cleanup();
     spaObserver = null;
     contexts.clear();
     protectedFrames = [];
     registeredInputs = new WeakSet();
     protectedFrameSet = new WeakSet();
-    observedRoots = new WeakSet();
+    observedRoots = new WeakMap();
+    frameDocuments.clear();
+  };
+
+  const onComposedEvent = (event) => {
+    if (!active) return;
+    const input = findFileInputFromEvent(event);
+    if (input && isImageUploader(input)) registerInput(input);
   };
 
   return {
@@ -319,6 +396,14 @@ export function createUploaderDiscovery({
       if (active) return [...contexts.values()];
       active = true;
       observeRoot(root);
+      for (const type of ['input', 'change']) {
+        rootDocument?.addEventListener?.(type, onComposedEvent, true);
+        if (rootDocument?.addEventListener) eventListeners.push({
+          target: rootDocument,
+          type,
+          listener: onComposedEvent
+        });
+      }
       spaObserver = createSpaObserver({
         windowRef: rootView,
         debounceMs,
@@ -329,9 +414,14 @@ export function createUploaderDiscovery({
 
     scan,
 
-    discoverFromEvent(event) {
+    discoverFromEvent(event, mime = null) {
       const input = findFileInputFromEvent(event);
-      return input ? contexts.get(input) ?? registerInput(input) : null;
+      return input ? contexts.get(input) ?? registerInput(input, mime) : null;
+    },
+
+    upgradeFromMime(input, mime) {
+      if (!isImageMime(mime) || !isInputInRoot(input)) return null;
+      return contexts.get(input) ?? registerInput(input, mime);
     },
 
     getUploaders() {

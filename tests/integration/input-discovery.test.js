@@ -207,3 +207,146 @@ test('uses composedPath for an open-shadow event and reports cross-origin frame 
   expect(result.discoveredFromEvent).toBe(true);
   expect(result.protectedFrameCount).toBeGreaterThanOrEqual(1);
 });
+
+test('upgrades a bare file input only through a verified image MIME', async ({ page }) => {
+  await page.goto('/test-pages/probe.html');
+  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+
+  const result = await page.evaluate(async () => {
+    const api = globalThis.__uploadfit_debug_bundle__;
+    document.querySelector('#probe-file')?.remove();
+    const callbacks = [];
+    const discovery = api.createUploaderDiscovery({
+      onDiscover: (context) => callbacks.push(context)
+    });
+    discovery.start();
+    const bare = document.createElement('input');
+    bare.type = 'file';
+    document.body.append(bare);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const initialCount = discovery.getUploaders().length;
+    const pdf = discovery.upgradeFromMime(bare, 'application/pdf');
+    const upgraded = discovery.upgradeFromMime(bare, 'image/png');
+    const repeated = discovery.upgradeFromMime(bare, 'image/jpeg');
+    const detached = document.createElement('input');
+    detached.type = 'file';
+    const detachedUpgrade = discovery.upgradeFromMime(detached, 'image/png');
+    const beforeCleanup = {
+      initialCount,
+      pdf: pdf === null,
+      upgraded: upgraded?.input === bare,
+      repeated: repeated?.input === bare,
+      callbackCount: callbacks.filter((context) => context.input === bare).length
+    };
+    discovery.cleanup();
+    return {
+      beforeCleanup,
+      detached: detachedUpgrade === null,
+      afterCleanup: discovery.upgradeFromMime(bare, 'image/webp') === null
+    };
+  });
+
+  expect(result).toEqual({
+    beforeCleanup: {
+      initialCount: 0,
+      pdf: true,
+      upgraded: true,
+      repeated: true,
+      callbackCount: 1
+    },
+    detached: true,
+    afterCleanup: true
+  });
+});
+
+test('discovers a late-created open shadow input on its first composed event', async ({ page }) => {
+  await page.goto('/test-pages/probe.html');
+  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+
+  const result = await page.evaluate(async () => {
+    const api = globalThis.__uploadfit_debug_bundle__;
+    document.querySelector('#probe-file')?.remove();
+    const callbacks = [];
+    const discovery = api.createUploaderDiscovery({
+      onDiscover: (context) => callbacks.push(context)
+    });
+    discovery.start();
+    const host = document.createElement('section');
+    document.body.append(host);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const shadow = host.attachShadow({ mode: 'open' });
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/jpeg';
+    shadow.append(input);
+    input.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    discovery.cleanup();
+    input.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+    return {
+      discovered: discovery.getUploaders().length,
+      callbackCount: callbacks.filter((context) => context.input === input).length
+    };
+  });
+
+  expect(result).toEqual({ discovered: 0, callbackCount: 1 });
+});
+
+test('discovers an already-loaded same-origin srcdoc iframe', async ({ page }) => {
+  await page.goto('/test-pages/probe.html');
+  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+
+  const result = await page.evaluate(async () => {
+    const api = globalThis.__uploadfit_debug_bundle__;
+    document.querySelector('#probe-file')?.remove();
+    const frame = document.createElement('iframe');
+    frame.srcdoc = '<label>iframe image</label><input type="file" accept="image/png">';
+    document.body.append(frame);
+    await new Promise((resolve) => frame.addEventListener('load', resolve, { once: true }));
+    const discovery = api.createUploaderDiscovery();
+    const initial = discovery.start();
+    discovery.cleanup();
+    return initial.some((context) => context.input.ownerDocument === frame.contentDocument);
+  });
+
+  expect(result).toBe(true);
+});
+
+test('tracks dynamic same-origin iframe loads without stale observers or duplicate callbacks', async ({ page }) => {
+  await page.goto('/test-pages/probe.html');
+  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+
+  const result = await page.evaluate(async () => {
+    const api = globalThis.__uploadfit_debug_bundle__;
+    document.querySelector('#probe-file')?.remove();
+    const callbacks = [];
+    const discovery = api.createUploaderDiscovery({
+      onDiscover: (context) => callbacks.push(context)
+    });
+    discovery.start();
+    const frame = document.createElement('iframe');
+    const load = (html) => new Promise((resolve) => {
+      frame.addEventListener('load', resolve, { once: true });
+      frame.srcdoc = html;
+    });
+    document.body.append(frame);
+    await load('<input id="first" type="file" accept="image/png">');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await load('<input id="second" type="file" accept="image/jpeg">');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const beforeCleanup = {
+      callbacks: callbacks.length,
+      currentDocuments: new Set(discovery.getUploaders().map((context) => context.input.ownerDocument)).size,
+      currentId: discovery.getUploaders()[0]?.input.id ?? null
+    };
+    discovery.cleanup();
+    frame.srcdoc = '<input id="third" type="file" accept="image/webp">';
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    return { beforeCleanup, afterCleanupCallbacks: callbacks.length };
+  });
+
+  expect(result).toEqual({
+    beforeCleanup: { callbacks: 2, currentDocuments: 1, currentId: 'second' },
+    afterCleanupCallbacks: 2
+  });
+});

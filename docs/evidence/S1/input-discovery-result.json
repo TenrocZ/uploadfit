@@ -1,6 +1,6 @@
 {
   "date": "2026-08-18",
-  "step": "S1-D1 (final regression)",
+  "step": "S1-D1 (rework regression)",
   "environment": "Playwright Chromium with the production IIFE bundle",
   "sensitiveDataUsed": false,
   "implementation": [
@@ -14,9 +14,15 @@
     "repeatScanDoesNotDuplicate": true,
     "dynamicAddedSubtree": true,
     "dynamicAddedOpenShadowSubtree": true,
+    "lateOpenShadowRootComposedEvent": true,
+    "bareInputImageMimeUpgrade": true,
+    "nonImageMimeRejected": true,
     "spaPopstateHashchangeDebounced": true,
     "composedPathInputLookup": true,
     "sameOriginIframePathImplemented": true,
+    "sameOriginIframeInitialLoad": true,
+    "sameOriginIframeDynamicLoad": true,
+    "sameOriginIframeNavigationReplacesObserver": true,
     "protectedFrameExceptionReported": true,
     "cleanupDisconnectsObservers": true,
     "cleanupStopsCallbacks": true
@@ -29,16 +35,16 @@
     "fileReadOrProcessed": false
   },
   "testSummary": {
-    "unitTestFiles": 8,
-    "unitTests": 60,
-    "browserTests": 14,
+    "unitTestFiles": 9,
+    "unitTests": 71,
+    "browserTests": 19,
     "command": "npm run test:e2e -- --reporter=line --workers=1",
     "testServerPort": 8765,
     "testServerClosed": true
   },
   "build": {
-    "bytes": 31929,
-    "sha256": "7E3E73B9C0E64FA9FA5B7CDF33C1A99AF173E330882DE611F9152BAB726D7161",
+    "bytes": 40270,
+    "sha256": "8AC0AEF3342E0512360A8E88E666F0418AC9641FA96902DA4A2884D0E168F4F4",
     "staticCheck": "PASS"
   },
   "limitations": [

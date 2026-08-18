@@ -1,6 +1,7 @@
 import { ASPECT_RATIO_TOLERANCE } from '../config.js';
 import { createEmptyRuleSet } from './schema.js';
 import { validateRuleCandidate, validateRuleSet } from './validators.js';
+import { sanitizeText } from '../utils/text.js';
 
 function stableCandidateKey(candidate) {
   return [
@@ -24,7 +25,28 @@ function sortCandidates(candidates) {
 function collectInvalidCandidates(candidates) {
   return candidates
     .map((candidate) => ({ candidate, validation: validateRuleCandidate(candidate) }))
-    .filter(({ validation }) => !validation.valid);
+    .filter(({ validation }) => !validation.valid)
+    .sort((left, right) => {
+      const leftKey = [
+        left.candidate?.sourceType ?? '',
+        JSON.stringify(left.validation.errors),
+        JSON.stringify(safeEvidence(left.candidate?.evidence)),
+        JSON.stringify(left.candidate?.rules ?? {})
+      ].join('|');
+      const rightKey = [
+        right.candidate?.sourceType ?? '',
+        JSON.stringify(right.validation.errors),
+        JSON.stringify(safeEvidence(right.candidate?.evidence)),
+        JSON.stringify(right.candidate?.rules ?? {})
+      ].join('|');
+      return leftKey.localeCompare(rightKey);
+    });
+}
+
+function safeEvidence(evidence) {
+  return Array.isArray(evidence)
+    ? evidence.map(sanitizeText).filter(Boolean).slice(0, 32)
+    : [];
 }
 
 function valueKey(value) {
@@ -218,7 +240,7 @@ export function resolveRules(candidates = []) {
       values: validation.errors,
       reason: 'VALIDATION_FAILED',
       sourceType: candidate?.sourceType ?? null,
-      evidence: Array.isArray(candidate?.evidence) ? candidate.evidence.slice() : [],
+      evidence: safeEvidence(candidate?.evidence),
       unresolvable: true
     });
   }

@@ -37,7 +37,7 @@ test('extracts bounded uploader context and excludes sensitive or unrelated DOM 
     required: true
   });
   expect(result.context.label).toBe('证件照上传');
-  expect(result.context.alertTexts).toEqual(['文件格式不合法,请重新选择。']);
+  expect(result.context.alertTexts).toEqual(['文件格式不合法，请重新选择。']);
   expect(result.context.normalizedText.length).toBeLessThanOrEqual(6000);
   expect(result.context.normalizedText).toContain('100KB');
   expect(result.context.normalizedText).toContain('[REDACTED]');
@@ -80,4 +80,50 @@ test('keeps contexts isolated and applies the 6000-character budget', async ({ p
   expect(result.contextB.normalizedText).toContain('500KB');
   expect(result.contextA.normalizedText).not.toContain('500KB');
   expect(result.aiA.length).toBeLessThanOrEqual(2000);
+  expect(result.aiA).not.toContain('B-only text');
+});
+
+test('isolates two uploaders in one form while retaining explicitly shared text', async ({ page }) => {
+  await page.goto('/test-pages/probe.html');
+  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+
+  const result = await page.evaluate(() => {
+    const api = globalThis.__uploadfit_debug_bundle__;
+    const form = document.createElement('form');
+    form.innerHTML = [
+      '<div data-uploader="a">',
+      '<label for="upload-a">头像 A</label>',
+      '<input id="upload-a" type="file" accept="image/jpeg">',
+      '<p>图片最大100KB</p>',
+      '<div class="error">A 文件规则错误</div>',
+      '</div>',
+      '<div data-uploader="b">',
+      '<label for="upload-b">头像 B</label>',
+      '<input id="upload-b" type="file" accept="image/jpeg">',
+      '<p>图片最大500KB</p>',
+      '<div class="error">B 文件规则错误</div>',
+      '</div>',
+      '<p>共享说明：支持 JPG 格式</p>'
+    ].join('');
+    document.body.append(form);
+    const inputA = form.querySelector('#upload-a');
+    const inputB = form.querySelector('#upload-b');
+    return {
+      a: api.extractRelevantContext(inputA),
+      b: api.extractRelevantContext(inputB),
+      genericAErrors: api.genericAdapter.findErrorNodes(inputA).map((node) => node.textContent.trim()),
+      genericBErrors: api.genericAdapter.findErrorNodes(inputB).map((node) => node.textContent.trim())
+    };
+  });
+
+  expect(result.a.normalizedText).toContain('100KB');
+  expect(result.a.normalizedText).not.toContain('500KB');
+  expect(result.b.normalizedText).toContain('500KB');
+  expect(result.b.normalizedText).not.toContain('100KB');
+  expect(result.a.alertTexts).toEqual(['A 文件规则错误']);
+  expect(result.b.alertTexts).toEqual(['B 文件规则错误']);
+  expect(result.genericAErrors).toEqual(['A 文件规则错误']);
+  expect(result.genericBErrors).toEqual(['B 文件规则错误']);
+  expect(result.a.normalizedText).toContain('共享说明');
+  expect(result.b.normalizedText).toContain('共享说明');
 });

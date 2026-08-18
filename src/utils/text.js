@@ -21,6 +21,17 @@ export function sanitizeText(value) {
     .trim();
 }
 
+/** Keep safe display characters in their original form for auditable evidence. */
+export function sanitizeEvidenceText(value) {
+  if (typeof value !== 'string') return '';
+  return value
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, ' ')
+    .replace(URL_PATTERN, '')
+    .replace(SENSITIVE_VALUE_PATTERN, '[REDACTED]')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export function uniqueTexts(values) {
   return [...new Set(values.map(sanitizeText).filter(Boolean))];
 }

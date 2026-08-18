@@ -6,14 +6,14 @@
 - Status：`READY_FOR_ACCEPTANCE`
 - 核心门禁：`PASS`
 - Start commit：`3d132ad`（S1 启动登记）
-- End commit（实质实现范围）：`b9ab7ef`
+- End commit（返工实质实现范围）：待 Git 提交后回填
 - Agent：`Codex / UploadFit S1 Agent`
 - Environment：Windows；Node `v22.20.0`；npm `10.9.3`；Playwright Chromium；Tabbit Browser `1.9.22.0`（S1 未依赖 AI）
-- Build artifact：`dist/uploadfit.js`，31929 bytes，SHA-256 `7E3E73B9C0E64FA9FA5B7CDF33C1A99AF173E330882DE611F9152BAB726D7161`
+- Build artifact：`dist/uploadfit.js`，40270 bytes，SHA-256 `8AC0AEF3342E0512360A8E88E666F0418AC9641FA96902DA4A2884D0E168F4F4`
 
 ## 1. 阶段结论
 
-S1 已完成上传器发现、上下文提取、确定性规则解析、归一化、来源合并和安全分类。结果符合共享契约的 `UploaderContext`、`ContextBundle`、`RuleCandidate`、`RuleSet` 形态，并通过 R01–R30、DOM 边界和既有回归测试。
+S1 已完成独立验收质检提出的 R1–R8 返工：上传器发现、上下文提取、确定性规则解析、归一化、来源合并和安全分类均已复验。结果符合共享契约的 `UploaderContext`、`ContextBundle`、`RuleCandidate`、`RuleSet` 形态，并通过 R01–R30、Q-S1-001～026、DOM 边界和既有回归测试。
 
 本阶段只读 DOM 和文本。没有读取图片像素、处理 File、回填 input、触发上传、调用 AI、创建 UI/controller 或实现 S3 的 `src/dom/rejection-observer.js`。
 
@@ -21,13 +21,13 @@ S1 已完成上传器发现、上下文提取、确定性规则解析、归一�
 
 | 交付物 | 状态 | 实现/证据 |
 |---|---|---|
-| S1-D1 上传器发现 | PASS | `src/dom/input-discovery.js`、`src/dom/spa-observer.js`；普通/动态/open Shadow DOM、同源 iframe、composedPath、去重、cleanup 和受保护 iframe 边界 |
-| S1-D2 上下文提取 | PASS | `src/dom/context-extractor.js`、`src/utils/text.js`；允许来源、敏感过滤、6000/2000 字符预算、uploader 隔离 |
-| S1-D3 确定性解析 | PASS | `src/rules/deterministic-parser.js`；大小、格式、尺寸、比例、数量和语义 |
-| S1-D4 规则归一化 | PASS | `src/rules/normalizer.js`；NFKC、全角单位/标点、MIME/扩展名、比例/单位 |
-| S1-D5 来源合并 | PASS | `src/rules/resolver.js`；固定优先级、来源证据、冲突可回溯、最低 confidence |
-| S1-D6 安全分类 | PASS | advisory 不强制；网络/系统繁忙/官方工具等产生 safety conflict；不可解冲突 `actionable=false` |
-| S1-D7 测试 | PASS | 30 条规则、DOM/安全边界、全量单测/E2E/build/static-check |
+| S1-D1 上传器发现 | PASS | `src/dom/input-discovery.js`、`src/dom/spa-observer.js`；普通/动态/open Shadow DOM、composedPath、MIME 升级、真实同源 iframe load/navigate、去重、cleanup 和受保护 iframe 边界 |
+| S1-D2 上下文提取 | PASS | `src/dom/context-extractor.js`、`src/utils/text.js`；局部 uploader/error 隔离、共享说明、敏感过滤、单一 6000/2000 字符预算 |
+| S1-D3 确定性解析 | PASS | `src/rules/deterministic-parser.js`；大小、格式、尺寸/`*` 分隔符、比例、数量、语义和否定格式 |
+| S1-D4 规则归一化 | PASS | `src/rules/normalizer.js`；NFKC、全角单位/标点、MIME/扩展名、比例/单位；evidence 保留安全原文 |
+| S1-D5 来源合并 | PASS | `src/rules/resolver.js`；固定优先级、来源证据、非法候选留痕、冲突可回溯、最低 confidence |
+| S1-D6 安全分类 | PASS | advisory 不强制；网络/系统繁忙/官方工具等产生 safety conflict；非法/不可解冲突 `actionable=false` |
+| S1-D7 测试 | PASS | R01–R30、Q-S1-001～026、DOM/安全边界、全量单测/E2E/build/static-check |
 
 ## 3. 关键行为
 
@@ -35,29 +35,43 @@ S1 已完成上传器发现、上下文提取、确定性规则解析、归一�
 
 - 只将 `input[type=file]` 且具备 image accept 或图片关联文本的控件标为图片上传器；`multiple` 保留在上下文中。
 - 初始扫描一次；MutationObserver 只扫描新增节点/子树；WeakSet 防止同一 input 重复回调。
-- open Shadow DOM 递归扫描；动态新增的 host 子树同样递归；closed Shadow DOM 不尝试突破。
-- 同源 iframe 可递归扫描；跨域/不可访问 iframe 捕获异常并报告 `CROSS_ORIGIN_OR_UNAVAILABLE`。
-- SPA 只监听 `popstate`/`hashchange` 并去抖，不 monkey-patch history；cleanup 会断开观察器和监听。
+- open Shadow DOM 递归扫描；动态新增 host 子树通过 composed event 补发现；closed Shadow DOM 不尝试突破。
+- 同源 iframe 初始、动态插入、srcdoc load 和导航替换均重新注册观察；跨域/不可访问 iframe 捕获异常并报告 `CROSS_ORIGIN_OR_UNAVAILABLE`。
+- 裸 file input 不在初始扫描中发现；S3 通过 `upgradeFromMime(input, mime)` 传入真实/已验证的 `image/*` MIME 后才升级，同一 input 只回调一次。
+- SPA 只监听 `popstate`/`hashchange` 并去抖，不 monkey-patch history；cleanup 会移除 iframe load、composed event、观察器和路由监听。
 
 ### 上下文与规则
 
-- 上下文按允许来源稳定收集，排除隐藏、导航/页脚、脚本/样式、其他表单值和敏感值；总文本 ≤6000 字符。
-- `selectAiRelevantText()` 仅提供 ≤2000 字符的规则相关文本，S1 不调用 AI。
-- R01–R30 全部通过；JPG/JPEG 归一化为 `image/jpeg` 与 `jpg/jpeg`，全角输入通过 NFKC 归一化。
-- 建议/推荐保持 `advisoryOnly`；文件名语义仅展示；模糊文案不产生执行规则。
-- 来源优先级为 `700/600/500/400/300/200/100`；高优先级覆盖低优先级但记录 conflict；同优先级 exact/min/max 不选择“最后一个”。
-- exact 与兼容范围合并时 exact 保留；违反范围、范围反转、比例与精确尺寸矛盾、网络/系统繁忙/官方工具停止语义均不可执行。
+- 上下文按允许来源稳定收集，排除隐藏、导航/页脚、脚本/样式、其他表单值和敏感值；同一 form 下按局部 uploader scope 隔离祖先和错误节点，明确共享说明可稳定复用；总文本 ≤6000 字符。
+- source arrays、`normalizedText` 和确定性 parser 使用同一稳定 6000 字符预算；`selectAiRelevantText()` 仅从预算后的文本提供 ≤2000 字符规则相关文本，S1 不调用 AI。
+- R01–R30 全部通过；JPG/JPEG 归一化为 `image/jpeg` 与 `jpg/jpeg`，全角输入通过 NFKC 归一化，ASCII `*` 尺寸分隔符与 `×`/`x` 等价。
+- 建议/推荐保持 `advisoryOnly`；文件名语义仅展示；示例文件名、路径和 URL 扩展名不生成格式规则；不支持/禁止格式不进入允许集合；模糊文案不产生执行规则。
+- `validateRuleCandidate()` 与 `validateRuleSet()` 校验格式、扩展名、数量、DPI、比例、背景、语义、evidence、safety flags 和未知字段；非法候选以脱敏证据形成稳定不可解冲突。
+- evidence 保留经过 URL/敏感值脱敏后的原始显示文本；归一化副本只用于匹配，不写回证据。
 
-## 4. 自动验证
+## 4. 返工用例映射
+
+| 整改项 | 自动覆盖 |
+|---|---|
+| R1 上下文/错误节点隔离 | Q-S1-001～003：同 form 两 uploader、局部错误、共享说明 |
+| R2 单一文本预算 | Q-S1-004～006：nearby/alert/selected 6000 预算、稳定裁剪、AI 2000 摘要 |
+| R3 运行时校验 | Q-S1-007～010：非法数值、格式/扩展名、DPI/比例/语义/evidence/safety、顺序无关 |
+| R4 裸 input MIME 升级 | Q-S1-011～013：image MIME 单次升级、PDF/空 MIME、detached/cleanup |
+| R5 格式语义 | Q-S1-014～017：文件名/路径/URL、否定格式及 R04/R05/R21/R25/R26/R27 |
+| R6 生命周期 | Q-S1-018～022：真实 iframe 初始/动态/导航、延迟 Shadow event、cleanup |
+| R7 evidence/尺寸 | Q-S1-023～026：`*`/`×`/`x`、比例 `/`、全角原文、Token/URL 脱敏 |
+| R8 文档与证据 | 交接、progress、S1 evidence 和本验收复验记录均按返工后真实结果更新 |
+
+## 5. 自动验证
 
 | 命令 | 结果 |
 |---|---|
 | `npm ci` | PASS |
-| `npm test -- --run` | PASS：8 个测试文件、60 个单测 |
-| `npm run build` | PASS：31929 bytes；单文件生产 IIFE |
+| `npm test -- --run` | PASS：9 个测试文件、71 个单测 |
+| `npm run build` | PASS：40270 bytes；单文件生产 IIFE |
 | `npm run static-check` | PASS |
 | `npm run check` | PASS |
-| `npm run test:e2e -- --reporter=line --workers=1` | PASS：14 个浏览器测试；测试服务退出后 8765 端口关闭 |
+| `npm run test:e2e -- --reporter=line --workers=1` | PASS：19 个浏览器测试；测试服务退出后 8765 端口关闭 |
 
 代表性结果：
 
@@ -70,12 +84,14 @@ JPG｜30–120KB｜390×567｜confidence=0.90｜actionable=true
 - `docs/evidence/S1/input-discovery-result.json`
 - `docs/evidence/S1/context-and-rules-result.json`
 - `docs/evidence/S1/README.md`
+- `docs/handoffs/S1-acceptance-review.md`
 
-## 5. 安全与范围边界
+## 6. 安全与范围边界
 
 - `src` 未引入 AI、网络请求、图片像素读取、File 处理、UI/controller 或业务上传调用。
 - `src/dom/rejection-observer.js` 未创建；拒收观察和任务编排留给 S3。
 - closed Shadow DOM、跨域 iframe、密码/验证码和其他表单控件值不绕过、不读取。
+- host 插入后再创建的 open shadow root 不做原型 patch 或轮询，只在首次相关 composed event 到达时补发现；在事件发生前不声称已发现。
 - 本交接不保存真实照片、完整文件名、Base64、Cookie、Token 或完整页面文本。
 
-`b9ab7ef` 是本阶段代码、测试、证据和交接文档的实质实现提交；本行回填属于后续文档元数据提交。Git 只做本地版本留痕，未推送远程。
+新的实质 End commit 将在本轮返工提交后回填。Git 只做本地版本留痕，未推送远程。

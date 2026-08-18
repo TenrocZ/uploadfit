@@ -71,3 +71,69 @@ it('preserves a stop semantic even when it has no executable number', () => {
     reason: 'STOP_SEMANTIC'
   }));
 });
+
+it('does not infer a format from examples, filenames, paths, or URLs', () => {
+  for (const text of [
+    '示例文件名 avatar.jpg',
+    '下载 /assets/avatar.jpg',
+    'https://example.test/avatar.png'
+  ]) {
+    const result = resolve(text);
+    expect(result.formats).toEqual([]);
+    expect(result.actionable).toBe(false);
+  }
+});
+
+it('keeps only explicitly allowed formats when a format is denied', () => {
+  expect(resolve('不支持PNG，只支持JPG').formats).toEqual(['image/jpeg']);
+  expect(resolve('不支持PNG但允许JPG').formats).toEqual(['image/jpeg']);
+  expect(resolve('禁止WebP').formats).toEqual([]);
+  expect(resolve('禁止WebP').actionable).toBe(false);
+});
+
+it('supports star dimensions without confusing slash ratios', () => {
+  const star = resolve('390*567像素');
+  const multiplication = resolve('390×567像素');
+  expect(star.width).toEqual(multiplication.width);
+  expect(star.height).toEqual(multiplication.height);
+  expect(resolve('宽高比3/4').aspectRatio.value).toBeCloseTo(0.75);
+  expect(resolve('390/567像素').width).toEqual({ exact: null, min: null, max: null });
+});
+
+it('keeps safe original evidence while matching normalized text', () => {
+  const [candidate] = parseRulesDeterministically({ normalizedText: '390×567像素' });
+  expect(candidate.evidence).toEqual(['390×567像素']);
+  expect(candidate.rules.width.exact).toBe(390);
+  expect(candidate.rules.height.exact).toBe(567);
+});
+
+it('retains full-width source evidence while normalizing its numeric rule', () => {
+  const [candidate] = parseRulesDeterministically({ normalizedText: '不超过100ＫＢ（全角）' });
+  expect(candidate.evidence).toEqual(['不超过100ＫＢ（全角）']);
+  expect(candidate.rules.maxBytes).toBe(100000);
+});
+
+it('sanitizes evidence before parsing and before retaining a candidate', () => {
+  const candidates = parseRulesDeterministically({
+    normalizedText: '支持JPG，token:secret，https://example.test/?key=secret'
+  });
+  expect(candidates.map((candidate) => candidate.evidence.join(' ')).join(' ')).not.toContain('secret');
+});
+
+it('applies one deterministic 6000-character parse budget across all text sources', () => {
+  const context = {
+    nearbyTexts: [`必须小于100KB。${'N'.repeat(20000)}`],
+    alertTexts: [`必须小于200KB。${'A'.repeat(20000)}`],
+    selectedText: `必须小于300KB。${'S'.repeat(20000)}`
+  };
+  const first = parseRulesDeterministically(context);
+  const second = parseRulesDeterministically(context);
+  const evidenceLength = first.reduce(
+    (total, candidate) => total + candidate.evidence.join('').length,
+    0
+  );
+  expect(evidenceLength).toBeLessThanOrEqual(6000);
+  expect(second).toEqual(first);
+  expect(first[0].sourceType).toBe('nearby-text');
+  expect(first.some((candidate) => candidate.sourceType === 'rejection')).toBe(false);
+});

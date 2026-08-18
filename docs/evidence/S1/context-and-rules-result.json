@@ -32,6 +32,8 @@
       "other form controls and values excluded",
       "URL and sensitive key-value text sanitized",
       "two uploader contexts remain isolated",
+      "error nodes are associated by local uploader scope",
+      "source arrays share the same 6000-character budget",
       "stable truncation is deterministic"
     ]
   },
@@ -70,7 +72,9 @@
       "full-width digits, punctuation and KB/MB units",
       "dash and multiplication variants",
       "JPG/JPEG -> image/jpeg + jpg/jpeg",
-      "no File or filename-value inference"
+      "no File or filename-value inference",
+      "safe original evidence is retained separately from normalized matching text",
+      "ASCII star dimensions are accepted without treating slash text as dimensions"
     ]
   },
   "mergeAndSafety": {
@@ -91,7 +95,8 @@
       "reversed byte/dimension ranges are blocked",
       "contradictory exact dimensions and aspect ratio are blocked",
       "network/system-busy/official-tool stop semantics are not actionable",
-      "candidate order does not change the result"
+      "candidate order does not change the result",
+      "invalid candidate evidence is redacted in conflict summaries"
     ],
     "confidencePolicy": "minimum confidence across executable candidates; advisory-only candidates excluded"
   },
@@ -105,9 +110,11 @@
     "crossOriginIframe": "caught and reported; no bypass"
   },
   "testSummary": {
-    "unitTestFiles": 8,
-    "unitTests": 60,
-    "browserTests": 14,
+    "lateShadowRootBoundary": "discovered on first related composed event; no prototype patch or polling",
+    "bareInputUpgrade": "lifecycle.upgradeFromMime accepts only caller-provided image/* MIME",
+    "unitTestFiles": 9,
+    "unitTests": 71,
+    "browserTests": 19,
     "commands": [
       "npm ci",
       "npm run check",
@@ -118,8 +125,8 @@
   "build": {
     "artifact": "dist/uploadfit.js",
     "format": "single production IIFE",
-    "bytes": 31929,
-    "sha256": "7E3E73B9C0E64FA9FA5B7CDF33C1A99AF173E330882DE611F9152BAB726D7161",
+    "bytes": 40270,
+    "sha256": "8AC0AEF3342E0512360A8E88E666F0418AC9641FA96902DA4A2884D0E168F4F4",
     "staticCheck": "PASS"
   }
 }

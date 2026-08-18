@@ -12,6 +12,7 @@ import {
   createUploaderDiscovery,
   discoverUploaders,
   findFileInputFromEvent,
+  isImageMime,
   isImageUploader
 } from './dom/input-discovery.js';
 import {
@@ -45,6 +46,7 @@ export {
   findFileInputFromEvent,
   genericAdapter,
   injectFile,
+  isImageMime,
   isImageUploader,
   markUntrustedEventBlocked,
   normalizeRuleText,

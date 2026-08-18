@@ -8,7 +8,7 @@ export function normalizeRuleText(value) {
   return normalized
     .replace(/[—–−～~]/g, '-')
     .replace(/[：]/g, ':')
-    .replace(/[×✕✖＊]/g, 'x')
+    .replace(/[×✕✖＊*]/g, 'x')
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase();

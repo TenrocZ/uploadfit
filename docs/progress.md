@@ -420,9 +420,9 @@
 
 验证：规则解析/合并/安全单测通过；无 AI、文件或图片处理调用。
 
-## 2026-08-18：S1-D7 / 全流程回归与交接准备
+## 2026-08-18：S1-D7 / 整改前全流程基线
 
-状态：已完成，`READY_FOR_ACCEPTANCE`。
+状态：历史基线；独立验收质检后已由返工结果替代。
 
 最终验证：
 
@@ -440,3 +440,27 @@
 - `docs/handoffs/S1-handoff.md`
 
 阶段边界：S1 未读取图片像素、未处理文件、未回填、未触发上传、未调用 AI；未实现 `src/dom/rejection-observer.js`，未突破 closed Shadow DOM 或跨域 iframe。
+
+## 2026-08-18：S1 / 独立验收质检返工
+
+状态：返工完成，R1–R8 已关闭，`READY_FOR_ACCEPTANCE`，等待用户复验。
+
+质检文档 `docs/handoffs/S1-acceptance-review.md` 确认 R1–R8 八类边界缺口，涉及上下文隔离、单一文本预算、运行时校验、裸 input MIME 升级、格式否定语义、动态 Shadow DOM/同源 iframe 生命周期、原始 evidence 和过度声明的证据文档。
+
+已完成的返工方向：
+
+- 当前 uploader 分支和错误节点按局部 scope 隔离，generic adapter 复用同一错误节点关联逻辑。
+- ContextBundle 来源数组与确定性解析器共享 6000 字符预算，AI 摘要继续以 2000 字符为上限。
+- RuleCandidate/RuleSet 增加格式、扩展名、数量、DPI、比例、语义、证据和安全标记的运行时校验；非法候选留下脱敏不可解冲突。
+- 增加裸 file input 的真实 image MIME 升级入口；补充延迟 open Shadow DOM 事件发现和真实同源 iframe load/navigate/cleanup 生命周期。
+- 格式解析区分文件名/示例/URL、否定格式与明确允许格式；支持 `*` 尺寸分隔符并保留安全原始 evidence。
+
+最终验证：
+
+| 命令 | 结果 |
+|---|---|
+| `npm ci` | PASS |
+| `npm run check` | PASS：9 个测试文件、71 个单测；生产 IIFE 40270 bytes；静态检查通过 |
+| `npm run test:e2e -- --reporter=line --workers=1` | PASS：19 个浏览器测试；8765 端口已关闭 |
+
+Q-S1-001～026 均有纯函数或真实浏览器自动覆盖；最终提交哈希将在本轮返工提交后回填。Git 仍为本地留痕，未推送远程。
