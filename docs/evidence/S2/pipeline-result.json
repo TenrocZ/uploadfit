@@ -1,6 +1,12 @@
 {
-  "stage": "S2-D4/D5/D6/D8",
+  "stage": "S2-R1/R2/R6 processing pipeline",
   "status": "PASS",
+  "acceptanceReview": {
+    "R1": "fixed+verified: output processing only accepts a plan matching current metadata/rules and explicit confirmations",
+    "R2": "fixed+verified: main quality search finds a valid middle interval and preserves the highest valid quality",
+    "R6": "fixed+verified: abort propagation, output validation, performance, and pixel boundary are automated"
+  },
+  "regressionCases": ["Q-S2-001", "Q-S2-002", "Q-S2-010", "Q-S2-012", "Q-S2-013"],
   "scenarioCoverage": {
     "I01": "compliant JPEG passthrough",
     "I02": "PNG to allowed JPEG",
@@ -23,10 +29,12 @@
   },
   "performance": {
     "environment": "Chromium headless, Windows, Node 22.20.0, Playwright 1.62.1",
-    "input": "synthetic local 4000x3000 JPEG, <=10MiB",
-    "assertion": "processing durationMs and wall elapsedMs <=5000",
+    "input": { "fixture": "jpeg-4000x3000.jpg", "bytes": 5000000, "dimensions": [4000, 3000] },
+    "totalMs": 858.8000000715256,
+    "maxHeartbeatGapMs": 31.90000009536743,
+    "output": { "bytes": 438068, "dimensions": [1643, 1232], "valid": true },
+    "thresholds": { "totalMsAtMost": 5000, "maxHeartbeatGapMsAtMost": 500 },
     "result": "PASS"
   },
   "outputInvariant": "Only a non-empty File with real signature/MIME/extension, decodable dimensions and valid RuleSet result is returned"
 }
-

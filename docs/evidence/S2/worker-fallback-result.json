@@ -1,19 +1,25 @@
 {
-  "stage": "S2-D7",
+  "stage": "S2-R3/R6 Worker equivalence and cleanup",
   "status": "PASS",
-  "workerSuccess": {
-    "workerUsed": true,
-    "outputMime": "image/jpeg",
-    "outputDimensions": [120, 80],
-    "validationValid": true
+  "acceptanceReview": {
+    "R3": "fixed+verified: Worker uses the serialized shared lossy search and matches main output quality",
+    "R6": "fixed+verified: constructor/error/timeout/abort paths have bounded fallback and cleanup"
   },
-  "workerFailure": {
-    "failureMode": "Worker constructor throws CSP_BLOCKED",
-    "fallback": "one main-thread retry",
-    "warning": "WORKER_FALLBACK_MAIN_THREAD",
-    "workerUsed": false,
-    "outputStillValidated": true
+  "regressionCases": ["Q-S2-003", "Q-S2-004", "Q-S2-011"],
+  "workerEquivalence": {
+    "input": { "fixture": "jpeg-390x567-medium.jpg", "bytes": 500000, "mime": "image/jpeg", "dimensions": [390, 567] },
+    "targetMinBytes": 1,
+    "targetMaxBytes": 108000,
+    "worker": { "workerUsed": true, "bytes": 107058, "mime": "image/jpeg", "dimensions": [390, 567], "valid": true, "highestValidQuality": 0.834765625 },
+    "main": { "workerUsed": false, "bytes": 107058, "mime": "image/jpeg", "dimensions": [390, 567], "valid": true, "highestValidQuality": 0.834765625 },
+    "conclusion": "same MIME, dimensions, bytes, validity, and highest valid quality"
   },
-  "cleanup": ["worker.terminate", "URL.revokeObjectURL", "bitmap.close", "canvas release"]
+  "cleanup": {
+    "success": ["bitmap.close", "per-round canvas release", "worker.terminate", "URL.revokeObjectURL"],
+    "constructorFailure": { "fallback": true, "workerUsed": false, "warning": "WORKER_FALLBACK_MAIN_THREAD", "terminate": 0, "revoke": 1 },
+    "runtimeError": { "fallback": true, "workerUsed": false, "warning": "WORKER_FALLBACK_MAIN_THREAD", "terminate": 1, "revoke": 1 },
+    "timeout": { "fallback": true, "workerUsed": false, "warning": "WORKER_FALLBACK_MAIN_THREAD", "terminate": 1, "revoke": 1 },
+    "abort": { "fallback": false, "errorCode": "USER_CANCELLED", "reason": "PROCESS_ABORTED", "terminate": 1, "revoke": 1, "warnings": [] }
+  },
+  "finalValidation": "Worker and fallback outputs both pass main-thread inspectImage + validateFile before ProcessResult success"
 }
-

@@ -1,0 +1,106 @@
+{
+  "stage": "S2 acceptance rework R1-R6",
+  "status": "READY_FOR_REACCEPTANCE",
+  "baselineCommit": "463bab7",
+  "reworkCommit": "30795a5",
+  "acceptanceReview": {
+    "R1": {
+      "status": "fixed+verified",
+      "change": "processImage recomputes an authoritative plan from fresh metadata and plan.rules, compares immutable plan fields and each resolved confirmation payload",
+      "regressionCases": ["Q-S2-001"]
+    },
+    "R2": {
+      "status": "fixed+verified",
+      "change": "shared pure lossy search distinguishes endpoint states and searches the middle interval for the highest valid quality within eight steps",
+      "regressionCases": ["Q-S2-002"]
+    },
+    "R3": {
+      "status": "fixed+verified",
+      "change": "Worker serializes the same pure search function as main; every resize round releases its canvas and final resources",
+      "regressionCases": ["Q-S2-003", "Q-S2-004"]
+    },
+    "R4": {
+      "status": "fixed+verified",
+      "change": "primary resource errors short-circuit validation and error code propagation is whitelist-normalized",
+      "regressionCases": ["Q-S2-005", "Q-S2-006", "Q-S2-007"]
+    },
+    "R5": {
+      "status": "fixed+verified",
+      "change": "fixture generation hard-asserts target tolerance, validates signature/dimensions/decode, fails explicitly for unsupported WebP, and integration reads generated files from the local fixture directory",
+      "regressionCases": ["Q-S2-008", "Q-S2-009"]
+    },
+    "R6": {
+      "status": "fixed+verified",
+      "change": "abort signal is checked through decode/encode/resize, Worker error/timeout/abort cleanup is bounded, HTML fallback revokes URLs, and performance/pixel boundary tests record real values",
+      "regressionCases": ["Q-S2-010", "Q-S2-011", "Q-S2-012", "Q-S2-013"]
+    }
+  },
+  "regressionCases": {
+    "Q-S2-001": { "file": "tests/integration/s2-rework.test.js", "test": "recomputes authority and blocks deleted, forged, tampered, or mismatched confirmation plans", "result": "PASS" },
+    "Q-S2-002": { "file": "tests/unit/size-optimizer.test.js", "test": "finds the highest valid middle quality when both endpoints cross the range", "result": "PASS" },
+    "Q-S2-003": { "file": "tests/integration/s2-rework.test.js", "test": "Worker and main use the same bounded quality search", "result": "PASS" },
+    "Q-S2-004": { "file": "tests/integration/s2-rework.test.js", "test": "Worker and main use the same safe output range", "result": "PASS" },
+    "Q-S2-005": { "file": "tests/unit/s2-rework-contract.test.js", "test": "primary resource errors short-circuit with one violation and no fixes", "result": "PASS" },
+    "Q-S2-006": { "file": "tests/unit/s2-rework-contract.test.js", "test": "undecodable and untrusted metadata cannot be polluted by rule fixes", "result": "PASS" },
+    "Q-S2-007": { "file": "tests/unit/s2-rework-contract.test.js", "test": "arbitrary, numeric, and empty error codes fall back", "result": "PASS" },
+    "Q-S2-008": { "file": "tests/unit/s2-rework-contract.test.js", "test": "fixture generator exits nonzero for an impossible target", "result": "PASS" },
+    "Q-S2-009": { "file": "tests/integration/s2-rework.test.js", "test": "integration consumes generated fixture files from disk", "result": "PASS" },
+    "Q-S2-010": { "file": "tests/integration/s2-rework.test.js", "test": "HTMLImageElement fallback succeeds and revokes every decode object URL", "result": "PASS" },
+    "Q-S2-011": { "file": "tests/integration/s2-rework.test.js", "test": "Worker constructor/error/timeout fall back once while abort does not fall back", "result": "PASS" },
+    "Q-S2-012": { "file": "tests/integration/s2-rework.test.js", "test": "4000x3000 input stays within five seconds and 500ms heartbeat gap", "result": "PASS" },
+    "Q-S2-013": { "file": "tests/integration/s2-rework.test.js", "test": "80MP boundary rejects 10000x8001 but not exact 10000x8000", "result": "PASS" }
+  },
+  "fixtureSizes": [
+    { "fixture": "png-1170x1701.png", "targetBytes": 2000000, "toleranceRatio": 0.25, "actualBytes": 2062531, "pass": true },
+    { "fixture": "jpeg-390x567-medium.jpg", "targetBytes": 500000, "toleranceRatio": 0.25, "actualBytes": 500000, "pass": true },
+    { "fixture": "jpeg-390x567-small.jpg", "targetBytes": 20000, "toleranceRatio": 0.25, "actualBytes": 20000, "pass": true },
+    { "fixture": "jpeg-4000x3000.jpg", "targetBytes": 5000000, "toleranceRatio": 0.25, "actualBytes": 5000000, "pass": true },
+    { "fixture": "transparent.png", "targetBytes": null, "toleranceRatio": null, "actualBytes": 118929, "pass": true },
+    { "fixture": "jpeg-orientation-6.jpg", "targetBytes": null, "toleranceRatio": null, "actualBytes": 5682, "pass": true },
+    { "fixture": "corrupt.png", "targetBytes": null, "toleranceRatio": null, "actualBytes": 11, "pass": true },
+    { "fixture": "sample.webp", "targetBytes": null, "toleranceRatio": null, "actualBytes": 170788, "pass": true }
+  ],
+  "workerEquivalence": {
+    "input": { "fixture": "jpeg-390x567-medium.jpg", "bytes": 500000, "mime": "image/jpeg", "dimensions": [390, 567] },
+    "targetMinBytes": 1,
+    "targetMaxBytes": 108000,
+    "main": { "bytes": 107058, "mime": "image/jpeg", "dimensions": [390, 567], "valid": true, "workerUsed": false, "highestValidQuality": 0.834765625 },
+    "worker": { "bytes": 107058, "mime": "image/jpeg", "dimensions": [390, 567], "valid": true, "workerUsed": true, "highestValidQuality": 0.834765625 },
+    "conclusion": "same MIME, dimensions, bytes, validity, and highest valid quality"
+  },
+  "performance": {
+    "environment": "Windows, Node 22.20.0, npm 10.9.3, Playwright Chromium 1.62.1 headless",
+    "input": { "fixture": "jpeg-4000x3000.jpg", "bytes": 5000000, "dimensions": [4000, 3000] },
+    "totalMs": 858.8000000715256,
+    "maxHeartbeatGapMs": 31.90000009536743,
+    "output": { "bytes": 438068, "dimensions": [1643, 1232], "valid": true, "workerUsed": true },
+    "thresholds": { "totalMsAtMost": 5000, "maxHeartbeatGapMsAtMost": 500 },
+    "pass": true
+  },
+  "cleanup": {
+    "success": { "workerUsed": true, "terminate": true, "revoke": true, "bitmapClose": true, "canvasRelease": true },
+    "error": { "fallback": true, "terminate": 1, "revoke": 1, "warning": "WORKER_FALLBACK_MAIN_THREAD" },
+    "timeout": { "fallback": true, "terminate": 1, "revoke": 1, "warning": "WORKER_FALLBACK_MAIN_THREAD" },
+    "abort": { "fallback": false, "code": "USER_CANCELLED", "reason": "PROCESS_ABORTED", "terminate": 1, "revoke": 1, "warnings": [] },
+    "htmlImageFallback": { "success": true, "revokeCountAtLeast": 3 }
+  },
+  "artifact": {
+    "path": "dist/uploadfit.js",
+    "bytes": 85700,
+    "sha256": "30EC37ED660967CB5E0987A086EAB0C76A576D96606A5F568526D216A24291C7",
+    "format": "single pure JavaScript IIFE",
+    "runtimeDependencies": false,
+    "buildLimitBytes": 150000
+  },
+  "commands": {
+    "npm ci": "PASS",
+    "npm run fixtures:generate": "PASS: 8 fixtures, target hard assertions, signature/decode checks",
+    "npm test -- --run": "PASS: 13 files, 97 tests",
+    "npm run build": "PASS: 85700 bytes",
+    "npm run static-check": "PASS",
+    "npm run test:e2e -- --reporter=line --workers=1": "PASS: 31 Chromium tests; 8765 closed",
+    "git diff --check": "PASS",
+    "rg Q-S2 identifiers": "PASS: Q-S2-001 through Q-S2-013 present"
+  },
+  "scope": "S2 only; no S3 task orchestration, rejection observation, injection, UI, Tabbit AI, network, CDN, WASM, or provider changes"
+}

@@ -1,6 +1,11 @@
 {
-  "stage": "S2-D1/D2",
+  "stage": "S2-R4/R6 metadata and input boundaries",
   "status": "PASS",
+  "acceptanceReview": {
+    "R4": "fixed+verified: primary resource failures short-circuit and unknown error codes normalize to a stable fallback",
+    "R6": "fixed+verified: decode fallback, cancellation checks, and exact 80MP guard are covered"
+  },
+  "regressionCases": ["Q-S2-005", "Q-S2-006", "Q-S2-007", "Q-S2-010", "Q-S2-013"],
   "checks": [
     { "id": "I01", "mime": "image/jpeg", "bytes": 50000, "width": 390, "height": 567, "decodable": true, "result": "valid/passthrough" },
     { "id": "I12", "mime": "image/jpeg", "orientation": 6, "encoded": [100, 50], "display": [50, 100], "result": "detected" },
@@ -8,9 +13,16 @@
     { "id": "I14", "signatureMime": "image/jpeg", "declaredMime": "image/png", "result": "MIME_SIGNATURE_MISMATCH+EXTENSION_MISMATCH" },
     { "id": "I17-bytes", "size": 52428801, "errorCode": "FILE_TOO_LARGE_TO_PROCESS" },
     { "id": "I17-pixels", "width": 20001, "height": 1, "errorCode": "PIXEL_LIMIT_EXCEEDED" },
-    { "id": "I07/I15", "mime": "image/png", "hasAlpha": true, "result": "FLATTEN_BACKGROUND confirmation" }
+    { "id": "Q-S2-013-over", "width": 10000, "height": 8001, "errorCode": "PIXEL_LIMIT_EXCEEDED" },
+    { "id": "Q-S2-013-exact", "width": 10000, "height": 8000, "errorCode": "DECODE_FAILED", "pixelGuardRejected": false },
+    { "id": "Q-S2-010", "decoder": "HTMLImageElement", "result": "success+URL revoked" }
   ],
+  "primaryErrorContract": {
+    "codes": ["FILE_TOO_LARGE_TO_PROCESS", "DECODE_FAILED", "PIXEL_LIMIT_EXCEEDED", "UNSUPPORTED_FORMAT"],
+    "oneViolation": true,
+    "safeAutoFixes": [],
+    "requiredConfirmations": []
+  },
   "signatureWhitelist": ["image/jpeg", "image/png", "image/webp"],
   "privacy": "No personal files or pixel payloads persisted"
 }
-

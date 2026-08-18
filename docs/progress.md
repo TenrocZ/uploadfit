@@ -8,7 +8,7 @@
 - 需求事实来源：`C:\Users\蔡天乐\Desktop\黑客松\UploadFit-PRD-v1.0.md`
 - 执行任务书：`C:\Users\蔡天乐\Desktop\黑客松\UploadFit-开发任务书-v1.0`
 - 当前阶段：S2：图像处理引擎
-- 当前状态：S0、S1 已验收并放行；S2-D1～D8 已完成，但独立验收发现阻塞问题，当前为 `BLOCKED_REWORK`。
+- 当前状态：S0、S1 已验收并放行；S2-D1～D8 与 R1～R6 返工已完成，当前为 `READY_FOR_REACCEPTANCE`，等待独立复验。
 - 记录日期：2026-08-18
 
 ## 2026-08-17：S0 / 平台连接确认
@@ -557,3 +557,43 @@ S2 范围：
 - R6：处理中取消、Worker runtime error/timeout、HTMLImageElement 回退、连续卡顿和 80MP 精确边界缺少完整实现或自动证据。
 
 已创建正式外部 Agent 施工单：`docs/handoffs/S2-acceptance-rework-order.md`。施工单包含逐项根因、可复制复现、允许修改范围、Q-S2-001～Q-S2-013 必补用例、全量命令、证据要求和返工回报模板。R1～R6 未全部关闭前不得恢复 `READY_FOR_ACCEPTANCE`，也不得据此启动依赖 S2 正确性的 S3 实质开发。
+
+## 2026-08-18：S2 / R1-R6 返工闭合与复验交接
+
+状态：`READY_FOR_REACCEPTANCE`。本条只登记返工完成和独立复验入口，不登记用户验收通过。
+
+返工完成：
+
+- R1：处理入口依据新 inspect metadata + `plan.rules` 重算权威计划，比较 target/operation/rules/confirmation，删除、伪造、篡改和规则漂移均阻断。
+- R2/R3：抽取共享纯 `searchLossy`，主线程与 Worker 均在最多 8 步内寻找最高合法质量；Worker 每轮释放 canvas，最终输出仍由主线程复检。
+- R4：资源类 primary error 短路，未知/数字/空 error code 回退到稳定白名单错误码。
+- R5：fixture 生成器对 target/tolerance、签名、解码和 WebP 能力硬校验；Q-S2-009 从 `tests/fixtures/generated` 实际读取 8 个文件。
+- R6：取消信号贯穿处理，Worker constructor/error/timeout/abort、HTMLImageElement URL revoke、性能 heartbeat 和 80MP 精确边界均自动覆盖。
+
+验证结果：
+
+| 命令 | 结果 |
+|---|---|
+| `npm ci` | PASS |
+| `npm run fixtures:generate` | PASS：8 个 fixture，目标范围硬断言 |
+| `npm test -- --run` | PASS：13 个文件、97 个单测 |
+| `npm run build` | PASS：85700 bytes，SHA-256 `30EC37ED660967CB5E0987A086EAB0C76A576D96606A5F568526D216A24291C7` |
+| `npm run static-check` | PASS |
+| `npm run test:e2e -- --reporter=line --workers=1` | PASS：31 个 Chromium 测试，8765 端口关闭 |
+| `rg "Q-S2-0(0[1-9]|1[0-3])" tests` | PASS：Q-S2-001～013 全部存在 |
+| `git diff --check` | PASS |
+
+关键实测：Worker/main 同一输入均 `image/jpeg`、`390×567`、`107058` bytes、最高有效质量 `0.834765625`；4000×3000、5,000,000 bytes 输入 `totalMs=858.8000000715256`、`maxHeartbeatGapMs=31.90000009536743`，输出有效且为 `1643×1232` / `438068` bytes。
+
+证据与交接：
+
+- `docs/evidence/S2/rework-result.json`
+- `docs/evidence/S2/README.md`
+- `docs/evidence/S2/metadata-result.json`
+- `docs/evidence/S2/planner-result.json`
+- `docs/evidence/S2/pipeline-result.json`
+- `docs/evidence/S2/worker-fallback-result.json`
+- `docs/evidence/S2/fixtures-result.json`
+- `docs/handoffs/S2-handoff.md`
+
+范围边界：返工只修改 S2 生产逻辑、S2 测试/fixtures/证据/交接和测试服务器 MIME 映射；未进入 S3/S4，无网络/AI/CDN/WASM/provider 变更。Git 仅本地留痕，未推送远程。

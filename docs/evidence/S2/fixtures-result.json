@@ -1,18 +1,24 @@
 {
-  "stage": "S2-D8",
+  "stage": "S2-R5",
   "status": "PASS",
   "generator": "tests/fixtures/generate-fixtures.js",
-  "privacy": "Canvas-only deterministic synthetic pixels; no user input or network",
-  "samples": [
-    { "mime": "image/jpeg", "bytes": 141471, "width": 390, "height": 567 },
-    { "mime": "image/jpeg", "bytes": 74472, "width": 390, "height": 567 },
-    { "mime": "image/jpeg", "bytes": 9155188, "width": 4000, "height": 3000 },
-    { "mime": "image/png", "bytes": 53077, "width": 1170, "height": 1701 },
-    { "mime": "image/png", "bytes": 11560, "width": 390, "height": 567, "hasAlpha": true },
-    { "mime": "image/jpeg", "bytes": 5501, "width": 50, "height": 100, "orientation": 6 },
-    { "mime": "image/png", "bytes": 7, "decodable": false },
-    { "mime": "image/webp", "bytes": 162128, "width": 390, "height": 567 }
+  "privacy": "deterministic browser canvas only; no user files, external network, or pixel logs",
+  "hardAssertions": [
+    "targetBytes and toleranceRatio are enforced with a nonzero exit on mismatch",
+    "signature MIME, browser decode, and dimensions are checked for generated valid fixtures",
+    "WebP capability failure is explicit; no empty Blob is accepted",
+    "Q-S2-009 reads tests/fixtures/generated from the local test server and inspects actual bytes"
   ],
-  "largeBoundary": "80MP is constructed from a small PNG header in tests; no huge binary is stored"
+  "samples": [
+    { "name": "png-1170x1701.png", "mime": "image/png", "width": 1170, "height": 1701, "targetBytes": 2000000, "toleranceRatio": 0.25, "actualBytes": 2062531, "pass": true },
+    { "name": "jpeg-390x567-medium.jpg", "mime": "image/jpeg", "width": 390, "height": 567, "targetBytes": 500000, "toleranceRatio": 0.25, "actualBytes": 500000, "pass": true },
+    { "name": "jpeg-390x567-small.jpg", "mime": "image/jpeg", "width": 390, "height": 567, "targetBytes": 20000, "toleranceRatio": 0.25, "actualBytes": 20000, "pass": true },
+    { "name": "jpeg-4000x3000.jpg", "mime": "image/jpeg", "width": 4000, "height": 3000, "targetBytes": 5000000, "toleranceRatio": 0.25, "actualBytes": 5000000, "pass": true },
+    { "name": "transparent.png", "mime": "image/png", "width": 390, "height": 567, "hasAlpha": true, "actualBytes": 118929, "pass": true },
+    { "name": "jpeg-orientation-6.jpg", "mime": "image/jpeg", "display": [50, 100], "encoded": [100, 50], "orientation": 6, "actualBytes": 5682, "pass": true },
+    { "name": "corrupt.png", "mime": "image/png", "decodable": false, "actualBytes": 11, "pass": true },
+    { "name": "sample.webp", "mime": "image/webp", "width": 390, "height": 567, "actualBytes": 170788, "pass": true }
+  ],
+  "impossibleTargetCheck": "Q-S2-008 PASS: UPLOADFIT_FIXTURE_FORCE_FAILURE=1 exits nonzero with FIXTURE_TARGET_UNREACHABLE",
+  "largeBoundary": "80MP is constructed from a small PNG header in Q-S2-013; no huge binary is stored"
 }
-
