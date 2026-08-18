@@ -250,9 +250,9 @@ iframe 插入、随后 srcdoc load 完成 -> 未发现
 
 未满足复验门槛时，不要把状态改回 `READY_FOR_ACCEPTANCE`。
 
-## 6. 返工复验记录（2026-08-18）
+## 6. 第一次返工复验记录（2026-08-18，历史）
 
-返工已按 R1–R8 完成，以下结论仅表示本地自动复验通过，不替代用户最终验收：
+以下是第一次返工时的本地自动复验记录；第二次独立复验随后发现 3 个残留边界，最终关闭情况以第 7 节为准：
 
 | 整改项 | 处理结果 | 自动覆盖 |
 |---|---|---|
@@ -276,3 +276,39 @@ iframe 插入、随后 srcdoc load 完成 -> 未发现
 | 安全边界 | AI/图片像素/File内容/UI/controller/业务上传均未调用；closed Shadow/cross-origin 不绕过 |
 
 保留限制：host 插入后再创建的 open shadow root 不做原型 patch 或轮询，只在首次相关 composed event 到达时补发现；在事件发生前不声称已发现。Git 仅做本地留痕，未推送远程。返工实质 End commit：`3a90174`。
+
+## 7. 第二次复验与修复记录（2026-08-18）
+
+- 复验基线：`f533820`
+- 实质修复提交：`4e4d89c`
+- 状态：`READY_FOR_ACCEPTANCE`
+
+第二次复验没有回退已关闭的 DOM、预算、MIME 升级、iframe/shadow 和 evidence 边界，但稳定复现了 3 个规则层残留。修复结果如下：
+
+| 残留项 | 根因 | 关闭方式 | 自动覆盖 |
+|---|---|---|---|
+| R5 后置否定格式 | parser 只检查格式词前缀，`PNG不支持` 仍把 PNG 放入允许集合 | 同时检查格式词前后否定语境，覆盖“不支持/不允许/禁止使用/禁用/拒绝/不接受”等表达 | Q-S1-027 |
+| D6 source item 语义串染 | `nearbyTexts` 等数组用空格拼接，前一节点“建议”污染后一节点强制规则 | 在共享 6000 字符预算后逐 source item 解析，保留各自 evidence、advisory 和 source type | Q-S1-028 |
+| R3 运行时校验残留 | formats/extensions 只做单向子集检查，嵌套对象没有未知键白名单 | 要求 MIME 与规范扩展名全集成对自洽；width/height/aspectRatio/count 使用嵌套白名单；候选和最终 RuleSet 独立校验 | Q-S1-029～030 |
+| JPEG 规范映射 | 单独出现 `JPEG` 时仅生成 `jpeg`，严格映射会将其判为不完整 | JPEG/JPG 统一生成 `jpg` 与 `jpeg` 规范全集 | Q-S1-031 |
+
+独立复验代表结果：
+
+```text
+PNG不支持，只支持JPG -> formats=[image/jpeg]
+PNG格式不支持，请使用JPG -> formats=[image/jpeg]
+nearbyTexts=[建议JPG, 图片最大100KB] -> format advisory, maxBytes=100000, actionable=true
+formats=[image/png], extensions=[] -> VALIDATION_FAILED
+aspectRatio 含 unexpected 字段 -> VALIDATION_FAILED
+```
+
+最终门禁：
+
+| 项目 | 结果 |
+|---|---|
+| `npm ci` | PASS |
+| `npm run check` | PASS：9 个测试文件、75 个单测；生产 IIFE 40961 bytes；静态检查通过 |
+| `npm run test:e2e -- --reporter=line --workers=1` | PASS：19 个浏览器测试；8765 端口关闭 |
+| 产物 SHA-256 | `956E13F9BF8CA887C04488904DCCE12E56735BA6024CBACF86393D21F80C8B2B` |
+
+结论：第二次复验发现的 3 个阻断项及伴随的 JPEG 规范映射问题已关闭；R1–R8 与 Q-S1-001～031 全部有可复查的本地自动证据，S1 恢复为 `READY_FOR_ACCEPTANCE`。

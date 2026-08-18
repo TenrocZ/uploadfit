@@ -74,7 +74,9 @@
       "JPG/JPEG -> image/jpeg + jpg/jpeg",
       "no File or filename-value inference",
       "safe original evidence is retained separately from normalized matching text",
-      "ASCII star dimensions are accepted without treating slash text as dimensions"
+      "ASCII star dimensions are accepted without treating slash text as dimensions",
+      "prefix and suffix format denials are excluded from the allowed set",
+      "JPG and JPEG both emit the complete jpg/jpeg extension set"
     ]
   },
   "mergeAndSafety": {
@@ -96,7 +98,9 @@
       "contradictory exact dimensions and aspect ratio are blocked",
       "network/system-busy/official-tool stop semantics are not actionable",
       "candidate order does not change the result",
-      "invalid candidate evidence is redacted in conflict summaries"
+      "invalid candidate evidence is redacted in conflict summaries",
+      "bounded source items retain independent advisory semantics",
+      "format-extension mappings are complete and nested unknown rule keys are rejected"
     ],
     "confidencePolicy": "minimum confidence across executable candidates; advisory-only candidates excluded"
   },
@@ -113,7 +117,7 @@
     "lateShadowRootBoundary": "discovered on first related composed event; no prototype patch or polling",
     "bareInputUpgrade": "lifecycle.upgradeFromMime accepts only caller-provided image/* MIME",
     "unitTestFiles": 9,
-    "unitTests": 71,
+    "unitTests": 75,
     "browserTests": 19,
     "commands": [
       "npm ci",
@@ -125,8 +129,8 @@
   "build": {
     "artifact": "dist/uploadfit.js",
     "format": "single production IIFE",
-    "bytes": 40270,
-    "sha256": "8AC0AEF3342E0512360A8E88E666F0418AC9641FA96902DA4A2884D0E168F4F4",
+    "bytes": 40961,
+    "sha256": "956E13F9BF8CA887C04488904DCCE12E56735BA6024CBACF86393D21F80C8B2B",
     "staticCheck": "PASS"
   }
 }

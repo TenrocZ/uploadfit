@@ -464,3 +464,26 @@
 | `npm run test:e2e -- --reporter=line --workers=1` | PASS：19 个浏览器测试；8765 端口已关闭 |
 
 Q-S1-001～026 均有纯函数或真实浏览器自动覆盖；返工实质提交为 `3a90174`。Git 仍为本地留痕，未推送远程。
+
+## 2026-08-18：S1 / 第二次验收残留修复
+
+状态：修复完成，`READY_FOR_ACCEPTANCE`。
+
+第二次独立复验在全绿门禁之外复现了 3 个规则层残留：后置否定格式仍进入允许集合、formats/extensions 与嵌套对象校验不完整、不同 source item 通过空格拼接后发生 advisory 语义串染。
+
+完成事项：
+
+- 格式解析同时检查格式词前后的否定语境，覆盖 `PNG不支持`、`PNG格式不支持`、`PNG禁用`、`WebP禁止使用` 等表达。
+- nearby/alert/selected 在共享 6000 字符预算后逐条解析，独立 DOM 文本节点不再互相污染强制/建议分类。
+- formats/extensions 必须成对且与 MIME 的规范扩展名全集一致；width/height/aspectRatio/count 增加嵌套字段白名单；候选和最终 RuleSet 均独立校验。
+- JPG/JPEG 均稳定归一化为 `image/jpeg` 和完整 `jpg/jpeg` 扩展名集合。
+- 新增 Q-S1-027～031；实质修复提交为 `4e4d89c`。
+
+最终验证：
+
+| 命令 | 结果 |
+|---|---|
+| `npm ci` | PASS |
+| `npm run check` | PASS：9 个测试文件、75 个单测；生产 IIFE 40961 bytes；静态检查通过 |
+| `npm run test:e2e -- --reporter=line --workers=1` | PASS：19 个浏览器测试；8765 端口已关闭 |
+| 产物 SHA-256 | `956E13F9BF8CA887C04488904DCCE12E56735BA6024CBACF86393D21F80C8B2B` |

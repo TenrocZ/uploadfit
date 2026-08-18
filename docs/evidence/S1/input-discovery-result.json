@@ -36,15 +36,15 @@
   },
   "testSummary": {
     "unitTestFiles": 9,
-    "unitTests": 71,
+    "unitTests": 75,
     "browserTests": 19,
     "command": "npm run test:e2e -- --reporter=line --workers=1",
     "testServerPort": 8765,
     "testServerClosed": true
   },
   "build": {
-    "bytes": 40270,
-    "sha256": "8AC0AEF3342E0512360A8E88E666F0418AC9641FA96902DA4A2884D0E168F4F4",
+    "bytes": 40961,
+    "sha256": "956E13F9BF8CA887C04488904DCCE12E56735BA6024CBACF86393D21F80C8B2B",
     "staticCheck": "PASS"
   },
   "limitations": [
