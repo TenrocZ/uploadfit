@@ -333,6 +333,29 @@
 - `docs/evidence/S0/probe-result.json`
 - `docs/handoffs/S0-handoff.md`
 
+## 2026-08-18：S1-D1 / 上传器发现与动态生命周期
+
+状态：已完成，当前步骤暂停；未进入 S1-D2 上下文提取。
+
+完成事项：
+
+- 新增 `src/dom/input-discovery.js`：识别图片上传器、生成契约兼容的 `UploaderContext`、扫描普通 DOM/open Shadow DOM/同源 iframe，并通过订阅回调向上层报告。
+- 新增 `src/dom/spa-observer.js`：监听 `popstate`/`hashchange`，使用 `DOM_DEBOUNCE_MS` 去抖，不 monkey-patch history。
+- MutationObserver 只处理新增子树；已注册 input 使用 WeakSet 防重复；`findFileInputFromEvent()` 使用 `composedPath()` 支持 open Shadow DOM 事件路径。
+- 跨域或受保护 iframe 访问异常被捕获并报告为 `CROSS_ORIGIN_OR_UNAVAILABLE`；不尝试访问 closed Shadow DOM。
+- cleanup 会断开所有观察器、移除路由监听并清理发现上下文；不触发文件处理、上传或业务任务。
+
+验证结果：
+
+| 命令 | 结果 |
+|---|---|
+| `npm run check` | PASS：9 个单测；构建 14021 bytes；静态检查通过 |
+| `npm run test:e2e -- --reporter=line --workers=1` | PASS：11 个浏览器测试；8765 端口关闭 |
+
+证据：`docs/evidence/S1/input-discovery-result.json`、`docs/evidence/S1/README.md`。
+
+下一步：实现 S1-D2 `context-extractor.js`，只读取允许范围的文本并落实 6000/2000 字符预算；完成后暂停汇报。
+
 ## 2026-08-18：S1 / 启动登记与边界确认
 
 状态：已启动，当前步骤完成并暂停；尚未进入产品代码实现。

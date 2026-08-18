@@ -1,0 +1,45 @@
+{
+  "date": "2026-08-18",
+  "step": "S1-D1",
+  "environment": "Playwright Chromium with the production IIFE bundle",
+  "sensitiveDataUsed": false,
+  "implementation": [
+    "src/dom/input-discovery.js",
+    "src/dom/spa-observer.js"
+  ],
+  "verified": {
+    "ordinaryImageInput": true,
+    "openShadowRootInput": true,
+    "bareFileInputWithoutImageHintExcluded": true,
+    "repeatScanDoesNotDuplicate": true,
+    "dynamicAddedSubtree": true,
+    "spaPopstateHashchangeDebounced": true,
+    "composedPathInputLookup": true,
+    "sameOriginIframePathImplemented": true,
+    "protectedFrameExceptionReported": true,
+    "cleanupDisconnectsObservers": true,
+    "cleanupStopsCallbacks": true
+  },
+  "securityBoundary": {
+    "closedShadowRoot": "unsupported; no access attempt",
+    "crossOriginIframe": "caught and reported as CROSS_ORIGIN_OR_UNAVAILABLE",
+    "historyMutation": "not patched",
+    "businessTaskStarted": false,
+    "fileReadOrProcessed": false
+  },
+  "testSummary": {
+    "unitTests": 9,
+    "browserTests": 11,
+    "command": "npm run test:e2e -- --reporter=line --workers=1",
+    "testServerPort": 8765,
+    "testServerClosed": true
+  },
+  "build": {
+    "bytes": 14021,
+    "sha256": "A950B01075C42030982F11785D148F05F4A283305100D39A60A8DD0DC2226DE3",
+    "staticCheck": "PASS"
+  },
+  "limitations": [
+    "Context extraction, text budgets, deterministic rule parsing and resolver are not included in S1-D1."
+  ]
+}

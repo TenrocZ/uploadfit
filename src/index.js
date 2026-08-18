@@ -1,6 +1,12 @@
 import { bootstrap, cleanupSession } from './bootstrap.js';
 import { detectCapabilities } from './capabilities.js';
 import {
+  createUploaderDiscovery,
+  discoverUploaders,
+  findFileInputFromEvent,
+  isImageUploader
+} from './dom/input-discovery.js';
+import {
   injectFile,
   markUntrustedEventBlocked,
   restoreOriginal
@@ -24,8 +30,12 @@ export {
   BUILD_INFO,
   bootstrap,
   cleanupSession,
+  createUploaderDiscovery,
   detectCapabilities,
+  discoverUploaders,
+  findFileInputFromEvent,
   injectFile,
+  isImageUploader,
   markUntrustedEventBlocked,
   restoreOriginal
 };

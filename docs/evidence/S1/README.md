@@ -11,5 +11,14 @@
 
 ## 当前状态
 
-- 2026-08-18：S1 启动登记完成，尚无产品实现证据。
+- 2026-08-18：S1 启动登记完成。
+- 2026-08-18：S1-D1 上传器发现与动态生命周期完成；证据见 `input-discovery-result.json`。
 - 证据只保存结构化测试结果和脱敏摘要，不保存完整页面文本、Cookie、Token、文件名或文件内容。
+
+## S1-D1：上传器发现与动态生命周期
+
+- 普通 `input[type=file]` 和 open Shadow DOM 输入可发现；无图片 accept/关联语义的裸 file input 不进入图片上传器集合。
+- 重复扫描使用 WeakSet 去重；动态新增子树只扫描新增节点；路由事件使用 `popstate`/`hashchange` 去抖，不改写 history。
+- `composedPath()` 可定位 open Shadow DOM 事件中的 file input；同源 iframe 可递归扫描；跨域/受保护 iframe 捕获异常并报告，不绕过访问控制。
+- cleanup 会断开 MutationObserver、移除 SPA 监听和清理订阅状态。
+- 自动验证：9 个单测、11 个浏览器测试通过；当前 IIFE 14021 bytes。
