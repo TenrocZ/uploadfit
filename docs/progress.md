@@ -324,6 +324,8 @@
 | `dist/uploadfit.js` | SHA-256 `72E55E584CCA6E6B9992C7A42CBD6AB47139EF6F50E88C7D2C8CE63C893132B1` |
 | 临时端口 8765/8768 | CLOSED |
 
+本轮实质整改提交：`ae93d44`。
+
 证据：
 
 - `docs/evidence/S0/tabbit-llmbridge-result.json`

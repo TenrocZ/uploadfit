@@ -7,7 +7,7 @@
 - Status：`READY_FOR_ACCEPTANCE`
 - 核心门禁：`PASS`
 - Start commit：`edbdce2`（S0 整改前的可核验基线）
-- End commit（实质整改范围）：`PENDING`
+- End commit（实质整改范围）：`ae93d44`
 - Agent：`Codex / UploadFit S0 Agent`
 - Environment：Windows；Node `v22.20.0`；npm `10.9.3`；Tabbit Browser `1.9.22.0`；Playwright Chromium
 - Build artifact：`dist/uploadfit.js`，9308 bytes，SHA-256 `72E55E584CCA6E6B9992C7A42CBD6AB47139EF6F50E88C7D2C8CE63C893132B1`
