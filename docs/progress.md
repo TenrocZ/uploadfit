@@ -8,7 +8,7 @@
 - 需求事实来源：`C:\Users\蔡天乐\Desktop\黑客松\UploadFit-PRD-v1.0.md`
 - 执行任务书：`C:\Users\蔡天乐\Desktop\黑客松\UploadFit-开发任务书-v1.0`
 - 当前阶段：S2：图像处理引擎
-- 当前状态：S0、S1 已验收并放行；S2-D1～D8 已完成，交接状态 `READY_FOR_ACCEPTANCE`，等待用户验收。
+- 当前状态：S0、S1 已验收并放行；S2-D1～D8 已完成，但独立验收发现阻塞问题，当前为 `BLOCKED_REWORK`。
 - 记录日期：2026-08-18
 
 ## 2026-08-17：S0 / 平台连接确认
@@ -542,3 +542,18 @@ S2 范围：
 - `docs/handoffs/S2-handoff.md`
 
 性能与边界：合成 4000×3000、≤10MiB JPEG 在 Chromium 参考环境通过处理总耗时 ≤5 秒断言；最大尺寸输出保持等比。MVP 不引入 PNG 量化；DPI 只展示；Worker/OffscreenCanvas/createImageBitmap/Blob Worker 能力不可用时按证据降级。S2 实质 End commit：`463bab7`；交接文档元数据回填为同一提交后的文档留痕提交。
+
+## 2026-08-18：S2 / 独立验收阻塞与返工施工单
+
+状态：`BLOCKED_REWORK`。现有 92 个 Vitest 用例、24 个 Chromium 用例、构建和静态检查仍保留为返工前自动化基线，但不足以证明 S2 通过独立验收。
+
+独立复核确认 6 组阻塞问题：
+
+- R1：可通过篡改普通 plan 对象绕过 UPSCALE 确认并执行放大；
+- R2：主线程有损质量搜索在 min/max 端点跨越时误报 `FILE_TOO_SMALL`；
+- R3：Worker 在最低质量已有效时提前返回，未选择最高可用质量，与主线程显著不等价；
+- R4：不可处理 metadata 被继续套用普通规则而污染分类，任意 `error.code` 可穿透稳定契约；
+- R5：fixture 声称目标体积与实际生成值严重不符，现有集成测试也未消费生成文件；
+- R6：处理中取消、Worker runtime error/timeout、HTMLImageElement 回退、连续卡顿和 80MP 精确边界缺少完整实现或自动证据。
+
+已创建正式外部 Agent 施工单：`docs/handoffs/S2-acceptance-rework-order.md`。施工单包含逐项根因、可复制复现、允许修改范围、Q-S2-001～Q-S2-013 必补用例、全量命令、证据要求和返工回报模板。R1～R6 未全部关闭前不得恢复 `READY_FOR_ACCEPTANCE`，也不得据此启动依赖 S2 正确性的 S3 实质开发。

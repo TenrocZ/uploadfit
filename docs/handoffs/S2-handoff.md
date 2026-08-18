@@ -3,15 +3,18 @@
 - 交接日期：2026-08-18
 - 工程目录：`C:\Users\蔡天乐\Desktop\黑客松\main`
 - 对应任务书：`30-S2-图像处理引擎.md`
-- Status：`READY_FOR_ACCEPTANCE`
-- 核心门禁：`PASS`
+- Status：`BLOCKED_REWORK`
+- 核心门禁：`AUTOMATION_PASS / ACCEPTANCE_BLOCKED`
 - Start commit：`115a495`（S1 用户验收登记后启动 S2 前的本地基线）
 - End commit：`463bab7`（S2 实质实现、测试、证据和交接提交）
 - Agent：`Codex / UploadFit S2 Agent`
 - Environment：Windows；Node `v22.20.0`；npm `10.9.3`；Playwright Chromium `1.62.1`
 - Build artifact：`dist/uploadfit.js`，80652 bytes，SHA-256 `FC24CC793CB62E25F83630A16A80932A2837B81ED61E9C7990ECE8C48ED0758E`
+- 独立验收返工单：`docs/handoffs/S2-acceptance-rework-order.md`
 
 ## 1. 阶段结论
+
+> 2026-08-18 独立验收更正：现有自动门禁虽全绿，但对抗性与边界复核发现 R1～R6 共 6 组阻塞问题，当前结论为 `BLOCKED_REWORK`。下文 D1～D8、测试数和产物信息是返工前自动化基线，不代表独立验收通过。施工范围、复现步骤、新增 Q-S2-001～Q-S2-013 和重新验收入口见 `docs/handoffs/S2-acceptance-rework-order.md`。
 
 S2 已完成从 `File + RuleSet` 到 `ProcessResult` 的纯本地图像管线：真实签名/元数据读取、输入资源防护、规则校验、固定处理计划、显式确认、Canvas/OffscreenCanvas 绘制、JPEG/WebP 质量搜索、PNG 安全缩小、输出新 File、最终再解码复检，以及 Worker 失败后主线程回退。
 
@@ -69,6 +72,6 @@ I01–I18 映射、性能门槛、Worker 回退和 fixture 摘要见 `docs/evide
 - MVP 不引入 PNG 量化；只允许 PNG 且在尺寸规则不允许缩小时，无法满足体积会诚实失败，不添加垃圾字节。
 - Worker 依赖 Worker、Blob Worker、OffscreenCanvas、createImageBitmap 和 convertToBlob；任一能力不可用或 CSP 阻止 Blob Worker 时，主线程 Canvas/HTMLImageElement 路径重试。
 - 动态背景颜色仅接受白、蓝、红、绿、黑；透明 PNG 转 JPEG 默认只提出白底确认，不自动读取或修改证件照语义背景。
-- 本地自动门禁通过不等于 S2 用户验收通过；当前交接状态仍需用户验收。
+- 本地自动门禁通过不等于 S2 用户验收通过；当前独立验收已阻塞，须完成返工单 R1～R6 后重新提交验收。
 
 Git 仅做本地版本留痕，未推送远程。
