@@ -7,8 +7,8 @@
 - 工程目录：`C:\Users\蔡天乐\Desktop\黑客松\main`
 - 需求事实来源：`C:\Users\蔡天乐\Desktop\黑客松\UploadFit-PRD-v1.0.md`
 - 执行任务书：`C:\Users\蔡天乐\Desktop\黑客松\UploadFit-开发任务书-v1.0`
-- 当前阶段：S0：平台能力探针与工程骨架
-- 当前状态：S0-R1 至 R6 已完成第二次整改与实机复验；官方脚本生命周期和 `LLMBridge.chat` 契约已闭合，S0 为 `READY_FOR_ACCEPTANCE`。
+- 当前阶段：S1：DOM 发现与规则引擎
+- 当前状态：S0 已验收并放行；S1 已完成启动登记，尚未修改产品代码。
 - 记录日期：2026-08-18
 
 ## 2026-08-17：S0 / 平台连接确认
@@ -332,3 +332,29 @@
 - `docs/evidence/S0/tabbit-llmbridge-probe.png`
 - `docs/evidence/S0/probe-result.json`
 - `docs/handoffs/S0-handoff.md`
+
+## 2026-08-18：S1 / 启动登记与边界确认
+
+状态：已启动，当前步骤完成并暂停；尚未进入产品代码实现。
+
+放行依据：
+
+- `docs/handoffs/S0-handoff.md` 状态为 `READY_FOR_ACCEPTANCE`。
+- 用户已确认 S0 验收通过并授权启动 S1。
+- 既有 `npm ci`、单测、构建、静态检查和 E2E 回归保持绿色；S1 不修改 S0 注入契约。
+
+本阶段范围：
+
+- `input[type=file]` 上传器发现、动态 DOM、open Shadow DOM、同源 iframe 的安全边界。
+- 围绕单个 input 的上下文提取、敏感内容过滤和 6000/2000 字符预算。
+- 纯本地确定性规则解析、归一化、来源合并、冲突显式化和安全分类。
+- 30 条中文规则变体及 DOM/安全边界测试；完成后生成 `docs/handoffs/S1-handoff.md`。
+
+明确不做：
+
+- 不读取图片像素、不处理文件、不回填、不触发上传。
+- 不调用 `LLMBridge.chat()` 或其他 AI；S1 的 `selectAiRelevantText()` 只提供受控文本摘要能力。
+- 不实现 `src/dom/rejection-observer.js`，该文件属于 S3。
+- 不突破 closed Shadow DOM、跨域 iframe、密码/验证码字段或其他表单值边界。
+
+下一步：先实现 `src/dom/input-discovery.js` 和对应边界测试；完成该独立步骤后暂停汇报。
