@@ -5,13 +5,13 @@
     "R3": "fixed+verified: Worker uses the serialized shared lossy search and matches main output quality",
     "R6": "fixed+verified: constructor/error/timeout/abort paths have bounded fallback and cleanup"
   },
-  "regressionCases": ["Q-S2-003", "Q-S2-004", "Q-S2-011"],
+  "regressionCases": ["Q-S2-003", "Q-S2-004", "Q-S2-011", "Q-S2-014", "Q-S2-017"],
   "workerEquivalence": {
-    "input": { "fixture": "jpeg-390x567-medium.jpg", "bytes": 500000, "mime": "image/jpeg", "dimensions": [390, 567] },
+    "input": { "fixture": "jpeg-390x567-medium.jpg", "bytes": 555011, "mime": "image/jpeg", "dimensions": [390, 567] },
     "targetMinBytes": 1,
     "targetMaxBytes": 108000,
-    "worker": { "workerUsed": true, "bytes": 107058, "mime": "image/jpeg", "dimensions": [390, 567], "valid": true, "highestValidQuality": 0.834765625 },
-    "main": { "workerUsed": false, "bytes": 107058, "mime": "image/jpeg", "dimensions": [390, 567], "valid": true, "highestValidQuality": 0.834765625 },
+    "worker": { "workerUsed": true, "bytes": 107474, "mime": "image/jpeg", "dimensions": [390, 567], "valid": true, "highestValidQuality": 0.66484375 },
+    "main": { "workerUsed": false, "bytes": 107474, "mime": "image/jpeg", "dimensions": [390, 567], "valid": true, "highestValidQuality": 0.66484375 },
     "conclusion": "same MIME, dimensions, bytes, validity, and highest valid quality"
   },
   "cleanup": {
@@ -21,5 +21,6 @@
     "timeout": { "fallback": true, "workerUsed": false, "warning": "WORKER_FALLBACK_MAIN_THREAD", "terminate": 1, "revoke": 1 },
     "abort": { "fallback": false, "errorCode": "USER_CANCELLED", "reason": "PROCESS_ABORTED", "terminate": 1, "revoke": 1, "warnings": [] }
   },
+  "mainThreadPerformance": { "input": [4000, 3000], "totalMs": 886.6999999284744, "maxHeartbeatGapMs": 128.80000007152557, "workerUsed": false, "result": "PASS" },
   "finalValidation": "Worker and fallback outputs both pass main-thread inspectImage + validateFile before ProcessResult success"
 }

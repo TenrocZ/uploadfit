@@ -8,7 +8,7 @@
 - 需求事实来源：`C:\Users\蔡天乐\Desktop\黑客松\UploadFit-PRD-v1.0.md`
 - 执行任务书：`C:\Users\蔡天乐\Desktop\黑客松\UploadFit-开发任务书-v1.0`
 - 当前阶段：S2：图像处理引擎
-- 当前状态：S0、S1 已验收并放行；S2-D1～D8 与 R1～R6 返工已完成，当前为 `READY_FOR_REACCEPTANCE`，等待独立复验。
+- 当前状态：S0、S1 已验收并放行；S2-D1～D8、R1～R6 及二次复验追加项均已修复，当前为 `READY_FOR_REACCEPTANCE`，等待用户确认。
 - 记录日期：2026-08-18
 
 ## 2026-08-17：S0 / 平台连接确认
@@ -597,3 +597,27 @@ S2 范围：
 - `docs/handoffs/S2-handoff.md`
 
 范围边界：返工只修改 S2 生产逻辑、S2 测试/fixtures/证据/交接和测试服务器 MIME 映射；未进入 S3/S4，无网络/AI/CDN/WASM/provider 变更。Git 仅本地留痕，未推送远程。
+
+## 2026-08-18：S2 / 二次复验问题修复闭合
+
+状态：`READY_FOR_REACCEPTANCE`。本条登记二次复验修复完成，不登记用户验收通过。
+
+完成事项：
+
+- 执行入口不再返回或继续执行调用方 plan；按权威 confirmation type 校验 `crop`、`flattenBackground`、`upscaleAccepted` 后构造 canonical plan。Q-S2-014 证明 CROP/FLATTEN/UPSCALE 不能相互借权，主线程与 Worker 请求路径六种组合均稳定拒绝。
+- 删除 fixture 生成器的 JPEG APP1 补体积逻辑；改用确定性图案熵、block size 和编码 quality 自然进入 ±25% 容差。500KB/20KB/5MB 目标 JPEG 的 APP1 bytes 均为 0。
+- Q-S2-016 使用 generated 二进制真实覆盖 PNG→JPEG、JPEG 压缩、小文件最小值失败、大图缩放、透明白底、EXIF 6 主/Worker、损坏输入和 WebP passthrough。
+- Q-S2-017 固化主线程 fallback 性能：`totalMs=886.7`、`maxHeartbeatGapMs=128.8`；Worker 为 `808.5/32.9`，均满足 5s/500ms 门槛。
+
+验证结果：
+
+| 命令 | 结果 |
+|---|---|
+| `npm ci` | PASS |
+| `npm run fixtures:generate` | PASS：8 个自然编码 fixture，目标 JPEG APP1=0 |
+| `npm run check` | PASS：13 个 Vitest 文件、98 个测试；构建 86213 bytes；静态检查通过 |
+| `npm run test:e2e -- --reporter=line --workers=1` | PASS：34 个 Chromium 测试；8765 端口关闭 |
+| `git diff --check` | PASS |
+| 产物 SHA-256 | `F511425408A38D0D96AD931CF9FE8E7D32CA122297B3172B8594CFF9FA1AA62D` |
+
+代码与测试提交：`4dabd84`。权威证据：`docs/evidence/S2/second-rework-result.json`。范围仍限定 S2，没有进入 S3/S4、网络、AI、CDN、WASM、provider 或业务 DOM。

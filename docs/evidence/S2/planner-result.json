@@ -2,10 +2,10 @@
   "stage": "S2-R1 planner authority and confirmation boundary",
   "status": "PASS",
   "acceptanceReview": {
-    "R1": "fixed+verified: processImage recomputes from fresh metadata plus plan.rules and rejects mutable-plan drift",
+    "R1": "fixed+verified: processImage recomputes from fresh metadata plus plan.rules, rejects mutable-plan drift and cross-type execution fields, then executes a canonical plan",
     "R2": "fixed+verified: optimizer receives the authoritative plan byte interval and shared search strategy"
   },
-  "regressionCases": ["Q-S2-001", "Q-S2-002"],
+  "regressionCases": ["Q-S2-001", "Q-S2-002", "Q-S2-014"],
   "fixedOperationOrder": ["ORIENT", "CONVERT", "CROP", "RESIZE", "UPSCALE", "FLATTEN_BACKGROUND", "ENCODE", "COMPRESS"],
   "checks": [
     { "id": "I05", "source": [390, 567], "target": [390, 567], "operations": [], "passthrough": true },
@@ -16,7 +16,8 @@
     { "id": "I11", "exactDimensions": true, "tinyMaximum": true, "result": "fails without dimension relaxation" },
     { "id": "I04", "source": [4000, 3000], "max": [2000, 2000], "target": [2000, 1500], "result": "proportional" },
     { "id": "Q-S2-001", "deletedConfirmations": "USER_CONFIRMATION_REQUIRED", "forgedPayload": "USER_CONFIRMATION_REQUIRED", "targetMismatch": "PROCESSING_FAILED", "validResolution": "PASS" },
-    { "id": "Q-S2-002", "qualitySearch": "middle interval found; highest valid candidate retained; max eight search steps" }
+    { "id": "Q-S2-002", "qualitySearch": "middle interval found; highest valid candidate retained; max eight search steps" },
+    { "id": "Q-S2-014", "crossTypeInjection": ["CROP+FLATTEN", "FLATTEN+CROP", "UPSCALE+FLATTEN"], "paths": ["main", "worker-requested"], "result": "USER_CONFIRMATION_REQUIRED" }
   ],
-  "immutability": "resolveProcessingConfirmation returns a new plan and does not mutate the unresolved plan"
+  "immutability": "resolveProcessingConfirmation returns a new plan; processImage validates it but executes a freshly constructed canonical plan"
 }
