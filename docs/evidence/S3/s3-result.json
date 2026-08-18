@@ -1,0 +1,110 @@
+{
+  "stage": "S3 task orchestration and rejection observation",
+  "status": "READY_FOR_ACCEPTANCE",
+  "baselineCommit": "1e2d0d9",
+  "scope": [
+    "session and state machine",
+    "uploader registration and adapter registry",
+    "FIFO task controller with one processing task",
+    "preflight routing",
+    "DOM rejection observation and classification",
+    "final validation, injection guard and original restore",
+    "single retry using input/change only",
+    "idempotent cleanup and pagehide disposal"
+  ],
+  "delivery": {
+    "S3-D1": "PASS",
+    "S3-D2": "PASS",
+    "S3-D3": "PASS",
+    "S3-D4": "PASS",
+    "S3-D5": "PASS",
+    "S3-D6": "PASS",
+    "S3-D7": "PASS",
+    "S3-D8": "PASS",
+    "S3-D9": "PASS"
+  },
+  "contractChecks": {
+    "states": [
+      "BOOTING",
+      "SCANNING",
+      "ARMED",
+      "INSPECTING",
+      "PASSTHROUGH",
+      "WAITING_REJECTION",
+      "NEEDS_CONFIRMATION",
+      "PROCESSING",
+      "INJECTING",
+      "RETRYING",
+      "SUCCESS",
+      "STOPPED",
+      "DISPOSED"
+    ],
+    "maxAutoRetries": 1,
+    "rejectionWindowMs": 30000,
+    "domDebounceMs": 100,
+    "autoRuleConfidence": 0.9,
+    "confirmRuleConfidence": 0.75,
+    "noBusinessClickForRetry": true,
+    "noRequestInterception": true,
+    "noFormalUi": true
+  },
+  "observedScenarios": {
+    "passthrough": {
+      "status": "PASSTHROUGH",
+      "originalChangeDelivered": true,
+      "processCalls": 0,
+      "injectionCalls": 0
+    },
+    "preflightAdaptation": {
+      "inputMime": "image/png",
+      "outputMime": "image/jpeg",
+      "outputDimensions": [390, 567],
+      "finalValidation": true,
+      "pageChangeEvents": 1,
+      "originalEventBlocked": true
+    },
+    "rejectionRetry": {
+      "initialStatus": "WAITING_REJECTION",
+      "rejectionSourceMerged": true,
+      "retryCount": 1,
+      "changeEvents": 3,
+      "businessClicks": 0,
+      "secondRejectionStatus": "STOPPED"
+    },
+    "ambiguousFailure": {
+      "textClass": "ambiguous",
+      "errorCode": "PROCESSING_FAILED",
+      "retryCount": 0,
+      "processCalls": 0,
+      "fileChanged": false
+    },
+    "multipleFiles": {
+      "fileCount": 2,
+      "taskCreated": false,
+      "collectionModified": false
+    },
+    "detachedAndDisposed": {
+      "detachedErrorCode": "INPUT_DETACHED",
+      "disposedState": "DISPOSED",
+      "injectionAfterStaleResult": false
+    }
+  },
+  "automation": {
+    "vitestFiles": 15,
+    "vitestTests": 103,
+    "chromiumTests": 49,
+    "buildBytes": 119062,
+    "buildLimitBytes": 150000,
+    "sha256": "7F0DEDA9CE989911A5D24D1BFA0A73B55D0B8ACDEF8B9B272B8A79E2BBBAC514",
+    "staticCheck": "PASS",
+    "diffCheck": "PASS"
+  },
+  "forbiddenScopeChecks": {
+    "formalS4Ui": false,
+    "realTabbitAiProvider": false,
+    "businessButtonClicks": false,
+    "networkRequestInspection": false,
+    "remotePush": false
+  }
+}
+

@@ -1,0 +1,1191 @@
+import {
+  AUTO_RULE_CONFIDENCE,
+  CONFIRM_RULE_CONFIDENCE,
+  MAX_AUTO_RETRIES
+} from '../config.js';
+import {
+  extractRelevantContext
+} from '../dom/context-extractor.js';
+import {
+  createUploaderDiscovery
+} from '../dom/input-discovery.js';
+import {
+  observeRejection
+} from '../dom/rejection-observer.js';
+import { parseRulesDeterministically } from '../rules/deterministic-parser.js';
+import { resolveRules } from '../rules/resolver.js';
+import {
+  createProcessingPlan,
+  resolveProcessingConfirmation
+} from '../image/planner.js';
+import { inspectImage, validateFile } from '../image/metadata.js';
+import { processImage } from '../image/canvas-pipeline.js';
+import {
+  injectFile,
+  restoreOriginal
+} from '../injection/file-injector.js';
+import {
+  armInjectionGuard,
+  clearInjectionGuard,
+  consumeInjectionGuard
+} from '../injection/injection-guard.js';
+import { asImageProcessingError } from '../image/errors.js';
+import { createRandomId } from '../utils/ids.js';
+import { createLogger } from '../utils/logger.js';
+import { createAdapterRegistry } from '../adapters/registry.js';
+import { createCleanupRegistry } from './cleanup.js';
+import { createStateMachine } from './state-machine.js';
+
+const TERMINAL_TASK_STATES = new Set(['STOPPED', 'DISPOSED', 'PASSTHROUGH']);
+const ACTIVE_TASK_STATES = new Set([
+  'ARMED',
+  'INSPECTING',
+  'WAITING_REJECTION',
+  'NEEDS_CONFIRMATION',
+  'PROCESSING',
+  'INJECTING',
+  'RETRYING',
+  'SUCCESS'
+]);
+const EVENT_CONSTRUCTOR_FALLBACK = globalThis.Event;
+
+function cloneValue(value, seen = new WeakMap()) {
+  if (value === null || value === undefined) return value;
+  if (typeof value !== 'object') return value;
+  if (seen.has(value)) return seen.get(value);
+  if (Array.isArray(value)) {
+    const result = [];
+    seen.set(value, result);
+    for (const item of value) result.push(cloneValue(item, seen));
+    return result;
+  }
+  const result = {};
+  seen.set(value, result);
+  for (const [key, item] of Object.entries(value)) {
+    if (typeof item === 'function') continue;
+    result[key] = cloneValue(item, seen);
+  }
+  return result;
+}
+
+function safeRuleSet(rules) {
+  if (!rules || typeof rules !== 'object') return null;
+  return {
+    formats: [...(rules.formats ?? [])],
+    extensions: [...(rules.extensions ?? [])],
+    minBytes: rules.minBytes ?? null,
+    maxBytes: rules.maxBytes ?? null,
+    width: cloneValue(rules.width ?? { exact: null, min: null, max: null }),
+    height: cloneValue(rules.height ?? { exact: null, min: null, max: null }),
+    aspectRatio: cloneValue(rules.aspectRatio),
+    dpi: rules.dpi ?? null,
+    count: cloneValue(rules.count ?? { max: null }),
+    background: rules.background ?? null,
+    semanticRequirements: [...(rules.semanticRequirements ?? [])],
+    confidence: rules.confidence ?? 0,
+    sources: (rules.sources ?? []).map((source) => ({
+      type: source.type,
+      priority: source.priority,
+      confidence: source.confidence,
+      advisoryOnly: Boolean(source.advisoryOnly)
+    })),
+    conflicts: (rules.conflicts ?? []).map((conflict) => ({
+      field: conflict.field,
+      reason: conflict.reason,
+      unresolvable: Boolean(conflict.unresolvable),
+      values: cloneValue(conflict.values)
+    })),
+    advisories: (rules.advisories ?? []).map((advisory) => ({
+      sourceType: advisory.sourceType,
+      rules: safeRuleSet(advisory.rules)
+    })),
+    safetyFlags: [...(rules.safetyFlags ?? [])],
+    actionable: Boolean(rules.actionable)
+  };
+}
+
+function safeMetadata(metadata) {
+  if (!metadata || typeof metadata !== 'object') return null;
+  return {
+    mime: metadata.mime ?? metadata.signatureMime ?? null,
+    size: Number.isFinite(metadata.size) ? metadata.size : null,
+    width: Number.isFinite(metadata.width) ? metadata.width : null,
+    height: Number.isFinite(metadata.height) ? metadata.height : null
+  };
+}
+
+function safeValidation(validation) {
+  if (!validation || typeof validation !== 'object') return null;
+  return {
+    valid: Boolean(validation.valid),
+    violations: (validation.violations ?? []).map((item) => ({
+      code: item.code,
+      expected: cloneValue(item.expected),
+      actual: cloneValue(item.actual)
+    })),
+    warnings: (validation.warnings ?? []).map((item) => ({ code: item.code })),
+    safeAutoFixes: [...(validation.safeAutoFixes ?? [])],
+    requiredConfirmations: (validation.requiredConfirmations ?? []).map((item) => ({
+      type: item.type,
+      required: Boolean(item.required)
+    })),
+    unfixable: [...(validation.unfixable ?? [])]
+  };
+}
+
+function safePlan(plan) {
+  if (!plan || typeof plan !== 'object') return null;
+  return {
+    targetMime: plan.targetMime ?? null,
+    targetWidth: plan.targetWidth ?? null,
+    targetHeight: plan.targetHeight ?? null,
+    crop: cloneValue(plan.crop),
+    proposedCrop: cloneValue(plan.proposedCrop),
+    flattenBackground: cloneValue(plan.flattenBackground),
+    proposedFlattenBackground: cloneValue(plan.proposedFlattenBackground),
+    qualityRange: cloneValue(plan.qualityRange),
+    targetMinBytes: plan.targetMinBytes ?? null,
+    targetMaxBytes: plan.targetMaxBytes ?? null,
+    operations: [...(plan.operations ?? [])],
+    confirmations: (plan.confirmations ?? []).map((item) => ({
+      id: item.id,
+      type: item.type,
+      required: Boolean(item.required),
+      resolved: Boolean(item.resolved),
+      accepted: item.accepted === true ? true : item.accepted === false ? false : null,
+      payload: cloneValue(item.payload)
+    })),
+    warnings: (plan.warnings ?? []).map((item) => ({ code: item.code })),
+    executable: Boolean(plan.executable),
+    passthrough: Boolean(plan.passthrough),
+    unfixable: [...(plan.unfixable ?? [])],
+    validation: safeValidation(plan.validation)
+  };
+}
+
+function safeResult(result) {
+  if (!result || typeof result !== 'object') return null;
+  return {
+    metadata: safeMetadata(result.metadata),
+    operations: [...(result.operations ?? [])],
+    validation: safeValidation(result.validation),
+    durationMs: Number.isFinite(result.durationMs) ? result.durationMs : null,
+    warnings: (result.warnings ?? []).map((item) => ({ code: item.code })),
+    passthrough: Boolean(result.passthrough),
+    workerUsed: Boolean(result.workerUsed)
+  };
+}
+
+function createAbortController() {
+  if (typeof AbortController === 'function') return new AbortController();
+  const signal = { aborted: false };
+  return {
+    signal,
+    abort() {
+      signal.aborted = true;
+    }
+  };
+}
+
+function fileConstructor(input) {
+  return input?.ownerDocument?.defaultView?.File
+    ?? globalThis.File;
+}
+
+function isFileForInput(input, file) {
+  const Constructor = fileConstructor(input);
+  return typeof Constructor === 'function' && file instanceof Constructor;
+}
+
+function quickViolations(file, rules) {
+  const violations = [];
+  if (rules?.formats?.length && typeof file?.type === 'string'
+    && !rules.formats.includes(file.type.toLowerCase())) {
+    violations.push('FORMAT_NOT_ALLOWED');
+  }
+  if (Number.isFinite(rules?.maxBytes) && file?.size > rules.maxBytes) {
+    violations.push('FILE_TOO_LARGE');
+  }
+  if (Number.isFinite(rules?.minBytes) && file?.size < rules.minBytes) {
+    violations.push('FILE_TOO_SMALL');
+  }
+  return violations;
+}
+
+function hasRequiredConfirmation(plan) {
+  return Boolean(plan?.confirmations?.some((item) => item.required && !item.resolved));
+}
+
+function addRuleConfidenceConfirmation(plan) {
+  const next = cloneValue(plan);
+  next.confirmations = [
+    {
+      id: createRandomId('confirmation'),
+      type: 'RULE_CONFIDENCE',
+      required: true,
+      resolved: false,
+      accepted: null,
+      payload: null
+    },
+    ...(next.confirmations ?? [])
+  ];
+  next.executable = false;
+  next.passthrough = false;
+  return next;
+}
+
+function stableErrorCode(error, fallback = 'PROCESSING_FAILED') {
+  return asImageProcessingError(error, fallback).code;
+}
+
+function isTaskCurrent(task, record) {
+  return Boolean(
+    task
+    && record?.currentTask === task
+    && task.inputElement?.isConnected
+    && task.abortController?.signal?.aborted !== true
+  );
+}
+
+function taskCanBeObserved(task) {
+  return ACTIVE_TASK_STATES.has(task?.status);
+}
+
+function isBusinessClickTarget(target) {
+  return Boolean(target?.closest?.(
+    'button, [type="submit"], [role="button"], a'
+  ));
+}
+
+/**
+ * The sole cross-module S3 orchestrator.
+ */
+export class TaskController {
+  constructor(options = {}) {
+    this.documentRef = options.documentRef ?? globalThis.document ?? null;
+    this.globalRef = options.globalRef ?? this.documentRef?.defaultView ?? globalThis;
+    this.sessionId = options.sessionId ?? createRandomId('session');
+    this.logger = options.logger ?? createLogger();
+    this.adapterRegistry = options.adapterRegistry
+      ?? createAdapterRegistry({ adapters: options.adapters ?? [] });
+    this.discovery = options.discovery ?? null;
+    this.inspectImage = options.inspectImageFn ?? options.inspectImage ?? inspectImage;
+    this.validateFile = options.validateFileFn ?? options.validateFile ?? validateFile;
+    this.createProcessingPlan = options.createProcessingPlanFn
+      ?? options.createProcessingPlan
+      ?? createProcessingPlan;
+    this.resolveProcessingConfirmation = options.resolveProcessingConfirmationFn
+      ?? options.resolveProcessingConfirmation
+      ?? resolveProcessingConfirmation;
+    this.processImage = options.processImageFn ?? options.processImage ?? processImage;
+    this.injectFile = options.injectFileFn ?? options.injectFile ?? injectFile;
+    this.restoreOriginal = options.restoreOriginalFn ?? options.restoreOriginal ?? restoreOriginal;
+    this.observeRejection = options.observeRejectionFn
+      ?? options.observeRejection
+      ?? observeRejection;
+    this.parseRules = options.parseRulesFn ?? options.parseRules ?? parseRulesDeterministically;
+    this.resolveRules = options.resolveRulesFn ?? options.resolveRules ?? resolveRules;
+    this.confirmationResolver = options.confirmationResolver ?? null;
+    this.resources = createCleanupRegistry();
+    this.sessionMachine = createStateMachine({
+      initial: 'BOOTING',
+      onTransition: () => this._publish(),
+      onInvalid: (diagnostic) => {
+        this.diagnostics.push(diagnostic);
+      }
+    });
+    this.uploaders = new Map();
+    this.tasks = new Map();
+    this.queue = [];
+    this.listeners = new Set();
+    this.diagnostics = [];
+    this.processingTask = null;
+    this.started = false;
+    this.disposed = false;
+    this.clickListener = null;
+  }
+
+  start() {
+    if (this.disposed) return this;
+    if (this.started) return this;
+    this.started = true;
+    this.logger.emit('SESSION_STARTED', { taskId: this.sessionId });
+    this.sessionMachine.transition('SCANNING');
+
+    if (!this.discovery) {
+      this.discovery = createUploaderDiscovery({
+        root: this.documentRef,
+        onDiscover: (context) => this.registerUploader(context)
+      });
+    }
+    this.discovery.start?.();
+
+    if (this.documentRef?.addEventListener) {
+      this.clickListener = (event) => {
+        if (!isBusinessClickTarget(event.target)) return;
+        for (const task of this.tasks.values()) {
+          if (taskCanBeObserved(task)) task.businessClickCount += 1;
+        }
+      };
+      this.documentRef.addEventListener('click', this.clickListener, true);
+      this.resources.add(() => this.documentRef.removeEventListener(
+        'click',
+        this.clickListener,
+        true
+      ));
+    }
+    if (this.globalRef?.addEventListener) {
+      this.resources.trackListener(
+        this.globalRef,
+        'pagehide',
+        () => this.dispose(),
+        { once: true }
+      );
+    }
+
+    this.sessionMachine.transition('ARMED');
+    this._publish();
+    return this;
+  }
+
+  registerUploader(uploaderContext) {
+    if (this.disposed || !uploaderContext?.input) return null;
+    const input = uploaderContext.input;
+    const existing = this.uploaders.get(input);
+    if (existing) return existing.context;
+
+    const url = uploaderContext.pageUrl ?? this.globalRef?.location?.href ?? '';
+    const adapter = uploaderContext.adapter
+      ?? this.adapterRegistry.resolve(url);
+    const context = {
+      ...uploaderContext,
+      adapter,
+      nearbyTexts: [...(uploaderContext.nearbyTexts ?? [])],
+      alertTexts: [...(uploaderContext.alertTexts ?? [])]
+    };
+    const record = {
+      context,
+      adapter,
+      input,
+      currentTask: null,
+      listener: null,
+      cleanupListener: null
+    };
+    record.listener = (event) => {
+      const result = this.handleFileChange(event, context);
+      result?.catch?.((error) => {
+        if (record.currentTask) this._stopTask(
+          record.currentTask,
+          stableErrorCode(error),
+          error
+        );
+      });
+    };
+    input.addEventListener?.('change', record.listener, true);
+    record.cleanupListener = () => {
+      input.removeEventListener?.('change', record.listener, true);
+      clearInjectionGuard(input);
+    };
+    this.resources.add(record.cleanupListener);
+    this.uploaders.set(input, record);
+    this.logger.emit('UPLOADER_DISCOVERED');
+    this._publish();
+    return context;
+  }
+
+  _contextBundle(record, selectedText = null, alertTexts = []) {
+    const input = record.input;
+    let bundle;
+    try {
+      bundle = typeof record.adapter?.extractContext === 'function'
+        ? record.adapter.extractContext(input, selectedText, {
+          uploaderId: record.context.uploaderId
+        })
+        : extractRelevantContext(input, selectedText, {
+          uploaderId: record.context.uploaderId
+        });
+    } catch {
+      bundle = extractRelevantContext(input, selectedText, {
+        uploaderId: record.context.uploaderId
+      });
+    }
+    const mergedAlerts = [
+      ...(bundle?.alertTexts ?? []),
+      ...alertTexts
+    ].filter(Boolean);
+    const normalized = [
+      ...(bundle?.normalizedText ? [bundle.normalizedText] : []),
+      ...mergedAlerts
+    ].join('\n').slice(0, 6000);
+    return {
+      ...bundle,
+      uploaderId: record.context.uploaderId,
+      alertTexts: mergedAlerts,
+      normalizedText: normalized
+    };
+  }
+
+  _resolveRules(record, selectedText = null, alertTexts = []) {
+    const bundle = this._contextBundle(record, selectedText, alertTexts);
+    const candidates = this.parseRules(bundle);
+    const rules = this.resolveRules(candidates);
+    this.logger.emit('CONTEXT_EXTRACTED');
+    this.logger.emit('RULES_PARSED_LOCAL', { rules });
+    if (rules.conflicts?.length) {
+      this.logger.emit('RULE_CONFLICT', { rules });
+    }
+    return { bundle, candidates, rules };
+  }
+
+  _makeTask(record, file, event, rules, candidates, bundle) {
+    const abortController = createAbortController();
+    const stateMachine = createStateMachine({
+      initial: 'ARMED',
+      onTransition: () => this._publish(),
+      onInvalid: (diagnostic) => {
+        this.diagnostics.push({
+          ...diagnostic,
+          taskId: task?.taskId
+        });
+      }
+    });
+    const task = {
+      taskId: createRandomId('task'),
+      inputElement: record.input,
+      uploaderId: record.context.uploaderId,
+      label: record.context.label ?? '',
+      originalFile: file,
+      processedFile: null,
+      rules,
+      ruleCandidates: candidates,
+      contextBundle: bundle,
+      source: 'preflight',
+      status: 'ARMED',
+      retryCount: 0,
+      createdAt: Date.now(),
+      objectUrls: [],
+      warnings: [],
+      result: null,
+      metadata: null,
+      validation: null,
+      plan: null,
+      abortController,
+      stateMachine,
+      eventBlocked: false,
+      event,
+      businessClickCount: 0,
+      rejection: null,
+      rejectionStopper: null,
+      cancelled: false,
+      retryDispatched: false
+    };
+    return task;
+  }
+
+  async handleFileChange(event, uploaderContext) {
+    if (this.disposed) return { ignored: 'SESSION_DISPOSED' };
+    const input = uploaderContext?.input
+      ?? event?.currentTarget
+      ?? event?.target;
+    const record = this.uploaders.get(input);
+    if (!record || event?.type !== 'change') return { ignored: 'UNKNOWN_UPLOADER' };
+    if (consumeInjectionGuard(input, event)) {
+      return { ignored: 'INJECTION_GUARD' };
+    }
+    if (!input?.files?.length) return { ignored: 'EMPTY_FILE_LIST' };
+    if (input.multiple && input.files.length > 1) {
+      this._notify({ code: 'MULTIPLE_FILES_UNSUPPORTED', uploaderId: record.context.uploaderId });
+      return { ignored: 'MULTIPLE_FILES_UNSUPPORTED' };
+    }
+
+    const file = input.files[0];
+    if (!isFileForInput(input, file)) {
+      return { ignored: 'FILE_UNAVAILABLE' };
+    }
+
+    if (record.currentTask && taskCanBeObserved(record.currentTask)) {
+      this._cancelTaskInternal(record.currentTask, 'USER_CANCELLED', false);
+    }
+    const resolved = this._resolveRules(record);
+    const task = this._makeTask(
+      record,
+      file,
+      event,
+      resolved.rules,
+      resolved.candidates,
+      resolved.bundle
+    );
+    record.currentTask = task;
+    this.tasks.set(task.taskId, task);
+    this.logger.emit('FILE_SELECTED', {
+      taskId: task.taskId,
+      mime: file.type,
+      bytes: file.size
+    });
+
+    const shouldInspect = resolved.rules.actionable
+      || resolved.rules.safetyFlags?.length
+      || resolved.rules.conflicts?.length;
+    const quick = quickViolations(file, resolved.rules);
+    if (shouldInspect && (
+      quick.length > 0
+      || (
+        resolved.rules.confidence >= CONFIRM_RULE_CONFIDENCE
+        && resolved.rules.confidence < AUTO_RULE_CONFIDENCE
+      )
+    )) {
+      event.stopImmediatePropagation?.();
+      event.preventDefault?.();
+      task.eventBlocked = true;
+    }
+
+    this._transitionTask(task, 'INSPECTING');
+    this._transitionSession('INSPECTING');
+    if (!shouldInspect) {
+      this._waitForRejection(task, record);
+      return task;
+    }
+
+    await this._runPreflight(task, record);
+    return task;
+  }
+
+  async _runPreflight(task, record) {
+    if (record.currentTask === task && !task.inputElement.isConnected) {
+      this._stopTask(task, 'INPUT_DETACHED');
+      return;
+    }
+    if (!isTaskCurrent(task, record)) return;
+    if (!task.rules.actionable) {
+      if (task.rules.safetyFlags?.length || task.rules.conflicts?.some((item) => item.unresolvable)) {
+        this._stopTask(
+          task,
+          task.rules.safetyFlags?.length ? 'OFFICIAL_TOOL_REQUIRED' : 'RULE_CONFLICT'
+        );
+      } else {
+        this._waitForRejection(task, record);
+      }
+      return;
+    }
+    if (task.rules.confidence < CONFIRM_RULE_CONFIDENCE) {
+      this._waitForRejection(task, record);
+      return;
+    }
+
+    try {
+      const metadata = await this.inspectImage(task.originalFile, {
+        signal: task.abortController.signal
+      });
+      if (task.abortController.signal.aborted || record.currentTask !== task) return;
+      if (!task.inputElement.isConnected) {
+        this._stopTask(task, 'INPUT_DETACHED');
+        return;
+      }
+      task.metadata = metadata;
+      const validation = this.validateFile(metadata, task.rules);
+      task.validation = validation;
+      this._logValidation(task, metadata, validation);
+
+      if (validation.valid && task.rules.confidence >= AUTO_RULE_CONFIDENCE) {
+        if (task.eventBlocked) {
+          this._stopTask(task, 'USER_CONFIRMATION_REQUIRED');
+        } else {
+          this._completePassthrough(task);
+        }
+        return;
+      }
+
+      let plan = this.createProcessingPlan(metadata, task.rules);
+      if (task.rules.confidence >= CONFIRM_RULE_CONFIDENCE
+        && task.rules.confidence < AUTO_RULE_CONFIDENCE) {
+        plan = addRuleConfidenceConfirmation(plan);
+      }
+      task.plan = plan;
+
+      if (plan.unfixable?.length) {
+        this._stopTask(task, plan.unfixable[0] === 'RULE_CONFLICT'
+          ? 'RULE_CONFLICT'
+          : plan.unfixable[0]);
+        return;
+      }
+      if (hasRequiredConfirmation(plan)) {
+        this._needConfirmation(task, record);
+        this._requestConfirmation(task);
+        return;
+      }
+      if (!plan.executable) {
+        this._stopTask(task, 'USER_CONFIRMATION_REQUIRED');
+        return;
+      }
+      this._enqueue(task, record);
+    } catch (error) {
+      if (task.abortController.signal.aborted) return;
+      this._stopTask(task, stableErrorCode(error), error);
+    }
+  }
+
+  _logValidation(task, metadata, validation) {
+    const fields = {
+      taskId: task.taskId,
+      mime: metadata?.mime ?? metadata?.signatureMime,
+      bytes: metadata?.size,
+      width: metadata?.width,
+      height: metadata?.height
+    };
+    this.logger.emit(validation.valid ? 'FILE_VALID' : 'FILE_INVALID', fields);
+  }
+
+  _completePassthrough(task) {
+    this._transitionTask(task, 'PASSTHROUGH');
+    this._transitionSession('PASSTHROUGH');
+    this._transitionSession('ARMED');
+    this.logger.emit('TASK_SUCCEEDED', { taskId: task.taskId });
+    this._publish();
+  }
+
+  _waitForRejection(task, record) {
+    if (!isTaskCurrent(task, record)) return;
+    if (task.status !== 'WAITING_REJECTION') {
+      this._transitionTask(task, 'WAITING_REJECTION');
+    }
+    this._transitionSession('WAITING_REJECTION');
+    this._startRejectionObserver(task, record);
+    this._publish();
+  }
+
+  _needConfirmation(task, record) {
+    if (!isTaskCurrent(task, record)) return;
+    this._transitionTask(task, 'NEEDS_CONFIRMATION');
+    this._transitionSession('NEEDS_CONFIRMATION');
+    this.logger.emit('CONFIRMATION_REQUIRED', { taskId: task.taskId });
+    this._publish();
+  }
+
+  _requestConfirmation(task) {
+    if (typeof this.confirmationResolver !== 'function') return;
+    const pending = task.plan?.confirmations?.find((item) => item.required && !item.resolved);
+    if (!pending) return;
+    Promise.resolve()
+      .then(() => this.confirmationResolver({
+        taskId: task.taskId,
+        type: pending.type,
+        plan: safePlan(task.plan)
+      }))
+      .then((confirmation) => {
+        if (confirmation) return this.confirmTask(task.taskId, confirmation);
+        return undefined;
+      })
+      .catch((error) => this._stopTask(task, stableErrorCode(error), error));
+  }
+
+  _enqueue(task, record) {
+    if (!isTaskCurrent(task, record)) return;
+    if (!this.queue.includes(task)) this.queue.push(task);
+    this._pumpQueue();
+  }
+
+  _pumpQueue() {
+    if (this.disposed || this.processingTask) return;
+    while (this.queue.length) {
+      const task = this.queue.shift();
+      const record = this.uploaders.get(task?.inputElement);
+      if (task && record && record.currentTask === task && !task.inputElement.isConnected) {
+        this._stopTask(task, 'INPUT_DETACHED');
+      }
+      if (!task || !record || !isTaskCurrent(task, record) || task.status === 'STOPPED') {
+        continue;
+      }
+      this.processingTask = task;
+      void this._processTask(task, record).finally(() => {
+        if (this.processingTask === task) this.processingTask = null;
+        this._pumpQueue();
+      });
+      return;
+    }
+  }
+
+  async _processTask(task, record) {
+    if (record.currentTask === task && !task.inputElement.isConnected) {
+      this._stopTask(task, 'INPUT_DETACHED');
+      return;
+    }
+    if (!isTaskCurrent(task, record)) return;
+    if (!this._transitionTask(task, 'PROCESSING')) return;
+    this._transitionSession('PROCESSING');
+    this.logger.emit('PROCESS_STARTED', { taskId: task.taskId });
+    try {
+      const result = await this.processImage(
+        task.originalFile,
+        task.plan,
+        (progress) => {
+          if (!isTaskCurrent(task, record)) return;
+          task.progress = {
+            stage: typeof progress?.stage === 'string' ? progress.stage : 'processing'
+          };
+          this._publish();
+        },
+        { signal: task.abortController.signal, taskId: task.taskId }
+      );
+      if (task.abortController.signal.aborted || record.currentTask !== task) return;
+      if (!task.inputElement.isConnected) {
+        this._stopTask(task, 'INPUT_DETACHED');
+        return;
+      }
+      const validFile = isFileForInput(task.inputElement, result?.file);
+      if (!validFile || result?.validation?.valid !== true) {
+        throw Object.assign(new Error('Processed output failed final validation.'), {
+          code: 'OUTPUT_VALIDATION_FAILED'
+        });
+      }
+      task.result = result;
+      task.processedFile = result.file;
+      this.logger.emit('PROCESS_COMPLETED', {
+        taskId: task.taskId,
+        mime: result.metadata?.mime,
+        bytes: result.metadata?.size,
+        width: result.metadata?.width,
+        height: result.metadata?.height,
+        durationMs: result.durationMs
+      });
+      if (!this._transitionTask(task, 'INJECTING')) return;
+      this._transitionSession('INJECTING');
+      if (!task.inputElement.isConnected || this.uploaders.get(task.inputElement) !== record) {
+        throw Object.assign(new Error('Input is no longer connected.'), {
+          code: 'INPUT_DETACHED'
+        });
+      }
+      record.adapter?.beforeInjection?.(task);
+      const injection = this.injectFile(task.inputElement, result.file, {
+        dispatchEvents: true,
+        reason: 'processed'
+      });
+      task.injection = injection;
+      if (!injection?.ok || !injection.inputFilesVerified) {
+        throw Object.assign(new Error('File injection failed.'), {
+          code: injection?.errorCode ?? 'INJECTION_FAILED'
+        });
+      }
+      this.logger.emit('INJECTION_COMPLETED', {
+        taskId: task.taskId,
+        mime: result.metadata?.mime,
+        bytes: result.metadata?.size,
+        width: result.metadata?.width,
+        height: result.metadata?.height
+      });
+      record.adapter?.afterInjection?.(task);
+      this._transitionTask(task, 'SUCCESS');
+      this._transitionSession('SUCCESS');
+      this.logger.emit('TASK_SUCCEEDED', { taskId: task.taskId });
+      this._afterInjection(task, record);
+    } catch (error) {
+      if (task.abortController.signal.aborted || record.currentTask !== task) return;
+      if (!task.inputElement.isConnected) {
+        this._stopTask(task, 'INPUT_DETACHED');
+        return;
+      }
+      const code = stableErrorCode(error);
+      if (task.status === 'INJECTING'
+        && ['INJECTION_FAILED', 'DATATRANSFER_UNAVAILABLE'].includes(code)) {
+        this.injectFile(task.inputElement, task.originalFile, {
+          dispatchEvents: false,
+          reason: 'restore'
+        });
+      }
+      this._stopTask(task, code, error);
+    }
+  }
+
+  _afterInjection(task, record) {
+    if (!isTaskCurrent(task, record)) return;
+    if (task.source === 'rejection' && task.rejection && task.retryCount === 0) {
+      if (this._canRetry(task, record)) {
+        this._retryTask(task, record);
+        return;
+      }
+      task.warnings.push({ code: 'FORM_PAGE_USE_ORIGINAL_BUTTON' });
+    }
+    this._startRejectionObserver(task, record);
+  }
+
+  _canRetry(task, record) {
+    if (MAX_AUTO_RETRIES < 1
+      || task.retryCount !== 0
+      || !task.rejection
+      || task.rejection.kind !== 'explicit'
+      || task.rejection.related !== true
+      || !task.result?.file
+      || task.result.validation?.valid !== true
+      || !task.inputElement.isConnected
+      || task.cancelled
+      || this.disposed) return false;
+    let adapterAuto = false;
+    try {
+      adapterAuto = Boolean(record.adapter?.isAutoUpload?.(task.inputElement));
+    } catch {
+      adapterAuto = false;
+    }
+    return adapterAuto || (
+      record.adapter?.id === 'generic'
+      && task.businessClickCount === 0
+    );
+  }
+
+  _retryTask(task, record) {
+    if (!this._canRetry(task, record)) return false;
+    task.retryCount += 1;
+    this._transitionTask(task, 'RETRYING');
+    this._transitionSession('RETRYING');
+    this.logger.emit('RETRY_TRIGGERED', { taskId: task.taskId });
+    this._startRejectionObserver(task, record);
+    const EventConstructor = task.inputElement.ownerDocument?.defaultView?.Event
+      ?? EVENT_CONSTRUCTOR_FALLBACK;
+    try {
+      armInjectionGuard(task.inputElement, 'change');
+      if (typeof EventConstructor !== 'function') {
+        clearInjectionGuard(task.inputElement);
+        throw Object.assign(new Error('Event API unavailable.'), {
+          code: 'INJECTION_FAILED'
+        });
+      }
+      task.inputElement.dispatchEvent(new EventConstructor('input', {
+        bubbles: true,
+        composed: true
+      }));
+      task.inputElement.dispatchEvent(new EventConstructor('change', {
+        bubbles: true,
+        composed: true
+      }));
+      task.retryDispatched = true;
+      this._transitionTask(task, 'SUCCESS');
+      this._transitionSession('SUCCESS');
+      this._publish();
+      return true;
+    } catch (error) {
+      clearInjectionGuard(task.inputElement);
+      this._stopTask(task, stableErrorCode(error), error);
+      return false;
+    }
+  }
+
+  _startRejectionObserver(task, record) {
+    this._stopRejectionObserver(task);
+    if (!taskCanBeObserved(task)) return;
+    const stopper = this.observeRejection(task, record.context, {
+      onRejection: (detail) => {
+        void this._handleRejection(task, record, detail);
+      },
+      onTimeout: () => {
+        if (isTaskCurrent(task, record)) this._publish();
+      },
+      getActiveTasks: () => [...this.tasks.values()]
+        .filter((candidate) => taskCanBeObserved(candidate))
+    });
+    task.rejectionStopper = typeof stopper === 'function' ? stopper : null;
+  }
+
+  _stopRejectionObserver(task) {
+    task?.rejectionStopper?.();
+    if (task) task.rejectionStopper = null;
+  }
+
+  async _handleRejection(task, record, detail) {
+    if (!isTaskCurrent(task, record) || !detail) return;
+    if (detail.task && detail.task !== task) return;
+    if (task.retryCount >= MAX_AUTO_RETRIES) {
+      this._stopTask(task, 'PROCESSING_FAILED');
+      return;
+    }
+    this.logger.emit('REJECTION_DETECTED', { taskId: task.taskId });
+    if (detail.errorCode === 'AMBIGUOUS_REJECTION_ASSOCIATION') {
+      this._stopTask(task, detail.errorCode);
+      return;
+    }
+    if (detail.kind !== 'explicit' || detail.related !== true) {
+      this._stopTask(task, 'PROCESSING_FAILED');
+      return;
+    }
+
+    this._stopRejectionObserver(task);
+    task.rejection = detail;
+    task.source = 'rejection';
+    task.ruleCandidates = [
+      ...(task.ruleCandidates ?? []),
+      ...(detail.candidates ?? [])
+    ];
+    task.rules = this.resolveRules(task.ruleCandidates);
+    if (task.rules.conflicts?.length) {
+      this.logger.emit('RULE_CONFLICT', {
+        taskId: task.taskId,
+        rules: task.rules
+      });
+    }
+    if (!task.rules.actionable || task.rules.safetyFlags?.length
+      || task.rules.conflicts?.some((item) => item.unresolvable)) {
+      this._stopTask(task, task.rules.safetyFlags?.length
+        ? 'OFFICIAL_TOOL_REQUIRED'
+        : 'RULE_CONFLICT');
+      return;
+    }
+
+    if (task.status === 'SUCCESS') {
+      this._transitionTask(task, 'INSPECTING');
+    } else if (task.status === 'WAITING_REJECTION') {
+      this._transitionTask(task, 'INSPECTING');
+    } else if (task.status !== 'INSPECTING') {
+      this._stopTask(task, 'PROCESSING_FAILED');
+      return;
+    }
+    this._transitionSession('INSPECTING');
+
+    try {
+      const metadata = await this.inspectImage(task.originalFile, {
+        signal: task.abortController.signal
+      });
+      if (task.abortController.signal.aborted || record.currentTask !== task) return;
+      if (!task.inputElement.isConnected) {
+        this._stopTask(task, 'INPUT_DETACHED');
+        return;
+      }
+      task.metadata = metadata;
+      task.validation = this.validateFile(metadata, task.rules);
+      this._logValidation(task, metadata, task.validation);
+      let plan = this.createProcessingPlan(metadata, task.rules);
+      if (task.rules.confidence >= CONFIRM_RULE_CONFIDENCE
+        && task.rules.confidence < AUTO_RULE_CONFIDENCE) {
+        plan = addRuleConfidenceConfirmation(plan);
+      }
+      task.plan = plan;
+      if (task.validation.valid && plan.passthrough) {
+        this._stopTask(task, 'PROCESSING_FAILED');
+        return;
+      }
+      if (plan.unfixable?.length) {
+        this._stopTask(task, plan.unfixable[0] === 'RULE_CONFLICT'
+          ? 'RULE_CONFLICT'
+          : plan.unfixable[0]);
+        return;
+      }
+      if (hasRequiredConfirmation(plan)) {
+        this._needConfirmation(task, record);
+        this._requestConfirmation(task);
+        return;
+      }
+      if (!plan.executable) {
+        this._stopTask(task, 'USER_CONFIRMATION_REQUIRED');
+        return;
+      }
+      this._enqueue(task, record);
+    } catch (error) {
+      if (task.abortController.signal.aborted) return;
+      this._stopTask(task, stableErrorCode(error), error);
+    }
+  }
+
+  async confirmTask(taskId, confirmationPayload) {
+    const task = this.tasks.get(taskId);
+    const record = this.uploaders.get(task?.inputElement);
+    if (!task || !record || task.status !== 'NEEDS_CONFIRMATION') {
+      return { ok: false, errorCode: 'USER_CONFIRMATION_REQUIRED' };
+    }
+    try {
+      const nextPlan = this.resolveProcessingConfirmation(task.plan, confirmationPayload);
+      task.plan = nextPlan;
+      const accepted = confirmationPayload?.accepted === true;
+      if (!accepted) {
+        if (task.eventBlocked) {
+          this.injectFile(task.inputElement, task.originalFile, {
+            dispatchEvents: false,
+            reason: 'restore'
+          });
+        }
+        this._stopTask(task, 'USER_CANCELLED');
+        return { ok: true, status: task.status };
+      }
+      if (hasRequiredConfirmation(nextPlan)) {
+        this._publish();
+        this._requestConfirmation(task);
+        return { ok: true, status: task.status };
+      }
+      if (!nextPlan.executable) {
+        this._stopTask(task, 'USER_CONFIRMATION_REQUIRED');
+        return { ok: false, errorCode: 'USER_CONFIRMATION_REQUIRED' };
+      }
+      this._enqueue(task, record);
+      return { ok: true, status: task.status };
+    } catch (error) {
+      const code = stableErrorCode(error, 'USER_CONFIRMATION_REQUIRED');
+      this._stopTask(task, code, error);
+      return { ok: false, errorCode: code };
+    }
+  }
+
+  cancelTask(taskId) {
+    const task = this.tasks.get(taskId);
+    if (!task) return false;
+    return this._cancelTaskInternal(task, 'USER_CANCELLED', true);
+  }
+
+  _cancelTaskInternal(task, code, notify) {
+    task.cancelled = true;
+    const changed = this._stopTask(task, code);
+    if (notify) this._publish();
+    return changed;
+  }
+
+  restoreTask(taskId) {
+    const task = this.tasks.get(taskId);
+    if (!task || !task.inputElement?.isConnected || !task.originalFile) {
+      return {
+        ok: false,
+        inputFilesVerified: false,
+        eventsDispatched: [],
+        fallback: 'download',
+        errorCode: 'INPUT_DETACHED'
+      };
+    }
+    const result = this.restoreOriginal(task);
+    if (result?.ok) {
+      task.processedFile = null;
+      task.warnings.push({ code: 'ORIGINAL_RESTORED' });
+      this._stopTask(task, 'USER_CANCELLED');
+    }
+    return result;
+  }
+
+  _stopTask(task, errorCode = 'PROCESSING_FAILED', error = null) {
+    if (!task || task.status === 'DISPOSED' || task.status === 'STOPPED') return false;
+    task.errorCode = errorCode;
+    if (error?.message && task.warnings.length < 4) {
+      task.warnings.push({ code: errorCode });
+    }
+    task.abortController?.abort?.();
+    this._stopRejectionObserver(task);
+    task.objectUrls.splice(0).forEach((url) => {
+      const urlApi = task.inputElement?.ownerDocument?.defaultView?.URL ?? globalThis.URL;
+      urlApi?.revokeObjectURL?.(url);
+    });
+    const changed = this._transitionTask(task, 'STOPPED');
+    if (changed) {
+      this.logger.emit('TASK_STOPPED', {
+        taskId: task.taskId,
+        errorCode
+      });
+      this._transitionSession('STOPPED', { taskId: task.taskId });
+      this._publish();
+    }
+    return changed;
+  }
+
+  _transitionTask(task, next, details = {}) {
+    if (!task || task.status === next) return true;
+    const changed = task.stateMachine.transition(next, details);
+    if (changed) {
+      task.status = next;
+      task.stateHistory = task.stateMachine.history;
+      this._publish();
+    }
+    return changed;
+  }
+
+  _transitionSession(next, details = {}) {
+    if (this.disposed || this.sessionMachine.state === next) return true;
+    if (next === 'INSPECTING'
+      && (this.sessionMachine.state === 'STOPPED' || this.sessionMachine.state === 'SUCCESS')) {
+      this.sessionMachine.transition('ARMED', { reason: 'NEW_TASK' });
+    }
+    if (next === 'PROCESSING' && this.sessionMachine.state === 'ARMED') {
+      this.sessionMachine.transition('INSPECTING');
+    }
+    if (next === 'INJECTING' && this.sessionMachine.state === 'ARMED') {
+      this.sessionMachine.transition('INSPECTING');
+      this.sessionMachine.transition('PROCESSING');
+    }
+    if (next === 'RETRYING' && this.sessionMachine.state === 'SUCCESS') {
+      return this.sessionMachine.transition(next, details);
+    }
+    return this.sessionMachine.transition(next, details);
+  }
+
+  _notify(value) {
+    if (this.disposed) return;
+    for (const listener of [...this.listeners]) {
+      try {
+        listener(value);
+      } catch {
+        // A view listener cannot interrupt task execution.
+      }
+    }
+  }
+
+  _publish() {
+    if (this.disposed) return;
+    this._notify(this.getSnapshot());
+  }
+
+  getSnapshot() {
+    const tasks = [...this.tasks.values()]
+      .sort((left, right) => right.createdAt - left.createdAt);
+    const task = tasks.find((candidate) => ACTIVE_TASK_STATES.has(candidate.status))
+      ?? tasks[0]
+      ?? null;
+    return {
+      sessionState: this.disposed ? 'DISPOSED' : this.sessionMachine.state,
+      uploaderCount: this.uploaders.size,
+      activeTask: task
+        ? {
+          taskId: task.taskId,
+          status: task.status,
+          label: task.label,
+          current: safeMetadata(task.metadata),
+          rules: safeRuleSet(task.rules),
+          plan: safePlan(task.plan),
+          result: safeResult(task.result),
+          errorCode: task.errorCode ?? null,
+          retryCount: task.retryCount,
+          warnings: task.warnings.map((item) => ({ code: item.code }))
+        }
+        : null
+    };
+  }
+
+  getDiagnostics() {
+    return {
+      sessionId: this.sessionId,
+      state: this.sessionMachine.state,
+      transitions: this.sessionMachine.history.slice(),
+      diagnostics: this.diagnostics.slice()
+    };
+  }
+
+  subscribe(listener) {
+    if (typeof listener !== 'function') return () => {};
+    this.listeners.add(listener);
+    listener(this.getSnapshot());
+    return () => this.listeners.delete(listener);
+  }
+
+  dispose() {
+    if (this.disposed) return false;
+    this.disposed = true;
+    for (const task of this.tasks.values()) {
+      task.abortController?.abort?.();
+      this._stopRejectionObserver(task);
+      task.stateMachine.transition('DISPOSED', { reason: 'SESSION_DISPOSED' });
+      task.status = 'DISPOSED';
+    }
+    this.discovery?.cleanup?.();
+    this.resources.cleanup();
+    for (const record of this.uploaders.values()) record.cleanupListener?.();
+    this.uploaders.clear();
+    this.queue.length = 0;
+    this.processingTask = null;
+    this.sessionMachine.transition('DISPOSED', { reason: 'SESSION_DISPOSED' });
+    this.logger.emit('SESSION_DISPOSED');
+    this.listeners.clear();
+    return true;
+  }
+}
+
+export function createTaskController(options = {}) {
+  return new TaskController(options);
+}

@@ -7,8 +7,8 @@
 - 工程目录：`C:\Users\蔡天乐\Desktop\黑客松\main`
 - 需求事实来源：`C:\Users\蔡天乐\Desktop\黑客松\UploadFit-PRD-v1.0.md`
 - 执行任务书：`C:\Users\蔡天乐\Desktop\黑客松\UploadFit-开发任务书-v1.0`
-- 当前阶段：S2：图像处理引擎
-- 当前状态：S0、S1 已验收并放行；S2-D1～D8、R1～R6 及二次复验追加项均已修复，当前为 `READY_FOR_REACCEPTANCE`，等待用户确认。
+- 当前阶段：S3：任务编排与上传闭环
+- 当前状态：S0、S1、S2 已验收并放行；S3-D1～D9 已完成自动化门禁，当前为 `READY_FOR_ACCEPTANCE`，等待用户确认。
 - 记录日期：2026-08-18
 
 ## 2026-08-17：S0 / 平台连接确认
@@ -621,3 +621,33 @@ S2 范围：
 | 产物 SHA-256 | `F511425408A38D0D96AD931CF9FE8E7D32CA122297B3172B8594CFF9FA1AA62D` |
 
 代码与测试提交：`4dabd84`。权威证据：`docs/evidence/S2/second-rework-result.json`。范围仍限定 S2，没有进入 S3/S4、网络、AI、CDN、WASM、provider 或业务 DOM。
+
+## 2026-08-18：S3 / 任务编排与拒收观察交接
+
+状态：`READY_FOR_ACCEPTANCE`。本条登记 S3 实现和自动化复验完成，不登记用户验收通过；开发基线为提交 `1e2d0d9`。
+
+完成事项：
+
+- S3-D1～D3：建立独立 session、显式状态机、资源清理注册表和多 uploader adapter registry；非法状态迁移、重复 dispose、页面离开和 stale task 均有安全边界。
+- S3-D4～D6：TaskController 统一处理发现、规则解析、文件预检、任务确认、处理计划、最终校验、注入和原文件恢复；合规文件直通，明确不合规才进入 S2 处理链。
+- S3-D7～D8：拒收观察只读取关联错误节点，不抓网络、不点击业务按钮；明确拒收最多重试一次，二次明确拒收进入 STOPPED，模糊失败保持安全状态。
+- S3-D9：快照和诊断只输出脱敏元数据；增加 compliant passthrough、invalid PNG、低置信度确认、拒收重试/停止、多文件、双 uploader 隔离、detached/disposed 和 cleanup 证据。
+
+验证结果：
+
+| 命令 | 结果 |
+|---|---|
+| `npm test -- --run` | PASS：15 个 Vitest 文件、103 个测试 |
+| `npm run build` | PASS：119062 bytes |
+| `npm run static-check` | PASS |
+| `npm run test:e2e -- --reporter=line --workers=1` | PASS：49 个 Chromium 测试 |
+| `git diff --check` | PASS |
+| 产物 SHA-256 | `7F0DEDA9CE989911A5D24D1BFA0A73B55D0B8ACDEF8B9B272B8A79E2BBBAC514` |
+
+证据与交接：
+
+- `docs/evidence/S3/README.md`
+- `docs/evidence/S3/s3-result.json`
+- `docs/handoffs/S3-handoff.md`
+
+范围边界：仅修改 S3 任务编排、拒收观察、资源/会话安全边界、对应测试和证据文档；未进入 S4 UI、真实 Tabbit AI、网络请求检查、业务按钮点击、CDN/WASM/provider 或远程推送。Git 仅本地留痕。

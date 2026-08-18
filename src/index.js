@@ -23,6 +23,24 @@ import {
 import { inspectImage, validateFile } from './image/metadata.js';
 import { createProcessingPlan, resolveProcessingConfirmation } from './image/planner.js';
 import { processImage } from './image/canvas-pipeline.js';
+import { createTaskController, TaskController } from './core/task-controller.js';
+import { createSession } from './core/session.js';
+import { createCleanupRegistry, cleanupSession as cleanupResources } from './core/cleanup.js';
+import {
+  createStateMachine,
+  canTransition,
+  STATE_TRANSITIONS,
+  SESSION_STATES
+} from './core/state-machine.js';
+import { observeRejection } from './dom/rejection-observer.js';
+import {
+  classifyRejectionText,
+  isExplicitRejection
+} from './dom/rejection-classifier.js';
+import {
+  createAdapterRegistry,
+  resolveAdapter
+} from './adapters/registry.js';
 
 const BUILD_INFO = Object.freeze({
   version: __UPLOADFIT_VERSION__,
@@ -60,6 +78,21 @@ export {
   resolveProcessingConfirmation,
   resolveRules,
   createProcessingPlan,
+  createTaskController,
+  TaskController,
+  createSession,
+  createCleanupRegistry,
+  cleanupResources,
+  createStateMachine,
+  canTransition,
+  STATE_TRANSITIONS,
+  SESSION_STATES,
+  observeRejection,
+  classifyRejectionText as classifyRejection,
+  classifyRejectionText,
+  isExplicitRejection,
+  createAdapterRegistry,
+  resolveAdapter,
   selectAiRelevantText,
   validateFile
 };

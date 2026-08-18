@@ -1,9 +1,7 @@
 import { createRandomId } from './utils/ids.js';
 import { createLogger } from './utils/logger.js';
-import {
-  clearInjectionGuard,
-  consumeInjectionGuard
-} from './injection/injection-guard.js';
+import { clearInjectionGuard } from './injection/injection-guard.js';
+import { createTaskController } from './core/task-controller.js';
 
 export const SESSION_KEY = '__uploadfit_session__';
 const HOST_ATTRIBUTE = 'data-uploadfit-host';
@@ -66,18 +64,14 @@ export function bootstrap({
     inputs: new Set(),
     inputCleanups: new Map(),
     observer: null,
-    cleanup: null
+    cleanup: null,
+    controller: null
   };
 
   const attachInput = (input) => {
     if (!isFileInput(input) || session.inputs.has(input)) return false;
-    const onChange = (event) => {
-      consumeInjectionGuard(input, event);
-    };
-    input.addEventListener('change', onChange, true);
     session.inputs.add(input);
     session.inputCleanups.set(input, () => {
-      input.removeEventListener('change', onChange, true);
       clearInjectionGuard(input);
     });
     return true;
@@ -98,12 +92,21 @@ export function bootstrap({
     });
   }
 
+  session.controller = createTaskController({
+    documentRef,
+    globalRef,
+    logger,
+    sessionId: session.sessionId
+  });
+
   const onPageHide = () => session.cleanup();
   globalRef.addEventListener?.('pagehide', onPageHide, { once: true });
 
   session.cleanup = () => {
     if (!session.active) return;
     session.active = false;
+    session.controller?.dispose?.();
+    session.controller = null;
     session.observer?.disconnect();
     session.observer = null;
     for (const cleanup of session.inputCleanups.values()) cleanup();
@@ -112,11 +115,10 @@ export function bootstrap({
     globalRef.removeEventListener?.('pagehide', onPageHide);
     host.remove();
     if (globalRef[SESSION_KEY] === session) delete globalRef[SESSION_KEY];
-    logger.emit('SESSION_DISPOSED');
   };
 
   registerSession(globalRef, session);
-  logger.emit('SESSION_STARTED', { taskId: session.sessionId });
+  session.controller.start();
   return session;
 }
 
