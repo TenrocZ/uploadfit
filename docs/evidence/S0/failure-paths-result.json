@@ -1,0 +1,49 @@
+{
+  "date": "2026-08-17",
+  "environment": "Playwright Chromium with the production IIFE bundle",
+  "sensitiveDataUsed": false,
+  "failureCases": [
+    {
+      "case": "detached input",
+      "errorCode": "INPUT_DETACHED",
+      "ok": false,
+      "inputFilesVerified": false,
+      "eventsDispatched": [],
+      "fallback": "download"
+    },
+    {
+      "case": "controlled DataTransfer unavailable",
+      "errorCode": "DATATRANSFER_UNAVAILABLE",
+      "ok": false,
+      "inputFilesVerified": false,
+      "eventsDispatched": [],
+      "fallback": "download",
+      "note": "The constructor was disabled only inside the test page; this does not claim that Tabbit lacks DataTransfer."
+    },
+    {
+      "case": "input.files verification mismatch",
+      "errorCode": "INJECTION_FAILED",
+      "ok": false,
+      "inputFilesVerified": false,
+      "eventsDispatched": [],
+      "fallback": "download"
+    }
+  ],
+  "cleanup": {
+    "firstCleanupActive": false,
+    "hostCountAfterCleanup": 0,
+    "sessionPresentAfterCleanup": false,
+    "inputCleanupsAfterCleanup": 0,
+    "observerAfterCleanup": null,
+    "repeatedCleanupThrew": false,
+    "newSessionAfterRebootstrap": true,
+    "newHostCount": 1
+  },
+  "testSummary": {
+    "command": "npm run test:e2e -- --reporter=line --workers=1",
+    "passed": 4,
+    "failed": 0,
+    "testServerPort": 8765,
+    "testServerClosed": true
+  }
+}

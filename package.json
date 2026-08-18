@@ -1,0 +1,26 @@
+{
+  "name": "uploadfit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local image constraint adaptation for browser upload controls.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.20.0",
+    "npm": ">=10.9.3"
+  },
+  "scripts": {
+    "build": "node esbuild.config.js --mode=production",
+    "build:dev": "node esbuild.config.js --mode=development",
+    "test": "vitest",
+    "pretest:e2e": "npm run build",
+    "test:e2e": "node scripts/run-e2e.js",
+    "serve:test": "node scripts/serve-test.js",
+    "static-check": "node scripts/static-check.js",
+    "check": "npm test -- --run && npm run build && npm run static-check"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "esbuild": "^0.28.2",
+    "vitest": "^4.1.10"
+  }
+}

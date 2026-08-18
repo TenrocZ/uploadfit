@@ -1,0 +1,78 @@
+{
+  "date": "2026-08-18",
+  "browser": {
+    "name": "Tabbit Browser",
+    "version": "1.9.22.0",
+    "page": "http://127.0.0.1:8767/test-pages/probe.html"
+  },
+  "capabilities": {
+    "file": true,
+    "blob": true,
+    "dataTransfer": true,
+    "inputFilesProperty": true,
+    "inputFilesAssignable": true,
+    "canvas": true,
+    "canvasToBlob": true,
+    "createImageBitmap": true,
+    "worker": true,
+    "offscreenCanvas": true
+  },
+  "actions": [
+    {
+      "action": "save original A",
+      "result": {
+        "ok": true,
+        "inputFilesVerified": true,
+        "eventsDispatched": ["input", "change"],
+        "metadata": { "mime": "image/png", "size": 17 },
+        "errorCode": null
+      },
+      "note": "The File object is retained in memory as the originalFile passed to restoreOriginal."
+    },
+    {
+      "action": "inject B with product injectFile",
+      "result": {
+        "ok": true,
+        "inputFilesVerified": true,
+        "eventsDispatched": ["input", "change"],
+        "metadata": { "mime": "image/jpeg", "size": 11 },
+        "errorCode": null
+      },
+      "eventSequence": [
+        { "sequence": 1, "type": "input", "phase": "capture", "isTrusted": false, "metadata": { "mime": "image/jpeg", "size": 11 } },
+        { "sequence": 2, "type": "input", "phase": "target", "isTrusted": false, "metadata": { "mime": "image/jpeg", "size": 11 } },
+        { "sequence": 3, "type": "input", "phase": "bubble", "isTrusted": false, "metadata": { "mime": "image/jpeg", "size": 11 } },
+        { "sequence": 4, "type": "change", "phase": "capture", "isTrusted": false, "metadata": { "mime": "image/jpeg", "size": 11 } },
+        { "sequence": 5, "type": "change", "phase": "target", "isTrusted": false, "metadata": { "mime": "image/jpeg", "size": 11 } },
+        { "sequence": 6, "type": "change", "phase": "bubble", "isTrusted": false, "metadata": { "mime": "image/jpeg", "size": 11 } }
+      ]
+    },
+    {
+      "action": "restore saved A with product restoreOriginal",
+      "result": {
+        "ok": true,
+        "inputFilesVerified": true,
+        "eventsDispatched": ["input", "change"],
+        "metadata": { "mime": "image/png", "size": 17 },
+        "errorCode": null
+      },
+      "eventSequence": [
+        { "sequence": 7, "type": "input", "phase": "capture", "isTrusted": false, "metadata": { "mime": "image/png", "size": 17 } },
+        { "sequence": 8, "type": "input", "phase": "target", "isTrusted": false, "metadata": { "mime": "image/png", "size": 17 } },
+        { "sequence": 9, "type": "input", "phase": "bubble", "isTrusted": false, "metadata": { "mime": "image/png", "size": 17 } },
+        { "sequence": 10, "type": "change", "phase": "capture", "isTrusted": false, "metadata": { "mime": "image/png", "size": 17 } },
+        { "sequence": 11, "type": "change", "phase": "target", "isTrusted": false, "metadata": { "mime": "image/png", "size": 17 } },
+        { "sequence": 12, "type": "change", "phase": "bubble", "isTrusted": false, "metadata": { "mime": "image/png", "size": 17 } }
+      ]
+    }
+  ],
+  "conclusion": {
+    "inputFilesWrite": "PASS",
+    "originalFileObjectSaved": true,
+    "restoreOriginalApi": "PASS",
+    "restoredMetadataMatchesOriginal": true,
+    "eventOrder": "PASS: input before change; each observed once in capture, target, bubble phases",
+    "trustedBoundary": "KNOWN: synthetic events have isTrusted=false",
+    "sensitiveDataUsed": false
+  }
+}
