@@ -6,7 +6,7 @@
 - Status：`READY_FOR_ACCEPTANCE`
 - 核心门禁：`PASS`
 - Start commit：`3d132ad`（S1 启动登记）
-- End commit（实质实现范围）：待 Git 提交后回填
+- End commit（实质实现范围）：`b9ab7ef`
 - Agent：`Codex / UploadFit S1 Agent`
 - Environment：Windows；Node `v22.20.0`；npm `10.9.3`；Playwright Chromium；Tabbit Browser `1.9.22.0`（S1 未依赖 AI）
 - Build artifact：`dist/uploadfit.js`，31929 bytes，SHA-256 `7E3E73B9C0E64FA9FA5B7CDF33C1A99AF173E330882DE611F9152BAB726D7161`
@@ -78,4 +78,4 @@ JPG｜30–120KB｜390×567｜confidence=0.90｜actionable=true
 - closed Shadow DOM、跨域 iframe、密码/验证码和其他表单控件值不绕过、不读取。
 - 本交接不保存真实照片、完整文件名、Base64、Cookie、Token 或完整页面文本。
 
-End commit 将在实质实现提交完成后回填；Git 只做本地版本留痕，未推送远程。
+`b9ab7ef` 是本阶段代码、测试、证据和交接文档的实质实现提交；本行回填属于后续文档元数据提交。Git 只做本地版本留痕，未推送远程。
