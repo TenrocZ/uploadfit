@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createRuleCandidate } from '../../src/rules/schema.js';
+import { createEmptyRuleSet, createRuleCandidate } from '../../src/rules/schema.js';
 import { resolveRules } from '../../src/rules/resolver.js';
 import { validateRuleCandidate, validateRuleSet } from '../../src/rules/validators.js';
 
@@ -37,6 +37,41 @@ describe('runtime rule validation', () => {
       expect(validateRuleCandidate(invalid).valid).toBe(false);
       expect(resolveRules([invalid]).actionable).toBe(false);
     }
+  });
+
+  it('Q-S1-029 requires a complete canonical extension mapping for every format', () => {
+    const invalidCandidates = [
+      candidate({ formats: ['image/png'], extensions: [] }),
+      candidate({ formats: ['image/jpeg'], extensions: ['jpg'] }),
+      candidate({ formats: ['image/webp'] }),
+      candidate({ extensions: ['png'] })
+    ];
+    for (const invalid of invalidCandidates) {
+      expect(validateRuleCandidate(invalid).valid).toBe(false);
+      expect(resolveRules([invalid]).actionable).toBe(false);
+    }
+
+    const malformedRuleSet = createEmptyRuleSet();
+    malformedRuleSet.formats = ['image/png'];
+    malformedRuleSet.extensions = [];
+    expect(validateRuleSet(malformedRuleSet).valid).toBe(false);
+  });
+
+  it('Q-S1-030 rejects unknown keys inside nested rule objects', () => {
+    const invalidCandidates = [
+      candidate({ width: { exact: 390, min: null, max: null, unexpected: true } }),
+      candidate({ height: { exact: 567, min: null, max: null, unexpected: true } }),
+      candidate({ aspectRatio: { value: 1, tolerance: 0.01, unexpected: true } }),
+      candidate({ count: { max: 1, unexpected: true } })
+    ];
+    for (const invalid of invalidCandidates) {
+      expect(validateRuleCandidate(invalid).valid).toBe(false);
+      expect(resolveRules([invalid]).actionable).toBe(false);
+    }
+
+    const malformedRuleSet = createEmptyRuleSet();
+    malformedRuleSet.aspectRatio = { value: 1, tolerance: 0.01, unexpected: true };
+    expect(validateRuleSet(malformedRuleSet).valid).toBe(false);
   });
 
   it('rejects malformed tolerance, DPI, background, evidence, and safety flags', () => {

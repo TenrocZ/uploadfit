@@ -119,13 +119,13 @@ describe('rule resolver', () => {
         sourceType: 'html-attribute',
         evidence: ['accept: image/png'],
         confidence: 0.95,
-        rules: { formats: ['image/png'] }
+        rules: { formats: ['image/png'], extensions: ['png'] }
       }),
       createRuleCandidate({
         sourceType: 'rejection',
         evidence: ['拒收 PNG，请使用 JPG'],
         confidence: 0.95,
-        rules: { formats: ['image/jpeg'] }
+        rules: { formats: ['image/jpeg'], extensions: ['jpg', 'jpeg'] }
       })
     ]);
     expect(result.formats).toEqual(['image/jpeg']);

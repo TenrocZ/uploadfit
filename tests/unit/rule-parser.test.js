@@ -84,11 +84,34 @@ it('does not infer a format from examples, filenames, paths, or URLs', () => {
   }
 });
 
-it('keeps only explicitly allowed formats when a format is denied', () => {
+it('Q-S1-027 keeps only explicitly allowed formats for prefix and suffix denials', () => {
   expect(resolve('不支持PNG，只支持JPG').formats).toEqual(['image/jpeg']);
   expect(resolve('不支持PNG但允许JPG').formats).toEqual(['image/jpeg']);
+  expect(resolve('PNG不支持，只支持JPG').formats).toEqual(['image/jpeg']);
+  expect(resolve('PNG格式不支持，请使用JPG').formats).toEqual(['image/jpeg']);
+  expect(resolve('JPG允许，PNG禁用').formats).toEqual(['image/jpeg']);
   expect(resolve('禁止WebP').formats).toEqual([]);
+  expect(resolve('WebP禁止使用').formats).toEqual([]);
   expect(resolve('禁止WebP').actionable).toBe(false);
+});
+
+it('Q-S1-028 keeps advisory semantics isolated between bounded source items', () => {
+  const result = resolveRules(parseRulesDeterministically({
+    nearbyTexts: ['建议JPG', '图片最大100KB']
+  }));
+  expect(result).toMatchObject({
+    formats: [],
+    maxBytes: 100000,
+    actionable: true
+  });
+  expect(result.advisories).toContainEqual(expect.objectContaining({
+    rules: expect.objectContaining({ formats: ['image/jpeg'] })
+  }));
+});
+
+it('Q-S1-031 emits the complete canonical extension set for JPEG tokens', () => {
+  expect(resolve('仅支持JPEG').extensions).toEqual(['jpeg', 'jpg']);
+  expect(resolve('仅支持JPG').extensions).toEqual(['jpeg', 'jpg']);
 });
 
 it('supports star dimensions without confusing slash ratios', () => {

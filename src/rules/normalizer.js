@@ -31,8 +31,12 @@ export function normalizeFormats(values) {
     const normalized = normalizeFormatToken(value);
     if (!normalized) continue;
     if (!formats.includes(normalized.mime)) formats.push(normalized.mime);
-    if (!extensions.includes(normalized.extension)) extensions.push(normalized.extension);
-    if (normalized.mime === 'image/jpeg' && !extensions.includes('jpeg')) extensions.push('jpeg');
+    const canonicalExtensions = normalized.mime === 'image/jpeg'
+      ? ['jpg', 'jpeg']
+      : [normalized.extension];
+    for (const extension of canonicalExtensions) {
+      if (!extensions.includes(extension)) extensions.push(extension);
+    }
   }
   return { formats, extensions };
 }

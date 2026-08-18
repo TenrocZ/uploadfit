@@ -18,7 +18,8 @@ const DIMENSION_QUALIFIER = /(?:不低于|至少|最低|>=|≥)/;
 const MAX_DIMENSION_QUALIFIER = /(?:不超过|最多|最高|<=|≤)/;
 const ADVISORY_PATTERN = /建议|推荐|最好|尽量/;
 const FORMAT_ALLOW_CONTEXT = /支持|允许|仅|只|格式|请使用|上传|图片|图像|照片|证件照|头像|封面|扫描件|建议|推荐|最好|尽量/;
-const FORMAT_NEGATIVE_CONTEXT = /(?:不支持|不允许|禁止|不能(?:使用|用)?|拒绝|不接受|不接收|排除)\s*$/;
+const FORMAT_NEGATIVE_PREFIX_CONTEXT = /(?:不支持|不允许|禁止(?:使用)?|禁用|不能(?:使用|用)?|拒绝|不接受|不接收|排除)\s*$/;
+const FORMAT_NEGATIVE_SUFFIX_CONTEXT = /^\s*(?:(?:图片|图像)?格式)?\s*(?:不支持|不允许|禁止(?:使用)?|禁用|不能(?:使用|用)?|拒绝|不接受|不接收|排除)/;
 const FORMAT_EXAMPLE_CONTEXT = /示例|样例|文件名|文件路径|路径|下载|链接|网址|\burl\b|\b(?:avatar|photo|image|file)[-_\w]*\.(?:jpg|jpeg|png|webp)\b/i;
 const STOP_SEMANTICS = [
   ['SYSTEM_BUSY', /系统繁忙/],
@@ -86,7 +87,10 @@ function parseFormats(text, rules) {
   const tokens = matches
     .filter((match) => {
       const prefix = text.slice(Math.max(0, match.index - 16), match.index);
-      return !FORMAT_NEGATIVE_CONTEXT.test(prefix);
+      const suffixStart = match.index + match[0].length;
+      const suffix = text.slice(suffixStart, suffixStart + 16);
+      return !FORMAT_NEGATIVE_PREFIX_CONTEXT.test(prefix)
+        && !FORMAT_NEGATIVE_SUFFIX_CONTEXT.test(suffix);
     })
     .map((match) => match[0]);
   if (!tokens.length) return;
@@ -261,8 +265,8 @@ export function parseRulesDeterministically(context = {}) {
   if (acceptCandidate) candidates.push(acceptCandidate);
 
   const bounded = getBoundedSourceTexts(context);
-  candidates.push(...parseText(bounded.nearby.join(' '), 'nearby-text'));
-  candidates.push(...parseText(bounded.alert.join(' '), 'rejection'));
-  candidates.push(...parseText(bounded.selected.join(' '), 'selected-text'));
+  for (const text of bounded.nearby) candidates.push(...parseText(text, 'nearby-text'));
+  for (const text of bounded.alert) candidates.push(...parseText(text, 'rejection'));
+  for (const text of bounded.selected) candidates.push(...parseText(text, 'selected-text'));
   return candidates;
 }

@@ -68,6 +68,9 @@ const FORMAT_EXTENSIONS = Object.freeze({
   'image/png': ['png'],
   'image/webp': ['webp']
 });
+const DIMENSION_FIELDS = new Set(['exact', 'min', 'max']);
+const ASPECT_RATIO_FIELDS = new Set(['value', 'tolerance']);
+const COUNT_FIELDS = new Set(['max']);
 const UNSAFE_EVIDENCE_PATTERN = /https?:\/\/|(?:password|passwd|pwd|密码|口令|token|cookie|session|authorization|bearer|secret|api[_-]?key|captcha|验证码|校验码|短信码|密钥)\s*[:=：]/i;
 
 function hasOwn(object, key) {
@@ -88,6 +91,9 @@ function validateDimensionRule(rule, field, required = false) {
   if (rule === undefined && !required) return [];
   if (!rule || typeof rule !== 'object' || Array.isArray(rule)) return [`${field}_INVALID`];
   const errors = [];
+  for (const key of Object.keys(rule)) {
+    if (!DIMENSION_FIELDS.has(key)) errors.push(`${field}_FIELD_${key}_UNKNOWN`);
+  }
   for (const key of ['exact', 'min', 'max']) {
     if (hasOwn(rule, key) && !optionalNumber(rule[key], MAX_DIMENSION)) {
       errors.push(`${field}_${key.toUpperCase()}_INVALID`);
@@ -122,9 +128,14 @@ function validateFormatsAndExtensions(rules, errors) {
   const extensions = rules.extensions;
   errors.push(...validateStringArray(formats, 'FORMATS', ALLOWED_FORMATS));
   errors.push(...validateStringArray(extensions, 'EXTENSIONS', ALLOWED_EXTENSIONS));
+  if (hasOwn(rules, 'formats') !== hasOwn(rules, 'extensions')) {
+    errors.push('FORMATS_EXTENSIONS_PAIR_REQUIRED');
+  }
   if (!Array.isArray(formats) || !Array.isArray(extensions)) return;
-  const compatibleExtensions = new Set(formats.flatMap((format) => FORMAT_EXTENSIONS[format] ?? []));
-  if (extensions.some((extension) => !compatibleExtensions.has(extension))) {
+  const expectedExtensions = new Set(formats.flatMap((format) => FORMAT_EXTENSIONS[format] ?? []));
+  const actualExtensions = new Set(extensions);
+  if (actualExtensions.size !== expectedExtensions.size
+    || [...actualExtensions].some((extension) => !expectedExtensions.has(extension))) {
     errors.push('FORMATS_EXTENSIONS_INCONSISTENT');
   }
 }
@@ -160,6 +171,9 @@ function validateRulesObject(rules, { required = false } = {}) {
     if (!rules.aspectRatio || typeof rules.aspectRatio !== 'object' || Array.isArray(rules.aspectRatio)) {
       errors.push('ASPECT_RATIO_INVALID');
     } else {
+      for (const key of Object.keys(rules.aspectRatio)) {
+        if (!ASPECT_RATIO_FIELDS.has(key)) errors.push(`ASPECT_RATIO_FIELD_${key}_UNKNOWN`);
+      }
       const { value, tolerance } = rules.aspectRatio;
       if (!hasOwn(rules.aspectRatio, 'value')) errors.push('ASPECT_RATIO_VALUE_MISSING');
       if (!hasOwn(rules.aspectRatio, 'tolerance')) errors.push('ASPECT_RATIO_TOLERANCE_MISSING');
@@ -176,6 +190,9 @@ function validateRulesObject(rules, { required = false } = {}) {
     if (!rules.count || typeof rules.count !== 'object' || Array.isArray(rules.count)) {
       errors.push('COUNT_INVALID');
     } else {
+      for (const key of Object.keys(rules.count)) {
+        if (!COUNT_FIELDS.has(key)) errors.push(`COUNT_FIELD_${key}_UNKNOWN`);
+      }
       if (!hasOwn(rules.count, 'max')) errors.push('COUNT_MAX_MISSING');
       if (hasOwn(rules.count, 'max') && !optionalPositiveInteger(rules.count.max, MAX_FILE_COUNT)) {
         errors.push('COUNT_MAX_INVALID');
