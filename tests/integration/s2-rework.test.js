@@ -108,6 +108,86 @@ test('Q-S2-001: recomputes authority and blocks deleted, forged, tampered, or mi
   expect(result.valid.bytes).toBeGreaterThan(0);
 });
 
+test('Q-S2-014: one accepted confirmation cannot authorize another lossy operation', async ({ page }) => {
+  await openApi(page);
+  const result = await page.evaluate(async () => {
+    const api = globalThis.__uploadfit_debug_bundle__;
+    const baseRules = (overrides = {}) => ({
+      formats: ['image/png'], extensions: ['png'], minBytes: 1, maxBytes: null,
+      width: { exact: 100, min: null, max: null },
+      height: { exact: 100, min: null, max: null },
+      aspectRatio: { value: 1, tolerance: 0.015 }, dpi: null, count: { max: 1 },
+      background: null, semanticRequirements: [], confidence: 0.96, sources: [], conflicts: [],
+      advisories: [], safetyFlags: [], actionable: true, ...overrides
+    });
+    async function canvasFile(width, height, mime, name, transparent = false) {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext('2d');
+      context.clearRect(0, 0, width, height);
+      context.fillStyle = '#d9363e';
+      context.fillRect(0, 0, transparent ? Math.ceil(width / 2) : width, height);
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, mime, 0.9));
+      return new File([blob], name, { type: mime });
+    }
+    async function code(file, candidate, useWorker) {
+      try {
+        await api.processImage(file, candidate, undefined, { useWorker });
+        return null;
+      } catch (error) {
+        return error.code;
+      }
+    }
+
+    const cropFile = await canvasFile(200, 100, 'image/png', 'crop.png', true);
+    const cropPlan = api.createProcessingPlan(await api.inspectImage(cropFile), baseRules());
+    const cropItem = cropPlan.confirmations.find((item) => item.type === 'CROP');
+    const cropResolved = api.resolveProcessingConfirmation(cropPlan, {
+      id: cropItem.id, type: 'CROP', accepted: true, payload: cropItem.suggestedPayload
+    });
+    const cropWithFlatten = { ...cropResolved, flattenBackground: { color: 'black' } };
+
+    const flattenFile = await canvasFile(100, 100, 'image/png', 'flatten.png', true);
+    const flattenPlan = api.createProcessingPlan(await api.inspectImage(flattenFile), baseRules({
+      formats: ['image/jpeg'], extensions: ['jpg', 'jpeg']
+    }));
+    const flattenItem = flattenPlan.confirmations.find((item) => item.type === 'FLATTEN_BACKGROUND');
+    const flattenResolved = api.resolveProcessingConfirmation(flattenPlan, {
+      id: flattenItem.id, type: 'FLATTEN_BACKGROUND', accepted: true, payload: { color: 'white' }
+    });
+    const flattenWithCrop = {
+      ...flattenResolved,
+      crop: { x: 0, y: 0, width: 50, height: 100 }
+    };
+
+    const upscaleFile = await canvasFile(50, 50, 'image/png', 'upscale.png');
+    const upscalePlan = api.createProcessingPlan(await api.inspectImage(upscaleFile), baseRules());
+    const upscaleItem = upscalePlan.confirmations.find((item) => item.type === 'UPSCALE');
+    const upscaleResolved = api.resolveProcessingConfirmation(upscalePlan, {
+      id: upscaleItem.id, type: 'UPSCALE', accepted: true, payload: { allow: true }
+    });
+    const upscaleWithFlatten = { ...upscaleResolved, flattenBackground: { color: 'white' } };
+
+    return {
+      cropMain: await code(cropFile, cropWithFlatten, false),
+      cropWorker: await code(cropFile, cropWithFlatten, true),
+      flattenMain: await code(flattenFile, flattenWithCrop, false),
+      flattenWorker: await code(flattenFile, flattenWithCrop, true),
+      upscaleMain: await code(upscaleFile, upscaleWithFlatten, false),
+      upscaleWorker: await code(upscaleFile, upscaleWithFlatten, true)
+    };
+  });
+  expect(result).toEqual({
+    cropMain: 'USER_CONFIRMATION_REQUIRED',
+    cropWorker: 'USER_CONFIRMATION_REQUIRED',
+    flattenMain: 'USER_CONFIRMATION_REQUIRED',
+    flattenWorker: 'USER_CONFIRMATION_REQUIRED',
+    upscaleMain: 'USER_CONFIRMATION_REQUIRED',
+    upscaleWorker: 'USER_CONFIRMATION_REQUIRED'
+  });
+});
+
 test('Q-S2-003/Q-S2-004: Worker and main use the same bounded quality search and safe output range', async ({ page }) => {
   await openApi(page);
   const fixture = await loadFixture('jpeg-390x567-medium.jpg');
@@ -192,6 +272,156 @@ test('Q-S2-009: integration consumes the generated fixture files from disk, incl
   }
   expect(result.find((item) => item.name === 'transparent.png').hasAlpha).toBe(true);
   expect(result.find((item) => item.name === 'jpeg-orientation-6.jpg')).toMatchObject({ width: 50, height: 100 });
+});
+
+test('Q-S2-016: generated fixtures drive conversion, compression, confirmation, orientation, and failure paths', async ({ page }) => {
+  test.setTimeout(120_000);
+  await openApi(page);
+  const result = await page.evaluate(async (baseRules) => {
+    const api = globalThis.__uploadfit_debug_bundle__;
+    async function fixture(name, mime) {
+      const response = await fetch(`/tests/fixtures/generated/${encodeURIComponent(name)}`);
+      if (!response.ok) throw new Error(`FIXTURE_FETCH_FAILED:${name}`);
+      return new File([await response.arrayBuffer()], name, { type: mime });
+    }
+    async function run(file, selectedRules, useWorker = true) {
+      const metadata = await api.inspectImage(file);
+      const plan = api.createProcessingPlan(metadata, selectedRules);
+      return api.processImage(file, plan, undefined, { useWorker });
+    }
+
+    const png = await fixture('png-1170x1701.png', 'image/png');
+    const converted = await run(png, {
+      ...baseRules,
+      minBytes: 30 * 1024,
+      maxBytes: 120_000
+    });
+
+    const medium = await fixture('jpeg-390x567-medium.jpg', 'image/jpeg');
+    const compressed = await run(medium, { ...baseRules, maxBytes: 120_000 });
+
+    const small = await fixture('jpeg-390x567-small.jpg', 'image/jpeg');
+    let smallError = null;
+    try {
+      await run(small, { ...baseRules, minBytes: 30_000, maxBytes: 120_000 }, false);
+    } catch (error) {
+      smallError = error.code;
+    }
+
+    const large = await fixture('jpeg-4000x3000.jpg', 'image/jpeg');
+    const resized = await run(large, {
+      ...baseRules,
+      maxBytes: 500_000,
+      width: { exact: null, min: null, max: 2000 },
+      height: { exact: null, min: null, max: 2000 },
+      aspectRatio: null
+    });
+
+    const transparent = await fixture('transparent.png', 'image/png');
+    const transparentMetadata = await api.inspectImage(transparent);
+    const flattenPlan = api.createProcessingPlan(transparentMetadata, baseRules);
+    const flattenItem = flattenPlan.confirmations.find((item) => item.type === 'FLATTEN_BACKGROUND');
+    const flattenResolved = api.resolveProcessingConfirmation(flattenPlan, {
+      id: flattenItem.id,
+      type: 'FLATTEN_BACKGROUND',
+      accepted: true,
+      payload: { color: 'white' }
+    });
+    const flattened = await api.processImage(transparent, flattenResolved, undefined, { useWorker: false });
+    const flattenedBitmap = await createImageBitmap(flattened.file);
+    const sampleCanvas = document.createElement('canvas');
+    sampleCanvas.width = flattenedBitmap.width;
+    sampleCanvas.height = flattenedBitmap.height;
+    const sampleContext = sampleCanvas.getContext('2d');
+    sampleContext.drawImage(flattenedBitmap, 0, 0);
+    const corner = Array.from(sampleContext.getImageData(0, 0, 1, 1).data.slice(0, 3));
+    flattenedBitmap.close();
+
+    const orientation = await fixture('jpeg-orientation-6.jpg', 'image/jpeg');
+    const orientationRules = {
+      ...baseRules,
+      width: { exact: 50, min: null, max: null },
+      height: { exact: 100, min: null, max: null },
+      aspectRatio: { value: 0.5, tolerance: 0.015 }
+    };
+    const orientationMetadata = await api.inspectImage(orientation);
+    const orientationPlan = api.createProcessingPlan(orientationMetadata, orientationRules);
+    const orientedWorker = await api.processImage(orientation, orientationPlan, undefined, { useWorker: true });
+    const orientedMain = await api.processImage(orientation, orientationPlan, undefined, { useWorker: false });
+
+    const corrupt = await fixture('corrupt.png', 'image/png');
+    const corruptPlan = api.createProcessingPlan(await api.inspectImage(corrupt), baseRules);
+    let corruptError = null;
+    try {
+      await api.processImage(corrupt, corruptPlan, undefined, { useWorker: false });
+    } catch (error) {
+      corruptError = error.code;
+    }
+
+    const webp = await fixture('sample.webp', 'image/webp');
+    const webpOutput = await run(webp, {
+      ...baseRules,
+      formats: ['image/webp'],
+      extensions: ['webp'],
+      maxBytes: 500_000
+    }, false);
+
+    return {
+      converted: {
+        mime: converted.file.type,
+        bytes: converted.file.size,
+        width: converted.metadata.width,
+        height: converted.metadata.height,
+        valid: converted.validation.valid
+      },
+      compressed: { bytes: compressed.file.size, valid: compressed.validation.valid },
+      smallError,
+      resized: {
+        bytes: resized.file.size,
+        width: resized.metadata.width,
+        height: resized.metadata.height,
+        valid: resized.validation.valid
+      },
+      flattened: {
+        mime: flattened.file.type,
+        valid: flattened.validation.valid,
+        corner
+      },
+      orientation: {
+        detected: orientationMetadata.orientation,
+        worker: [orientedWorker.metadata.width, orientedWorker.metadata.height, orientedWorker.workerUsed],
+        main: [orientedMain.metadata.width, orientedMain.metadata.height, orientedMain.workerUsed]
+      },
+      corruptError,
+      webp: {
+        mime: webpOutput.file.type,
+        passthrough: webpOutput.passthrough,
+        valid: webpOutput.validation.valid
+      }
+    };
+  }, rules());
+
+  expect(result.converted).toMatchObject({
+    mime: 'image/jpeg', width: 390, height: 567, valid: true
+  });
+  expect(result.converted.bytes).toBeGreaterThanOrEqual(30 * 1024);
+  expect(result.converted.bytes).toBeLessThanOrEqual(108_000);
+  expect(result.compressed.valid).toBe(true);
+  expect(result.compressed.bytes).toBeLessThanOrEqual(108_000);
+  expect(result.smallError).toBe('FILE_TOO_SMALL');
+  expect(result.resized.valid).toBe(true);
+  expect(result.resized.bytes).toBeLessThanOrEqual(450_000);
+  expect(result.resized.width).toBeLessThanOrEqual(2000);
+  expect(result.resized.height).toBeLessThanOrEqual(2000);
+  expect(result.flattened).toMatchObject({ mime: 'image/jpeg', valid: true });
+  for (const channel of result.flattened.corner) expect(channel).toBeGreaterThanOrEqual(200);
+  expect(result.orientation).toEqual({
+    detected: 6,
+    worker: [50, 100, true],
+    main: [50, 100, false]
+  });
+  expect(result.corruptError).toBe('DECODE_FAILED');
+  expect(result.webp).toEqual({ mime: 'image/webp', passthrough: true, valid: true });
 });
 
 test('Q-S2-010: HTMLImageElement fallback succeeds and revokes every decode object URL', async ({ page }) => {
@@ -354,6 +584,57 @@ test('Q-S2-012: generated 4000x3000 input stays within 5 seconds and 500ms heart
   expect(result.outputHeight).toBeLessThanOrEqual(2000);
   expect(result.valid).toBe(true);
   expect(result.workerUsed).toBe(true);
+});
+
+test('Q-S2-017: main-thread fallback stays within total and continuous-freeze limits', async ({ page }) => {
+  test.setTimeout(120_000);
+  await openApi(page);
+  const result = await page.evaluate(async (baseRules) => {
+    const response = await fetch('/tests/fixtures/generated/jpeg-4000x3000.jpg');
+    if (!response.ok) throw new Error('FIXTURE_FETCH_FAILED:jpeg-4000x3000.jpg');
+    const api = globalThis.__uploadfit_debug_bundle__;
+    const file = new File([await response.arrayBuffer()], 'jpeg-4000x3000.jpg', { type: 'image/jpeg' });
+    const plan = api.createProcessingPlan(await api.inspectImage(file), {
+      ...baseRules,
+      maxBytes: 500_000,
+      width: { exact: null, min: null, max: 2000 },
+      height: { exact: null, min: null, max: 2000 },
+      aspectRatio: null
+    });
+    const gaps = [];
+    let lastBeat = performance.now();
+    const heartbeat = setInterval(() => {
+      const now = performance.now();
+      gaps.push(now - lastBeat);
+      lastBeat = now;
+    }, 25);
+    const started = performance.now();
+    let output;
+    try {
+      output = await api.processImage(file, plan, undefined, { useWorker: false });
+    } finally {
+      clearInterval(heartbeat);
+    }
+    return {
+      totalMs: performance.now() - started,
+      maxHeartbeatGapMs: Math.max(0, ...gaps),
+      heartbeatCount: gaps.length,
+      outputBytes: output.file.size,
+      outputWidth: output.metadata.width,
+      outputHeight: output.metadata.height,
+      valid: output.validation.valid,
+      workerUsed: output.workerUsed
+    };
+  }, rules());
+  console.log(`S2-EVIDENCE Q-S2-017 ${JSON.stringify(result)}`);
+  expect(result.totalMs).toBeLessThanOrEqual(5000);
+  expect(result.maxHeartbeatGapMs).toBeLessThanOrEqual(500);
+  expect(result.heartbeatCount).toBeGreaterThan(0);
+  expect(result.outputBytes).toBeLessThanOrEqual(500_000);
+  expect(result.outputWidth).toBeLessThanOrEqual(2000);
+  expect(result.outputHeight).toBeLessThanOrEqual(2000);
+  expect(result.valid).toBe(true);
+  expect(result.workerUsed).toBe(false);
 });
 
 test('Q-S2-013: 80MP boundary rejects 10000x8001 but does not pixel-reject exact 10000x8000', async ({ page }) => {

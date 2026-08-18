@@ -118,6 +118,20 @@ function validateResolvedPlan(metadata, plan) {
     || plan.confirmations.length !== authoritative.confirmations.length) {
     confirmationFailure('Required confirmation set does not match the current input.');
   }
+  const expectedTypes = new Set(authoritative.confirmations.map((item) => item.type));
+  if (!expectedTypes.has('CROP') && plan.crop !== null && plan.crop !== undefined) {
+    confirmationFailure('Crop data is present without a matching required confirmation.');
+  }
+  if (!expectedTypes.has('FLATTEN_BACKGROUND')
+    && plan.flattenBackground !== null && plan.flattenBackground !== undefined) {
+    confirmationFailure('Background flattening is present without a matching required confirmation.');
+  }
+  if (!expectedTypes.has('UPSCALE') && plan.upscaleAccepted === true) {
+    confirmationFailure('Upscale approval is present without a matching required confirmation.');
+  }
+
+  const canonical = authoritative;
+  const canonicalConfirmations = [];
   for (const expected of authoritative.confirmations) {
     if (!CONFIRMATION_TYPES.has(expected.type)) {
       throw new ImageProcessingError('PROCESSING_FAILED', 'Processing plan contains an unsupported confirmation type.');
@@ -139,12 +153,26 @@ function validateResolvedPlan(metadata, plan) {
         || !stableEqual(plan.crop, crop)) {
         confirmationFailure('Crop confirmation payload is invalid or tampered.');
       }
+      canonical.crop = crop;
+      canonicalConfirmations.push({
+        ...expected,
+        resolved: true,
+        accepted: true,
+        payload: crop
+      });
     } else if (expected.type === 'FLATTEN_BACKGROUND') {
       const color = actual.payload?.color;
       if (!isRecord(actual.payload) || !BACKGROUND_COLOR_NAMES.has(color)
         || !stableEqual(plan.flattenBackground, { color })) {
         confirmationFailure('Flatten background confirmation payload is invalid or tampered.');
       }
+      canonical.flattenBackground = { color };
+      canonicalConfirmations.push({
+        ...expected,
+        resolved: true,
+        accepted: true,
+        payload: { color }
+      });
     } else if (expected.type === 'UPSCALE') {
       if (actual.payload?.allow !== true || plan.upscaleAccepted !== true) {
         confirmationFailure('Upscale confirmation must explicitly allow the proposed upscale.');
@@ -155,12 +183,14 @@ function validateResolvedPlan(metadata, plan) {
         || (actual.payload.height !== undefined && actual.payload.height !== proposedHeight)) {
         confirmationFailure('Upscale confirmation target does not match the current input.');
       }
+      canonical.upscaleAccepted = true;
+      canonicalConfirmations.push({
+        ...expected,
+        resolved: true,
+        accepted: true,
+        payload: { allow: true }
+      });
     }
-  }
-
-  if (authoritative.confirmations.length === 0
-    && (plan.crop !== null || plan.flattenBackground !== null || plan.upscaleAccepted === true)) {
-    throw new ImageProcessingError('PROCESSING_FAILED', 'Resolved plan contains operations not required by the current input.');
   }
   if (plan.executable !== true) {
     const declined = plan.confirmations.some((item) => item?.resolved === true && item.accepted === false);
@@ -169,7 +199,9 @@ function validateResolvedPlan(metadata, plan) {
       declined ? 'User confirmation was declined.' : 'Required confirmation is unresolved.'
     );
   }
-  return plan;
+  canonical.confirmations = canonicalConfirmations;
+  canonical.executable = true;
+  return canonical;
 }
 
 function createCanvas(width, height, preferOffscreen = false) {

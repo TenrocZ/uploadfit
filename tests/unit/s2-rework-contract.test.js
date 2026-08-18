@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -76,5 +77,22 @@ describe('S2 rework contracts', () => {
     });
     expect(result.status).not.toBe(0);
     expect(`${result.stdout}\n${result.stderr}`).toContain('FIXTURE_TARGET_UNREACHABLE');
+  });
+
+  it('Q-S2-015: size fixtures use natural encoded bytes without APP1 padding', () => {
+    const manifest = JSON.parse(readFileSync(
+      path.join(rootDir, 'tests', 'fixtures', 'manifest.json'),
+      'utf8'
+    ));
+    const sized = manifest.samples.filter((sample) => Number.isFinite(sample.targetBytes));
+    expect(sized).toHaveLength(4);
+    for (const sample of sized) {
+      const minimum = Math.round(sample.targetBytes * (1 - sample.toleranceRatio));
+      const maximum = Math.round(sample.targetBytes * (1 + sample.toleranceRatio));
+      expect(sample.actualBytes).toBeGreaterThanOrEqual(minimum);
+      expect(sample.actualBytes).toBeLessThanOrEqual(maximum);
+      expect(sample.encodingCandidate).toBeTruthy();
+      if (sample.mime === 'image/jpeg') expect(sample.app1MetadataBytes).toBe(0);
+    }
   });
 });

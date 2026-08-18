@@ -43,6 +43,25 @@ function hashBytes(bytes) {
   return createHash('sha256').update(bytes).digest('hex').toUpperCase();
 }
 
+function jpegApp1MetadataBytes(bytes) {
+  if (!(bytes instanceof Uint8Array) || bytes.length < 4
+    || bytes[0] !== 0xff || bytes[1] !== 0xd8) return 0;
+  let offset = 2;
+  let total = 0;
+  while (offset + 3 < bytes.length) {
+    if (bytes[offset] !== 0xff) break;
+    while (offset < bytes.length && bytes[offset] === 0xff) offset += 1;
+    const marker = bytes[offset++];
+    if (marker === 0xda || marker === 0xd9) break;
+    if (marker >= 0xd0 && marker <= 0xd7) continue;
+    const length = (bytes[offset] << 8) | bytes[offset + 1];
+    if (length < 2 || offset + length > bytes.length) break;
+    if (marker === 0xe1) total += length + 2;
+    offset += length;
+  }
+  return total;
+}
+
 async function main() {
   if (process.env.UPLOADFIT_FIXTURE_FORCE_FAILURE === '1') {
     throw new Error('FIXTURE_TARGET_UNREACHABLE:forced-test-failure');
@@ -68,7 +87,11 @@ async function main() {
             imageData.data[offset] = pixelValue(blockX, blockY, 0, seed);
             imageData.data[offset + 1] = pixelValue(blockX, blockY, 1, seed + 11);
             imageData.data[offset + 2] = pixelValue(blockX, blockY, 2, seed + 23);
-            imageData.data[offset + 3] = alpha && ((x + y) % 7 === 0) ? 0 : 255;
+            imageData.data[offset + 3] = alpha
+              && x < Math.max(8, Math.floor(width / 4))
+              && y < Math.max(8, Math.floor(height / 4))
+              ? 0
+              : 255;
           }
         }
         context.putImageData(imageData, 0, 0);
@@ -124,39 +147,9 @@ async function main() {
       async function nearestTarget(spec, candidates) {
         const results = [];
         for (const candidate of candidates) results.push(await canvasBytes(spec, candidate));
-        return results.map((result) => ({
-          ...result,
-          bytes: spec.mime === 'image/jpeg'
-            ? padJpegMetadata(result.bytes, spec.targetBytes)
-            : result.bytes
-        })).sort((first, second) => (
+        return results.sort((first, second) => (
           Math.abs(first.bytes.length - spec.targetBytes) - Math.abs(second.bytes.length - spec.targetBytes)
         ))[0];
-      }
-
-      function padJpegMetadata(bytes, targetBytes) {
-        if (!targetBytes || bytes.length >= targetBytes) return bytes;
-        const padding = [];
-        let remaining = targetBytes - bytes.length;
-        while (remaining >= 6) {
-          const dataLength = Math.min(remaining - 4, 65_531);
-          const segment = new Uint8Array(dataLength + 4);
-          segment[0] = 0xff;
-          segment[1] = 0xe1;
-          segment[2] = (dataLength + 2) >>> 8;
-          segment[3] = (dataLength + 2) & 0xff;
-          padding.push(segment);
-          remaining -= segment.length;
-        }
-        const output = new Uint8Array(bytes.length + padding.reduce((sum, item) => sum + item.length, 0));
-        output.set(bytes.slice(0, 2), 0);
-        let offset = 2;
-        for (const segment of padding) {
-          output.set(segment, offset);
-          offset += segment.length;
-        }
-        output.set(bytes.slice(2), offset);
-        return Array.from(output);
       }
 
       function addOrientation6(bytes) {
@@ -183,9 +176,16 @@ async function main() {
           ? [1, 2, 3, 4, 6, 8, 12, 16].map((blockSize) => ({ blockSize, seed: 31 }))
           : spec.kind === 'jpeg-smooth'
             ? [0.45, 0.55, 0.65, 0.75, 0.85, 0.95].map((quality) => ({ kind: 'smooth', quality }))
-            : [0.45, 0.55, 0.65, 0.75, 0.85, 0.92, 0.95].map((quality, index) => ({
-              quality, seed: index + (spec.width > 1000 ? 101 : 7)
-            }));
+            : spec.width <= 500
+              ? [
+                { quality: 1, blockSize: 2, seed: 7 },
+                ...[0.75, 0.85, 0.92, 0.95, 0.99].map((quality, index) => ({
+                  quality, seed: index + 17
+                }))
+              ]
+              : [0.45, 0.55, 0.65, 0.75, 0.85, 0.92, 0.95].map((quality, index) => ({
+                quality, seed: index + 101
+              }));
         const selected = await nearestTarget(spec, candidates);
         generated.push({
           ...spec,
@@ -241,6 +241,12 @@ async function main() {
         throw new Error(`FIXTURE_SIGNATURE_MISMATCH:${fixture.name}:${signatureMime}:${fixture.mime}`);
       }
       if (fixture.targetBytes) assertWithinTarget(fixture, bytes.length);
+      const app1MetadataBytes = fixture.mime === 'image/jpeg'
+        ? jpegApp1MetadataBytes(new Uint8Array(bytes))
+        : 0;
+      if (fixture.targetBytes && fixture.mime === 'image/jpeg' && app1MetadataBytes !== 0) {
+        throw new Error(`FIXTURE_MEANINGLESS_METADATA:${fixture.name}:${app1MetadataBytes}`);
+      }
       await writeFile(path.join(outputDir, fixture.name), bytes);
       const record = {
         name: fixture.name,
@@ -252,6 +258,8 @@ async function main() {
         actualBytes: bytes.length,
         purpose: fixture.purpose,
         decodable: fixture.decodable !== false,
+        ...(fixture.mime === 'image/jpeg' ? { app1MetadataBytes } : {}),
+        ...(fixture.selectedCandidate ? { encodingCandidate: fixture.selectedCandidate } : {}),
         ...(fixture.orientation ? { orientation: fixture.orientation } : {}),
         ...(fixture.encodedWidth ? { encodedWidth: fixture.encodedWidth } : {}),
         ...(fixture.encodedHeight ? { encodedHeight: fixture.encodedHeight } : {}),
