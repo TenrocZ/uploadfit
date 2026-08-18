@@ -1,6 +1,6 @@
 {
   "date": "2026-08-18",
-  "step": "S1-D1",
+  "step": "S1-D1 (final regression)",
   "environment": "Playwright Chromium with the production IIFE bundle",
   "sensitiveDataUsed": false,
   "implementation": [
@@ -13,6 +13,7 @@
     "bareFileInputWithoutImageHintExcluded": true,
     "repeatScanDoesNotDuplicate": true,
     "dynamicAddedSubtree": true,
+    "dynamicAddedOpenShadowSubtree": true,
     "spaPopstateHashchangeDebounced": true,
     "composedPathInputLookup": true,
     "sameOriginIframePathImplemented": true,
@@ -28,15 +29,16 @@
     "fileReadOrProcessed": false
   },
   "testSummary": {
-    "unitTests": 9,
-    "browserTests": 11,
+    "unitTestFiles": 8,
+    "unitTests": 60,
+    "browserTests": 14,
     "command": "npm run test:e2e -- --reporter=line --workers=1",
     "testServerPort": 8765,
     "testServerClosed": true
   },
   "build": {
-    "bytes": 14021,
-    "sha256": "A950B01075C42030982F11785D148F05F4A283305100D39A60A8DD0DC2226DE3",
+    "bytes": 31929,
+    "sha256": "7E3E73B9C0E64FA9FA5B7CDF33C1A99AF173E330882DE611F9152BAB726D7161",
     "staticCheck": "PASS"
   },
   "limitations": [

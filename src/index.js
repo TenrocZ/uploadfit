@@ -1,6 +1,14 @@
 import { bootstrap, cleanupSession } from './bootstrap.js';
 import { detectCapabilities } from './capabilities.js';
 import {
+  extractRelevantContext,
+  selectAiRelevantText
+} from './dom/context-extractor.js';
+import { genericAdapter } from './adapters/generic.js';
+import { parseRulesDeterministically } from './rules/deterministic-parser.js';
+import { normalizeRuleText } from './rules/normalizer.js';
+import { resolveRules } from './rules/resolver.js';
+import {
   createUploaderDiscovery,
   discoverUploaders,
   findFileInputFromEvent,
@@ -33,11 +41,17 @@ export {
   createUploaderDiscovery,
   detectCapabilities,
   discoverUploaders,
+  extractRelevantContext,
   findFileInputFromEvent,
+  genericAdapter,
   injectFile,
   isImageUploader,
   markUntrustedEventBlocked,
-  restoreOriginal
+  normalizeRuleText,
+  parseRulesDeterministically,
+  restoreOriginal,
+  resolveRules,
+  selectAiRelevantText
 };
 
 if (typeof document !== 'undefined') bootstrap();

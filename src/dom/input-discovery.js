@@ -54,7 +54,7 @@ function getPageTitle(documentRef) {
   return typeof documentRef?.title === 'string' ? documentRef.title : '';
 }
 
-function getAssociatedTexts(input) {
+export function getAssociatedTexts(input) {
   const documentRef = getOwnerDocument(input);
   const values = [];
 
@@ -139,25 +139,8 @@ function scanTree(root, handlers, local = {}) {
   const seenDocuments = local.seenDocuments ?? new WeakSet();
   const seenRoots = local.seenRoots ?? new WeakSet();
 
-  if (isDocument(root)) {
-    if (seenDocuments.has(root)) return;
-    seenDocuments.add(root);
-  }
-  if (isShadowRoot(root)) {
-    if (seenRoots.has(root)) return;
-    seenRoots.add(root);
-    handlers.observeRoot(root);
-  }
-
-  if (isElement(root)) {
-    if (seenNodes.has(root)) return;
-    seenNodes.add(root);
-    handlers.visitElement(root);
-  }
-
-  const elements = root.querySelectorAll?.('*') ?? [];
-  for (const element of elements) {
-    if (seenNodes.has(element)) continue;
+  const visitElement = (element) => {
+    if (seenNodes.has(element)) return;
     seenNodes.add(element);
     handlers.visitElement(element);
 
@@ -173,6 +156,23 @@ function scanTree(root, handlers, local = {}) {
         handlers.protectedFrame(element);
       }
     }
+  };
+
+  if (isDocument(root)) {
+    if (seenDocuments.has(root)) return;
+    seenDocuments.add(root);
+  }
+  if (isShadowRoot(root)) {
+    if (seenRoots.has(root)) return;
+    seenRoots.add(root);
+    handlers.observeRoot(root);
+  }
+
+  if (isElement(root)) visitElement(root);
+
+  const elements = root.querySelectorAll?.('*') ?? [];
+  for (const element of elements) {
+    visitElement(element);
   }
 
   if (isDocument(root)) handlers.observeRoot(root);

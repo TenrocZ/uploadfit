@@ -8,7 +8,7 @@
 - 需求事实来源：`C:\Users\蔡天乐\Desktop\黑客松\UploadFit-PRD-v1.0.md`
 - 执行任务书：`C:\Users\蔡天乐\Desktop\黑客松\UploadFit-开发任务书-v1.0`
 - 当前阶段：S1：DOM 发现与规则引擎
-- 当前状态：S0 已验收并放行；S1 已完成启动登记，尚未修改产品代码。
+- 当前状态：S0 已验收并放行；S1-D1～D7 本地实现与全量自动验证已完成，等待 S1 验收。
 - 记录日期：2026-08-18
 
 ## 2026-08-17：S0 / 平台连接确认
@@ -335,7 +335,7 @@
 
 ## 2026-08-18：S1-D1 / 上传器发现与动态生命周期
 
-状态：已完成，当前步骤暂停；未进入 S1-D2 上下文提取。
+状态：已完成；后续 D2～D7 已在本阶段继续完成，最终结果见 S1 交接文档。
 
 完成事项：
 
@@ -354,7 +354,7 @@
 
 证据：`docs/evidence/S1/input-discovery-result.json`、`docs/evidence/S1/README.md`。
 
-下一步：实现 S1-D2 `context-extractor.js`，只读取允许范围的文本并落实 6000/2000 字符预算；完成后暂停汇报。
+下一步：进入 S1-D2～D7 全流程收尾。
 
 ## 2026-08-18：S1 / 启动登记与边界确认
 
@@ -380,4 +380,63 @@
 - 不实现 `src/dom/rejection-observer.js`，该文件属于 S3。
 - 不突破 closed Shadow DOM、跨域 iframe、密码/验证码字段或其他表单值边界。
 
-下一步：先实现 `src/dom/input-discovery.js` 和对应边界测试；完成该独立步骤后暂停汇报。
+下一步：完成 S1-D2～D7，并在全量验证后生成 S1 交接文档。
+
+## 2026-08-18：S1-D2 / 上下文提取与文本预算
+
+状态：已完成；未进入图像、文件、UI 或 AI 实现。
+
+完成事项：
+
+- 新增 `src/dom/context-extractor.js` 和 `src/utils/text.js`，按属性、label、四层祖先、相邻说明、局部错误、当前提示、选中文字的顺序提取上下文。
+- 过滤 script/style/noscript/nav/footer、隐藏节点、其他表单控件和值；URL、Cookie/Token/密码/验证码样式值被移除或脱敏。
+- `normalizedText` 封顶 6000 字符，`selectAiRelevantText()` 封顶 2000 字符，仅保留规则相关句子，不调用 AI。
+- 增加 unit/integration 测试，覆盖敏感值、伪造脚本样式、字符预算和两个 uploader 不串线。
+
+验证：单测与上下文浏览器测试通过；证据见 `docs/evidence/S1/context-and-rules-result.json`。
+
+## 2026-08-18：S1-D3/D4 / 确定性解析与归一化
+
+状态：已完成。
+
+完成事项：
+
+- 新增 `schema.js`、`normalizer.js`、`deterministic-parser.js`、`validators.js`，覆盖 R01–R30 的大小、格式、尺寸、比例、数量及展示语义。
+- 完成 NFKC、全角单位/标点、大小写、破折号、乘号、MIME 和扩展名归一化；JPG/JPEG 统一为 `image/jpeg` 与 `jpg/jpeg`。
+- 建议/推荐作为 `advisoryOnly` 保留，不升级为强制；模糊文案不产生可执行规则；不从文件扩展名生成网页强制规则。
+
+验证：R01–R30 共 30 条规则单测全部通过。
+
+## 2026-08-18：S1-D5/D6 / 来源合并、冲突与安全分类
+
+状态：已完成。
+
+完成事项：
+
+- 新增 `resolver.js`，固定 adapter/rejection/html-attribute/nearby-text/selected-text/ai/weak-page-text 优先级。
+- 高优先级覆盖低优先级时保留冲突证据；同优先级 exact/min/max、反转范围、精确尺寸与比例矛盾均阻断执行。
+- 网络、超时、权限、登录、审核不通过、系统繁忙、官方工具语义统一产生人工检查标记；confidence 采用执行候选最低值，不取平均掩盖冲突。
+- 增加 resolver 单测，验证 accept 与 rejection、范围、比例、候选顺序、安全标记和非法候选留痕。
+
+验证：规则解析/合并/安全单测通过；无 AI、文件或图片处理调用。
+
+## 2026-08-18：S1-D7 / 全流程回归与交接准备
+
+状态：已完成，`READY_FOR_ACCEPTANCE`。
+
+最终验证：
+
+| 命令 | 结果 |
+|---|---|
+| `npm ci` | PASS |
+| `npm run check` | PASS：8 个测试文件、60 个单测；生产 IIFE 31929 bytes；静态检查通过 |
+| `npm run test:e2e -- --reporter=line --workers=1` | PASS：14 个浏览器测试；8765 端口已关闭 |
+
+证据与交接：
+
+- `docs/evidence/S1/input-discovery-result.json`
+- `docs/evidence/S1/context-and-rules-result.json`
+- `docs/evidence/S1/README.md`
+- `docs/handoffs/S1-handoff.md`
+
+阶段边界：S1 未读取图片像素、未处理文件、未回填、未触发上传、未调用 AI；未实现 `src/dom/rejection-observer.js`，未突破 closed Shadow DOM 或跨域 iframe。

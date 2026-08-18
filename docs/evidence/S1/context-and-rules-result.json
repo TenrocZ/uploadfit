@@ -1,0 +1,125 @@
+{
+  "date": "2026-08-18",
+  "phase": "S1",
+  "step": "S1-D2 through S1-D7",
+  "status": "READY_FOR_ACCEPTANCE",
+  "sensitiveDataUsed": false,
+  "implementation": [
+    "src/utils/text.js",
+    "src/dom/context-extractor.js",
+    "src/rules/schema.js",
+    "src/rules/normalizer.js",
+    "src/rules/deterministic-parser.js",
+    "src/rules/resolver.js",
+    "src/rules/validators.js",
+    "src/adapters/generic.js"
+  ],
+  "contextExtraction": {
+    "sourceOrder": [
+      "attributes",
+      "associated-labels",
+      "ancestor-text-up-to-four-levels",
+      "adjacent-descriptions",
+      "local-error-nodes",
+      "current-alert-or-aria-live",
+      "selected-text"
+    ],
+    "normalizedTextLimit": 6000,
+    "aiRelevantTextLimit": 2000,
+    "verified": [
+      "script/style/noscript/nav/footer excluded",
+      "hidden nodes excluded",
+      "other form controls and values excluded",
+      "URL and sensitive key-value text sanitized",
+      "two uploader contexts remain isolated",
+      "stable truncation is deterministic"
+    ]
+  },
+  "deterministicRules": {
+    "baseline": "R01-R30",
+    "passed": 30,
+    "representativeOutputs": [
+      {
+        "id": "R01-R03",
+        "input": "不超过100KB；大于30KB；30KB—120KB",
+        "result": "maxBytes=100000; minBytes=30720; range minBytes=30720,maxBytes=120000"
+      },
+      {
+        "id": "R04-R05",
+        "input": "仅支持JPG/JPEG；支持jpg、png格式",
+        "result": "image/jpeg; image/jpeg,image/png"
+      },
+      {
+        "id": "R06-R09",
+        "input": "390×567像素；不低于295×413；比例3:4",
+        "result": "exact/min dimensions and aspectRatio=0.75"
+      },
+      {
+        "id": "R12-R14",
+        "input": "系统繁忙，图片最大100KB；建议小于2MB；必须小于2MB",
+        "result": "stop semantic blocks; advisory is non-executable; forced max=2000000"
+      },
+      {
+        "id": "R24-R30",
+        "input": "宽300至600，高400至800像素；只可上传一张PNG图片；文件名须含姓名和身份证号",
+        "result": "dimension ranges, image/png, count.max=1, semantic-only filename requirement"
+      }
+    ],
+    "normalization": [
+      "Unicode NFKC",
+      "full-width digits, punctuation and KB/MB units",
+      "dash and multiplication variants",
+      "JPG/JPEG -> image/jpeg + jpg/jpeg",
+      "no File or filename-value inference"
+    ]
+  },
+  "mergeAndSafety": {
+    "sourcePriority": {
+      "adapter": 700,
+      "rejection": 600,
+      "html-attribute": 500,
+      "nearby-text": 400,
+      "selected-text": 300,
+      "ai": 200,
+      "weak-page-text": 100
+    },
+    "verified": [
+      "higher priority wins and records a resolvable conflict",
+      "same-priority exact/min/max conflict is unresolvable",
+      "exact within a lower-priority range is retained without unsafe bounds",
+      "exact outside a range is blocked",
+      "reversed byte/dimension ranges are blocked",
+      "contradictory exact dimensions and aspect ratio are blocked",
+      "network/system-busy/official-tool stop semantics are not actionable",
+      "candidate order does not change the result"
+    ],
+    "confidencePolicy": "minimum confidence across executable candidates; advisory-only candidates excluded"
+  },
+  "securityBoundary": {
+    "aiCalled": false,
+    "imagePixelsRead": false,
+    "filesProcessed": false,
+    "uiOrControllerCalled": false,
+    "rejectionObserverAdded": false,
+    "closedShadowRoot": "unsupported",
+    "crossOriginIframe": "caught and reported; no bypass"
+  },
+  "testSummary": {
+    "unitTestFiles": 8,
+    "unitTests": 60,
+    "browserTests": 14,
+    "commands": [
+      "npm ci",
+      "npm run check",
+      "npm run test:e2e -- --reporter=line --workers=1"
+    ],
+    "testServerPort8765Closed": true
+  },
+  "build": {
+    "artifact": "dist/uploadfit.js",
+    "format": "single production IIFE",
+    "bytes": 31929,
+    "sha256": "7E3E73B9C0E64FA9FA5B7CDF33C1A99AF173E330882DE611F9152BAB726D7161",
+    "staticCheck": "PASS"
+  }
+}

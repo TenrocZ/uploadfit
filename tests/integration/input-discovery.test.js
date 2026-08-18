@@ -123,6 +123,37 @@ test('observes added subtrees, debounces SPA route events, and cleans up', async
   });
 });
 
+test('discovers an input inside an open shadow root added as a dynamic subtree', async ({ page }) => {
+  await page.goto('/test-pages/probe.html');
+  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+
+  const result = await page.evaluate(async () => {
+    const api = globalThis.__uploadfit_debug_bundle__;
+    document.querySelector('#probe-file')?.remove();
+    const callbacks = [];
+    const discovery = api.createUploaderDiscovery({
+      onDiscover: (context) => callbacks.push(context)
+    });
+    discovery.start();
+
+    const host = document.createElement('section');
+    const shadow = host.attachShadow({ mode: 'open' });
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/webp';
+    shadow.append(input);
+    document.body.append(host);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    return {
+      discovered: discovery.getUploaders().some((context) => context.input === input),
+      callbackCount: callbacks.filter((context) => context.input === input).length
+    };
+  });
+
+  expect(result).toEqual({ discovered: true, callbackCount: 1 });
+});
+
 test('uses composedPath for an open-shadow event and reports cross-origin frame protection', async ({ page }) => {
   await page.goto('/test-pages/probe.html');
   await page.addScriptTag({ url: '/dist/uploadfit.js' });
