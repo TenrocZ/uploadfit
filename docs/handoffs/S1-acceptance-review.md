@@ -2,7 +2,7 @@
 
 - 验收日期：2026-08-18
 - 验收范围：S1 DOM 发现、上下文提取、确定性规则解析、规则归一化、来源裁决与安全分类
-- 返工前验收基线：`780af95`（S1 交接元数据）；实质实现提交 `b9ab7ef`
+- 返工前验收基线：`780af95`（S1 交接元数据）；返工实质实现提交 `3a90174`（基于 `b9ab7ef`）
 - 当前结论：`READY_FOR_REVIEW`
 - 核心门禁：返工后门禁 `PASS`，等待用户复验
 - 施工对象：本轮返工 Agent
@@ -275,4 +275,4 @@ iframe 插入、随后 srcdoc load 完成 -> 未发现
 | 产物 SHA-256 | `8AC0AEF3342E0512360A8E88E666F0418AC9641FA96902DA4A2884D0E168F4F4` |
 | 安全边界 | AI/图片像素/File内容/UI/controller/业务上传均未调用；closed Shadow/cross-origin 不绕过 |
 
-保留限制：host 插入后再创建的 open shadow root 不做原型 patch 或轮询，只在首次相关 composed event 到达时补发现；在事件发生前不声称已发现。Git 仅做本地留痕，未推送远程。返工实质 End commit 待提交后回填。
+保留限制：host 插入后再创建的 open shadow root 不做原型 patch 或轮询，只在首次相关 composed event 到达时补发现；在事件发生前不声称已发现。Git 仅做本地留痕，未推送远程。返工实质 End commit：`3a90174`。

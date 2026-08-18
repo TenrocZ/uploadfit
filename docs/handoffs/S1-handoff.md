@@ -6,7 +6,7 @@
 - Status：`READY_FOR_ACCEPTANCE`
 - 核心门禁：`PASS`
 - Start commit：`3d132ad`（S1 启动登记）
-- End commit（返工实质实现范围）：待 Git 提交后回填
+- End commit（返工实质实现范围）：`3a90174`
 - Agent：`Codex / UploadFit S1 Agent`
 - Environment：Windows；Node `v22.20.0`；npm `10.9.3`；Playwright Chromium；Tabbit Browser `1.9.22.0`（S1 未依赖 AI）
 - Build artifact：`dist/uploadfit.js`，40270 bytes，SHA-256 `8AC0AEF3342E0512360A8E88E666F0418AC9641FA96902DA4A2884D0E168F4F4`
@@ -94,4 +94,4 @@ JPG｜30–120KB｜390×567｜confidence=0.90｜actionable=true
 - host 插入后再创建的 open shadow root 不做原型 patch 或轮询，只在首次相关 composed event 到达时补发现；在事件发生前不声称已发现。
 - 本交接不保存真实照片、完整文件名、Base64、Cookie、Token 或完整页面文本。
 
-新的实质 End commit 将在本轮返工提交后回填。Git 只做本地版本留痕，未推送远程。
+`3a90174` 是本轮返工的实质代码、测试和证据提交；本行回填属于后续文档元数据提交。Git 只做本地版本留痕，未推送远程。
