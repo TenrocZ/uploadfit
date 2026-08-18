@@ -5,7 +5,9 @@ import {
   RESIZE_RETRY_LIMIT
 } from '../config.js';
 import { ImageProcessingError } from './errors.js';
+import { searchLossy } from './lossy-search.js';
 
+const WORKER_SEARCH_SOURCE = searchLossy.toString();
 const WORKER_SOURCE = `
 const lossy = (mime) => mime === 'image/jpeg' || mime === 'image/webp';
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
@@ -62,67 +64,56 @@ function valid(blob, minimum, maximum) {
   return blob.size >= (minimum == null ? 0 : minimum)
     && (maximum == null || blob.size <= maximum);
 }
+function releaseCanvas(canvas) {
+  try {
+    if (canvas) { canvas.width = 0; canvas.height = 0; }
+  } catch {}
+}
+const searchLossy = ${WORKER_SEARCH_SOURCE};
 async function optimize(oriented, plan) {
   let scale = 1;
   let lastTooLarge = null;
   for (let round = 0; round <= (plan.resizeRetryLimit || ${RESIZE_RETRY_LIMIT}); round += 1) {
     const rendered = render(oriented, plan, scale);
-    const minimum = plan.targetMinBytes;
-    const maximum = plan.targetMaxBytes;
-    let result = null;
-    if (lossy(plan.targetMime)) {
-      const qualityMin = plan.qualityRange && plan.qualityRange[0] || ${ENCODE_QUALITY_MIN};
-      const qualityMax = plan.qualityRange && plan.qualityRange[1] || ${ENCODE_QUALITY_MAX};
-      const highest = await encode(rendered.canvas, plan.targetMime, qualityMax);
-      emit({ type: 'progress', stage: 'encode', quality: qualityMax, bytes: highest.size });
-      if (valid(highest, minimum, maximum)) result = { blob: highest, quality: qualityMax };
-      if (!result && highest.size < (minimum == null ? 0 : minimum)
-        && (maximum == null || highest.size <= maximum)) {
+    try {
+      const minimum = plan.targetMinBytes;
+      const maximum = plan.targetMaxBytes;
+      let result = null;
+      let found;
+      if (lossy(plan.targetMime)) {
+        const qualityMin = plan.qualityRange && plan.qualityRange[0] || ${ENCODE_QUALITY_MIN};
+        const qualityMax = plan.qualityRange && plan.qualityRange[1] || ${ENCODE_QUALITY_MAX};
+        found = await searchLossy({
+          encode: (quality) => encode(rendered.canvas, plan.targetMime, quality),
+          targetMinBytes: minimum,
+          targetMaxBytes: maximum,
+          qualityMin,
+          qualityMax,
+          searchSteps: plan.searchSteps || ${ENCODE_SEARCH_STEPS},
+          onEncode: (event) => emit({ type: 'progress', stage: 'encode', ...event })
+        });
+        if (found.blob && valid(found.blob, minimum, maximum)) result = found;
+      } else {
+        const blob = await encode(rendered.canvas, plan.targetMime);
+        emit({ type: 'progress', stage: 'encode', bytes: blob.size });
+        if (valid(blob, minimum, maximum)) result = { blob, quality: null };
+        else if (blob.size > (maximum ?? Number.POSITIVE_INFINITY)) lastTooLarge = blob.size;
+        found = { blob: result?.blob ?? null, belowMinimum: blob.size < (minimum ?? 0), overMaximum: blob.size > (maximum ?? Number.POSITIVE_INFINITY), reference: blob };
+      }
+      if (result) return { ...result, scale, width: rendered.width, height: rendered.height, resizeRounds: round };
+      if (found?.belowMinimum && !found?.overMaximum) {
         throw Object.assign(new Error('FILE_TOO_SMALL'), { code: 'FILE_TOO_SMALL' });
       }
-      if (!result && maximum != null && highest.size > maximum) {
-        const lowest = await encode(rendered.canvas, plan.targetMime, qualityMin);
-        if (valid(lowest, minimum, maximum)) result = { blob: lowest, quality: qualityMin };
-        if (!result && lowest.size <= maximum && lowest.size >= (minimum == null ? 0 : minimum)) {
-          let low = qualityMin;
-          let high = qualityMax;
-          let best = { blob: lowest, quality: qualityMin };
-          for (let step = 0; step < (plan.searchSteps || ${ENCODE_SEARCH_STEPS}); step += 1) {
-            const quality = (low + high) / 2;
-            const blob = await encode(rendered.canvas, plan.targetMime, quality);
-            emit({ type: 'progress', stage: 'encode', quality, bytes: blob.size });
-            if (blob.size > maximum) high = quality;
-            else {
-              if (blob.size >= (minimum == null ? 0 : minimum) && quality > best.quality) best = { blob, quality };
-              low = quality;
-            }
-          }
-          if (valid(best.blob, minimum, maximum)) result = best;
-        }
-        if (!result && lowest.size > maximum) lastTooLarge = lowest.size;
-        if (!result && lowest.size < (minimum == null ? 0 : minimum)) {
-          throw Object.assign(new Error('FILE_TOO_SMALL'), { code: 'FILE_TOO_SMALL' });
-        }
+      if (found?.overMaximum) lastTooLarge = found.reference?.size ?? lastTooLarge;
+      if (plan.allowSizeResize !== true || maximum == null || round >= (plan.resizeRetryLimit || ${RESIZE_RETRY_LIMIT})) {
+        throw Object.assign(new Error('PROCESSING_FAILED'), { code: 'PROCESSING_FAILED', bytes: lastTooLarge });
       }
-      if (!result && maximum == null && highest.size < (minimum == null ? 0 : minimum)) {
-        throw Object.assign(new Error('FILE_TOO_SMALL'), { code: 'FILE_TOO_SMALL' });
-      }
-    } else {
-      const blob = await encode(rendered.canvas, plan.targetMime);
-      emit({ type: 'progress', stage: 'encode', bytes: blob.size });
-      if (valid(blob, minimum, maximum)) result = { blob, quality: null };
-      if (!result && blob.size < (minimum == null ? 0 : minimum)) {
-        throw Object.assign(new Error('FILE_TOO_SMALL'), { code: 'FILE_TOO_SMALL' });
-      }
-      if (!result) lastTooLarge = blob.size;
+      const ratio = lastTooLarge > 0 ? Math.sqrt(maximum / lastTooLarge) * 0.95 : 0.5;
+      scale *= clamp(ratio, 0.5, 0.95);
+      emit({ type: 'progress', stage: 'resize', scale, round: round + 1 });
+    } finally {
+      releaseCanvas(rendered.canvas);
     }
-    if (result) return { ...result, scale, width: rendered.width, height: rendered.height, resizeRounds: round };
-    if (plan.allowSizeResize !== true || maximum == null || round >= (plan.resizeRetryLimit || ${RESIZE_RETRY_LIMIT})) {
-      throw Object.assign(new Error('PROCESSING_FAILED'), { code: 'PROCESSING_FAILED', bytes: lastTooLarge });
-    }
-    const ratio = lastTooLarge > 0 ? Math.sqrt(maximum / lastTooLarge) * 0.95 : 0.5;
-    scale *= clamp(ratio, 0.5, 0.95);
-    emit({ type: 'progress', stage: 'resize', scale, round: round + 1 });
   }
   throw Object.assign(new Error('PROCESSING_FAILED'), { code: 'PROCESSING_FAILED' });
 }
@@ -171,9 +162,15 @@ function workerError(error) {
   );
 }
 
-export async function runWorkerPipeline(file, plan, metadata, progress) {
+export async function runWorkerPipeline(file, plan, metadata, progress, options = {}) {
   if (!canUseWorkerPipeline()) {
     throw new ImageProcessingError('PROCESSING_FAILED', 'Worker pipeline is unavailable.');
+  }
+  const signal = options?.signal;
+  if (signal?.aborted) {
+    throw new ImageProcessingError('USER_CANCELLED', 'Image processing was aborted.', {
+      reason: 'PROCESS_ABORTED'
+    });
   }
   const workerBlob = new globalThis.Blob([WORKER_SOURCE], { type: 'text/javascript' });
   const workerUrl = globalThis.URL.createObjectURL(workerBlob);
@@ -185,19 +182,46 @@ export async function runWorkerPipeline(file, plan, metadata, progress) {
     throw workerError(error);
   }
 
+  let workerTerminated = false;
   return await new Promise((resolve, reject) => {
     let settled = false;
+    const timeoutMs = Number.isFinite(options?.timeoutMs)
+      ? Math.max(1, options.timeoutMs)
+      : 30_000;
+    let abortListener;
     const timeout = globalThis.setTimeout(() => {
       if (settled) return;
       settled = true;
       reject(new ImageProcessingError('PROCESSING_FAILED', 'Worker timed out.', { worker: true }));
-    }, 30_000);
+      if (abortListener) signal?.removeEventListener?.('abort', abortListener);
+    }, timeoutMs);
     const finish = (callback, value) => {
       if (settled) return;
       settled = true;
       globalThis.clearTimeout(timeout);
+      if (abortListener) signal?.removeEventListener?.('abort', abortListener);
       callback(value);
     };
+    const terminateWorker = () => {
+      if (workerTerminated) return;
+      workerTerminated = true;
+      try { worker.terminate(); } catch {}
+    };
+    abortListener = () => {
+      if (settled) return;
+      settled = true;
+      globalThis.clearTimeout(timeout);
+      reject(new ImageProcessingError('USER_CANCELLED', 'Image processing was aborted.', {
+        reason: 'PROCESS_ABORTED',
+        worker: true
+      }));
+      terminateWorker();
+    };
+    signal?.addEventListener?.('abort', abortListener, { once: true });
+    if (signal?.aborted) {
+      abortListener();
+      return;
+    }
     worker.onmessage = (event) => {
       const message = event.data;
       if (message?.type === 'progress') {
@@ -220,7 +244,10 @@ export async function runWorkerPipeline(file, plan, metadata, progress) {
       finish(reject, workerError(error));
     }
   }).finally(() => {
-    try { worker.terminate(); } catch {}
+    if (!workerTerminated) {
+      workerTerminated = true;
+      try { worker.terminate(); } catch {}
+    }
     globalThis.URL.revokeObjectURL(workerUrl);
   });
 }

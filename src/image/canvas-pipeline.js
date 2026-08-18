@@ -2,8 +2,13 @@ import { clamp, scaleDimensions } from '../utils/bytes.js';
 import { extensionFromMime } from '../utils/mime.js';
 import { decodeImageSource, inspectImage, validateFile } from './metadata.js';
 import { encodeCanvas } from './encoder.js';
-import { ImageProcessingError, asImageProcessingError } from './errors.js';
+import {
+  ImageProcessingError,
+  asImageProcessingError,
+  normalizeErrorCode
+} from './errors.js';
 import { optimizeEncodedOutput } from './size-optimizer.js';
+import { createProcessingPlan } from './planner.js';
 import { canUseWorkerPipeline, runWorkerPipeline } from './worker-runtime.js';
 
 const BACKGROUND_COLORS = Object.freeze({
@@ -21,6 +26,150 @@ function report(progress, event) {
   } catch {
     // Progress reporting is advisory and cannot change processing semantics.
   }
+}
+
+function throwIfAborted(signal) {
+  if (signal?.aborted) {
+    throw new ImageProcessingError('USER_CANCELLED', 'Image processing was aborted.', {
+      reason: 'PROCESS_ABORTED'
+    });
+  }
+}
+
+function progressWithAbort(progress, signal) {
+  if (typeof progress !== 'function' && !signal) return progress;
+  return (event) => {
+    throwIfAborted(signal);
+    report(progress, event);
+    throwIfAborted(signal);
+  };
+}
+
+function isRecord(value) {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function stableValue(value) {
+  if (Array.isArray(value)) return value.map((item) => stableValue(item));
+  if (isRecord(value)) {
+    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, stableValue(value[key])]));
+  }
+  return value;
+}
+
+function stableEqual(first, second) {
+  return JSON.stringify(stableValue(first)) === JSON.stringify(stableValue(second));
+}
+
+const AUTHORITY_FIELDS = Object.freeze([
+  'targetMime',
+  'targetWidth',
+  'targetHeight',
+  'proposedCrop',
+  'proposedFlattenBackground',
+  'qualityRange',
+  'searchSteps',
+  'resizeRetryLimit',
+  'targetMinBytes',
+  'targetMaxBytes',
+  'hardMaxBytes',
+  'minOutputWidth',
+  'minOutputHeight',
+  'allowSizeResize',
+  'operations',
+  'rules'
+]);
+
+const CONFIRMATION_TYPES = new Set(['CROP', 'FLATTEN_BACKGROUND', 'UPSCALE']);
+const BACKGROUND_COLOR_NAMES = new Set(Object.keys(BACKGROUND_COLORS));
+
+function normalizeCropPayload(payload) {
+  const candidate = isRecord(payload?.crop) ? payload.crop : payload;
+  if (!isRecord(candidate)) return null;
+  const keys = ['x', 'y', 'width', 'height'];
+  if (!keys.every((key) => Number.isFinite(candidate[key]) && candidate[key] >= 0)) return null;
+  if (candidate.width <= 0 || candidate.height <= 0) return null;
+  return Object.fromEntries(keys.map((key) => [key, Math.round(candidate[key])]));
+}
+
+function confirmationFailure(message, details = {}) {
+  throw new ImageProcessingError('USER_CONFIRMATION_REQUIRED', message, details);
+}
+
+function validateResolvedPlan(metadata, plan) {
+  if (!isRecord(plan) || !isRecord(plan.rules)) {
+    throw new ImageProcessingError('PROCESSING_FAILED', 'Processing plan is not structurally valid.');
+  }
+  const authoritative = createProcessingPlan(metadata, plan.rules);
+  if (authoritative.unfixable?.length) {
+    throw new ImageProcessingError('PROCESSING_FAILED', 'Processing rules cannot produce an executable plan.', {
+      unfixable: authoritative.unfixable
+    });
+  }
+  for (const field of AUTHORITY_FIELDS) {
+    if (!stableEqual(plan[field], authoritative[field])) {
+      throw new ImageProcessingError('PROCESSING_FAILED', 'Processing plan does not match current input metadata or rules.', {
+        field
+      });
+    }
+  }
+
+  if (!Array.isArray(plan.confirmations)
+    || plan.confirmations.length !== authoritative.confirmations.length) {
+    confirmationFailure('Required confirmation set does not match the current input.');
+  }
+  for (const expected of authoritative.confirmations) {
+    if (!CONFIRMATION_TYPES.has(expected.type)) {
+      throw new ImageProcessingError('PROCESSING_FAILED', 'Processing plan contains an unsupported confirmation type.');
+    }
+    const actual = plan.confirmations.find((item) => item?.id === expected.id);
+    if (!actual || actual.type !== expected.type || actual.required !== true
+      || !stableEqual(actual.suggestedPayload, expected.suggestedPayload)) {
+      confirmationFailure('Required confirmation identity or proposal does not match.');
+    }
+    if (actual.resolved === true && actual.accepted === false) {
+      throw new ImageProcessingError('USER_CANCELLED', 'User confirmation was declined.');
+    }
+    if (actual.resolved !== true || actual.accepted !== true) {
+      confirmationFailure('Required confirmation is unresolved.');
+    }
+    if (expected.type === 'CROP') {
+      const crop = normalizeCropPayload(actual.payload);
+      if (!crop || !stableEqual(crop, authoritative.proposedCrop)
+        || !stableEqual(plan.crop, crop)) {
+        confirmationFailure('Crop confirmation payload is invalid or tampered.');
+      }
+    } else if (expected.type === 'FLATTEN_BACKGROUND') {
+      const color = actual.payload?.color;
+      if (!isRecord(actual.payload) || !BACKGROUND_COLOR_NAMES.has(color)
+        || !stableEqual(plan.flattenBackground, { color })) {
+        confirmationFailure('Flatten background confirmation payload is invalid or tampered.');
+      }
+    } else if (expected.type === 'UPSCALE') {
+      if (actual.payload?.allow !== true || plan.upscaleAccepted !== true) {
+        confirmationFailure('Upscale confirmation must explicitly allow the proposed upscale.');
+      }
+      const proposedWidth = expected.suggestedPayload?.width;
+      const proposedHeight = expected.suggestedPayload?.height;
+      if ((actual.payload.width !== undefined && actual.payload.width !== proposedWidth)
+        || (actual.payload.height !== undefined && actual.payload.height !== proposedHeight)) {
+        confirmationFailure('Upscale confirmation target does not match the current input.');
+      }
+    }
+  }
+
+  if (authoritative.confirmations.length === 0
+    && (plan.crop !== null || plan.flattenBackground !== null || plan.upscaleAccepted === true)) {
+    throw new ImageProcessingError('PROCESSING_FAILED', 'Resolved plan contains operations not required by the current input.');
+  }
+  if (plan.executable !== true) {
+    const declined = plan.confirmations.some((item) => item?.resolved === true && item.accepted === false);
+    throw new ImageProcessingError(
+      declined ? 'USER_CANCELLED' : 'USER_CONFIRMATION_REQUIRED',
+      declined ? 'User confirmation was declined.' : 'Required confirmation is unresolved.'
+    );
+  }
+  return plan;
 }
 
 function createCanvas(width, height, preferOffscreen = false) {
@@ -206,13 +355,16 @@ function createFileFromBlob(blob, name, mime, sourceFile) {
   }
 }
 
-async function processOnMainThread(file, plan, metadata, progress) {
+async function processOnMainThread(file, plan, metadata, progress, signal) {
   let decoded;
   let oriented;
   try {
+    throwIfAborted(signal);
     report(progress, { stage: 'decode' });
-    decoded = await decodeImageSource(file);
+    decoded = await decodeImageSource(file, { signal });
+    throwIfAborted(signal);
     oriented = createOrientedSource(decoded, metadata);
+    throwIfAborted(signal);
     const optimized = await optimizeEncodedOutput({
       mime: plan.targetMime,
       initialWidth: plan.targetWidth ?? oriented.width,
@@ -227,9 +379,16 @@ async function processOnMainThread(file, plan, metadata, progress) {
       minWidth: plan.minOutputWidth,
       minHeight: plan.minOutputHeight,
       progress,
-      render: (scale) => renderPlan(oriented, plan, scale),
+      signal,
+      render: (scale) => {
+        throwIfAborted(signal);
+        const rendered = renderPlan(oriented, plan, scale);
+        throwIfAborted(signal);
+        return rendered;
+      },
       encode: (canvas, quality) => encodeCanvas(canvas, plan.targetMime, quality)
     });
+    throwIfAborted(signal);
     return { ...optimized, workerUsed: false };
   } catch (error) {
     throw asImageProcessingError(error);
@@ -267,14 +426,28 @@ function assertExecutablePlan(plan) {
  */
 export async function processImage(file, plan, progressCallback, options = {}) {
   const startedAt = Date.now();
-  assertExecutablePlan(plan);
-  const metadata = await inspectImage(file);
-  const inputValidation = validateFile(metadata, plan.rules);
-  if (metadata.errorCode || !metadata.decodable) {
-    throw new ImageProcessingError(metadata.errorCode ?? 'DECODE_FAILED', 'Input image is not processable.');
+  const signal = options?.signal;
+  const progress = progressWithAbort(progressCallback, signal);
+  throwIfAborted(signal);
+  let metadata;
+  try {
+    metadata = await inspectImage(file, { signal });
+  } catch (error) {
+    if (signal?.aborted) throwIfAborted(signal);
+    throw asImageProcessingError(error);
   }
+  throwIfAborted(signal);
+  if (metadata.errorCode || !metadata.decodable) {
+    throw new ImageProcessingError(
+      normalizeErrorCode(metadata.errorCode, 'DECODE_FAILED'),
+      'Input image is not processable.'
+    );
+  }
+  const executablePlan = validateResolvedPlan(metadata, plan);
+  assertExecutablePlan(executablePlan);
+  const inputValidation = validateFile(metadata, executablePlan.rules);
 
-  if (plan.passthrough && inputValidation.valid && plan.operations.length === 0) {
+  if (executablePlan.passthrough && inputValidation.valid && executablePlan.operations.length === 0) {
     return {
       file,
       metadata: {
@@ -292,26 +465,33 @@ export async function processImage(file, plan, progressCallback, options = {}) {
     };
   }
 
-  const warnings = [...(plan.warnings ?? [])];
+  const warnings = [...(executablePlan.warnings ?? [])];
   let optimized;
   const wantWorker = options.useWorker !== false;
   if (wantWorker && canUseWorkerPipeline()) {
     try {
-      report(progressCallback, { stage: 'worker-start' });
-      optimized = await runWorkerPipeline(file, plan, metadata, progressCallback);
+      report(progress, { stage: 'worker-start' });
+      optimized = await runWorkerPipeline(file, executablePlan, metadata, progress, {
+        signal,
+        timeoutMs: options.workerTimeoutMs
+      });
     } catch (error) {
+      const normalized = asImageProcessingError(error);
+      if (normalized.code === 'USER_CANCELLED') throw normalized;
       warnings.push({ code: 'WORKER_FALLBACK_MAIN_THREAD' });
-      report(progressCallback, { stage: 'worker-fallback' });
-      optimized = await processOnMainThread(file, plan, metadata, progressCallback);
+      report(progress, { stage: 'worker-fallback' });
+      optimized = await processOnMainThread(file, executablePlan, metadata, progress, signal);
     }
   } else {
-    optimized = await processOnMainThread(file, plan, metadata, progressCallback);
+    optimized = await processOnMainThread(file, executablePlan, metadata, progress, signal);
   }
+  throwIfAborted(signal);
 
-  const outputName = createOutputFileName(file?.name, plan.targetMime);
-  const outputFile = createFileFromBlob(optimized.blob, outputName, plan.targetMime, file);
-  const outputMetadata = await inspectImage(outputFile);
-  const outputValidation = validateFile(outputMetadata, plan.rules);
+  const outputName = createOutputFileName(file?.name, executablePlan.targetMime);
+  const outputFile = createFileFromBlob(optimized.blob, outputName, executablePlan.targetMime, file);
+  const outputMetadata = await inspectImage(outputFile, { signal });
+  throwIfAborted(signal);
+  const outputValidation = validateFile(outputMetadata, executablePlan.rules);
   if (outputMetadata.errorCode || !outputMetadata.decodable || !outputValidation.valid) {
     throw new ImageProcessingError('OUTPUT_VALIDATION_FAILED', 'Processed output failed final validation.', {
       violations: outputValidation.violations.map((item) => item.code),
@@ -321,7 +501,7 @@ export async function processImage(file, plan, progressCallback, options = {}) {
       height: outputMetadata.height
     });
   }
-  report(progressCallback, { stage: 'complete', bytes: outputMetadata.size });
+  report(progress, { stage: 'complete', bytes: outputMetadata.size });
   return {
     file: outputFile,
     metadata: {
@@ -330,7 +510,7 @@ export async function processImage(file, plan, progressCallback, options = {}) {
       width: outputMetadata.width,
       height: outputMetadata.height
     },
-    operations: [...(plan.operations ?? [])],
+    operations: [...(executablePlan.operations ?? [])],
     validation: outputValidation,
     durationMs: Date.now() - startedAt,
     warnings,
@@ -340,4 +520,3 @@ export async function processImage(file, plan, progressCallback, options = {}) {
 }
 
 export { createCanvas, releaseCanvas, renderPlan };
-

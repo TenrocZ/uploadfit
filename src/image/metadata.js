@@ -20,7 +20,7 @@ import {
   SUPPORTED_IMAGE_MIMES
 } from '../utils/mime.js';
 import { orientationSwapsDimensions, parseExifOrientation } from './exif.js';
-import { ImageProcessingError } from './errors.js';
+import { ImageProcessingError, normalizeErrorCode } from './errors.js';
 import { validateRuleSet } from '../rules/validators.js';
 
 const JPEG_SOF_MARKERS = new Set([
@@ -28,6 +28,14 @@ const JPEG_SOF_MARKERS = new Set([
   0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf
 ]);
 const CONFIRMATION_TYPES = new Set(['CROP', 'FLATTEN_BACKGROUND', 'UPSCALE']);
+
+function throwIfAborted(signal) {
+  if (signal?.aborted) {
+    throw new ImageProcessingError('USER_CANCELLED', 'Image processing was aborted.', {
+      reason: 'PROCESS_ABORTED'
+    });
+  }
+}
 
 function isRecord(value) {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value));
@@ -228,11 +236,14 @@ function sampleHasTransparency(source, width, height, possibleAlpha) {
  * Decode without relying on page DOM. The preferred path explicitly disables
  * browser EXIF autorotation so the pipeline can apply orientation exactly once.
  */
-export async function decodeImageSource(file) {
+export async function decodeImageSource(file, options = {}) {
+  const { signal } = options;
+  throwIfAborted(signal);
   const createBitmap = globalThis.createImageBitmap;
   if (typeof createBitmap === 'function') {
     try {
       const bitmap = await createBitmap(file, { imageOrientation: 'none' });
+      throwIfAborted(signal);
       return {
         source: bitmap,
         width: bitmap.width,
@@ -240,9 +251,11 @@ export async function decodeImageSource(file) {
         orientationAppliedByBrowser: false,
         close: () => closeSource(bitmap)
       };
-    } catch {
+    } catch (error) {
+      if (signal?.aborted) throw error;
       try {
         const bitmap = await createBitmap(file);
+        throwIfAborted(signal);
         return {
           source: bitmap,
           width: bitmap.width,
@@ -250,7 +263,8 @@ export async function decodeImageSource(file) {
           orientationAppliedByBrowser: true,
           close: () => closeSource(bitmap)
         };
-      } catch {
+      } catch (fallbackError) {
+        if (signal?.aborted) throw fallbackError;
         // Continue to the HTMLImageElement fallback.
       }
     }
@@ -266,6 +280,7 @@ export async function decodeImageSource(file) {
   const image = new ImageConstructor();
   image.decoding = 'async';
   try {
+    throwIfAborted(signal);
     image.src = objectUrl;
     if (typeof image.decode === 'function') {
       await image.decode();
@@ -275,6 +290,7 @@ export async function decodeImageSource(file) {
         image.onerror = () => reject(new Error('IMAGE_LOAD_FAILED'));
       });
     }
+    throwIfAborted(signal);
     return {
       source: image,
       width: image.naturalWidth || image.width,
@@ -338,7 +354,9 @@ function dimensionRuleMismatch(value, rule) {
  * @param {File|Blob} file
  * @returns {Promise<Readonly<Record<string, unknown>>>}
  */
-export async function inspectImage(file) {
+export async function inspectImage(file, options = {}) {
+  const { signal } = options;
+  throwIfAborted(signal);
   const size = safeFileSize(file);
   if (!file || size === null || typeof file.slice !== 'function') {
     return failedMetadata(file, 'DECODE_FAILED');
@@ -362,6 +380,7 @@ export async function inspectImage(file) {
   } catch {
     return failedMetadata(file, 'DECODE_FAILED');
   }
+  throwIfAborted(signal);
   const signatureMime = detectImageSignature(prefix);
   if (!signatureMime || !SUPPORTED_IMAGE_MIMES.includes(signatureMime)) {
     return failedMetadata(file, SUPPORTED_IMAGE_MIMES.includes(declaredMime)
@@ -387,6 +406,7 @@ export async function inspectImage(file) {
       extensionConsistent: mimeAndExtensionAgree(signatureMime, declaredExtension)
     });
   }
+  throwIfAborted(signal);
 
   const header = parseHeader(bytes, signatureMime);
   const orientation = signatureMime === 'image/jpeg' ? parseExifOrientation(bytes) : 1;
@@ -411,8 +431,9 @@ export async function inspectImage(file) {
 
   let decoded;
   try {
-    decoded = await decodeImageSource(file);
-  } catch {
+    decoded = await decodeImageSource(file, { signal });
+  } catch (error) {
+    if (signal?.aborted) throw error;
     return failedMetadata(file, 'DECODE_FAILED', {
       mime: signatureMime,
       signatureMime,
@@ -438,6 +459,7 @@ export async function inspectImage(file) {
     Boolean(header?.hasAlpha)
   );
   decoded.close();
+  throwIfAborted(signal);
   if (decodedError) {
     return failedMetadata(file, decodedError, {
       mime: signatureMime,
@@ -502,19 +524,20 @@ export function validateFile(metadata, rules, options = {}) {
     return result;
   }
 
-  if (metadata.errorCode) {
-    addViolation(result, metadata.errorCode);
-    if (metadata.errorCode === 'FILE_TOO_LARGE_TO_PROCESS'
-      || metadata.errorCode === 'PIXEL_LIMIT_EXCEEDED'
-      || metadata.errorCode === 'UNSUPPORTED_FORMAT'
-      || metadata.errorCode === 'DECODE_FAILED') {
-      result.unfixable.push(metadata.errorCode);
-    }
+  // Primary resource failures are terminal for this validation pass. They must
+  // never be mixed with rule violations or proposed auto-fixes.
+  if (metadata.errorCode || metadata.decodable !== true) {
+    const primaryCode = metadata.errorCode
+      ? normalizeErrorCode(metadata.errorCode, 'DECODE_FAILED')
+      : 'DECODE_FAILED';
+    addViolation(result, primaryCode);
+    addUnique(result.unfixable, primaryCode);
+    return result;
   }
-  if (!metadata.decodable) addUnique(result.unfixable, 'DECODE_FAILED');
-  if (!metadata.signatureValid) {
+  if (metadata.signatureValid !== true) {
     addViolation(result, 'UNSUPPORTED_FORMAT');
     addUnique(result.unfixable, 'UNSUPPORTED_FORMAT');
+    return result;
   }
   if (metadata.signatureValid && (
     metadata.mimeConsistent !== true || metadata.declaredMime !== metadata.signatureMime

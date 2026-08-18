@@ -20,6 +20,19 @@ const common = {
 };
 
 describe('S2 size optimizer', () => {
+  it('Q-S2-002: finds the highest valid middle quality when both endpoints cross the range', async () => {
+    const result = await optimizeEncodedOutput({
+      ...common,
+      render: (scale) => ({ canvas: { scale }, width: 1000, height: 800 }),
+      encode: async (_canvas, quality) => fakeBlob(Math.round(160_000 * quality - 52_000))
+    });
+    expect(result.blob.size).toBeGreaterThanOrEqual(30_000);
+    expect(result.blob.size).toBeLessThanOrEqual(90_000);
+    expect(result.quality).toBeGreaterThan(common.qualityMin);
+    expect(result.quality).toBeLessThan(common.qualityMax);
+    expect(result.quality).toBeGreaterThan(0.7);
+  });
+
   it('selects the highest JPEG quality inside the safe byte target', async () => {
     const result = await optimizeEncodedOutput({
       ...common,
@@ -56,14 +69,14 @@ describe('S2 size optimizer', () => {
     expect(result.quality).toBeNull();
   });
 
-  it('fails honestly when exact dimensions cannot meet the maximum', async () => {
+  it('reports a stable below-minimum result when the highest quality is too small', async () => {
     await expect(optimizeEncodedOutput({
       ...common,
       targetMaxBytes: 100,
       allowResize: false,
       render: () => ({ canvas: {}, width: 390, height: 567 }),
       encode: async () => fakeBlob(10_000)
-    })).rejects.toMatchObject({ code: 'PROCESSING_FAILED' });
+    })).rejects.toMatchObject({ code: 'FILE_TOO_SMALL' });
   });
 
   it('does not add bytes when the minimum cannot be reached at highest quality', async () => {

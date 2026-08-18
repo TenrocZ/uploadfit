@@ -3,14 +3,104 @@
   "command": "npm run fixtures:generate",
   "privacy": "deterministic canvas-only; no user files or network",
   "samples": [
-    { "name": "png-1170x1701.png", "mime": "image/png", "width": 1170, "height": 1701, "targetApproxBytes": 2000000 },
-    { "name": "jpeg-390x567-medium.jpg", "mime": "image/jpeg", "width": 390, "height": 567, "targetApproxBytes": 500000 },
-    { "name": "jpeg-390x567-small.jpg", "mime": "image/jpeg", "width": 390, "height": 567, "targetApproxBytes": 20000 },
-    { "name": "jpeg-4000x3000.jpg", "mime": "image/jpeg", "width": 4000, "height": 3000, "targetApproxBytes": 5000000 },
-    { "name": "jpeg-orientation-6.jpg", "mime": "image/jpeg", "width": 100, "height": 50, "orientation": 6 },
-    { "name": "transparent.png", "mime": "image/png", "width": 390, "height": 567, "hasAlpha": true },
-    { "name": "corrupt.png", "mime": "image/png", "decodable": false },
-    { "name": "sample.webp", "mime": "image/webp", "width": 390, "height": 567 }
+    {
+      "name": "png-1170x1701.png",
+      "mime": "image/png",
+      "width": 1170,
+      "height": 1701,
+      "targetBytes": 2000000,
+      "toleranceRatio": 0.25,
+      "actualBytes": 2062531,
+      "purpose": "medium PNG byte-range and decode input",
+      "decodable": true,
+      "sha256": "EE191C62249FC57D8F5502B5800A3166EDD6431BA1548221896DC3EEEC895B97"
+    },
+    {
+      "name": "jpeg-390x567-medium.jpg",
+      "mime": "image/jpeg",
+      "width": 390,
+      "height": 567,
+      "targetBytes": 500000,
+      "toleranceRatio": 0.25,
+      "actualBytes": 500000,
+      "purpose": "medium JPEG compression input",
+      "decodable": true,
+      "sha256": "31FC9432C33BA0A1AA0685005760DDD756BE71E6365532E716BBAA10DB3EC84E"
+    },
+    {
+      "name": "jpeg-390x567-small.jpg",
+      "mime": "image/jpeg",
+      "width": 390,
+      "height": 567,
+      "targetBytes": 20000,
+      "toleranceRatio": 0.25,
+      "actualBytes": 20000,
+      "purpose": "small JPEG minimum-byte boundary input",
+      "decodable": true,
+      "sha256": "923FC6A170F3293B82B66EE939E911D9C361C4679C3DC835445D29A6263F99C0"
+    },
+    {
+      "name": "jpeg-4000x3000.jpg",
+      "mime": "image/jpeg",
+      "width": 4000,
+      "height": 3000,
+      "targetBytes": 5000000,
+      "toleranceRatio": 0.25,
+      "actualBytes": 5000000,
+      "purpose": "large local photo performance and resize input",
+      "decodable": true,
+      "sha256": "2596F297043B589F5D6C17E8BF9FDB383DB384FF3FEC92FA8A142182F9914F10"
+    },
+    {
+      "name": "transparent.png",
+      "mime": "image/png",
+      "width": 390,
+      "height": 567,
+      "targetBytes": null,
+      "toleranceRatio": null,
+      "actualBytes": 118929,
+      "purpose": "alpha-preserving JPEG flatten confirmation input",
+      "decodable": true,
+      "sha256": "DF8E618F4C58CD4E847B52506EAD95F626F9F9D52DDEA1479D01D6F2AC20EA9B"
+    },
+    {
+      "name": "jpeg-orientation-6.jpg",
+      "mime": "image/jpeg",
+      "width": 50,
+      "height": 100,
+      "targetBytes": null,
+      "toleranceRatio": null,
+      "actualBytes": 5682,
+      "purpose": "EXIF orientation normalization input",
+      "decodable": true,
+      "orientation": 6,
+      "encodedWidth": 100,
+      "encodedHeight": 50,
+      "sha256": "B49FB9FE2EA78527EB6DD918271F7622C4DF07229AE0F479AF4524CE712802FC"
+    },
+    {
+      "name": "corrupt.png",
+      "mime": "image/png",
+      "width": null,
+      "height": null,
+      "targetBytes": null,
+      "toleranceRatio": null,
+      "actualBytes": 11,
+      "purpose": "corrupt input primary DECODE_FAILED path",
+      "decodable": false,
+      "sha256": "1C8927715E5B55C70366BC753AD77E5CB5972184066CDC1BE8F85176E341CFA2"
+    },
+    {
+      "name": "sample.webp",
+      "mime": "image/webp",
+      "width": 390,
+      "height": 567,
+      "targetBytes": null,
+      "toleranceRatio": null,
+      "actualBytes": 170788,
+      "purpose": "WebP support and MIME/signature input",
+      "decodable": true,
+      "sha256": "6CA380C9E5DF81182A969CA005EFACD993FAE964EBB51C36368538665C510177"
+    }
   ]
 }
-

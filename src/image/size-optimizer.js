@@ -7,6 +7,7 @@ import {
 import { clamp } from '../utils/bytes.js';
 import { ImageProcessingError } from './errors.js';
 import { isLossyMime } from './encoder.js';
+import { searchLossy } from './lossy-search.js';
 
 function assertBlob(blob) {
   if (!blob || typeof blob.size !== 'number' || blob.size <= 0) {
@@ -27,56 +28,25 @@ function validSize(blob, minimum, maximum) {
   return blob.size >= (minimum ?? 0) && (maximum === null || maximum === undefined || blob.size <= maximum);
 }
 
-async function encodeQuality(canvas, encode, quality, progress) {
+function throwIfAborted(signal) {
+  if (signal?.aborted) {
+    throw new ImageProcessingError('USER_CANCELLED', 'Image processing was aborted.', {
+      reason: 'PROCESS_ABORTED'
+    });
+  }
+}
+
+async function encodeQuality(canvas, encode, quality, progress, signal) {
+  throwIfAborted(signal);
   const blob = await encode(canvas, quality);
+  throwIfAborted(signal);
   assertBlob(blob);
   report(progress, { stage: 'encode', quality, bytes: blob.size });
   return blob;
 }
 
-async function searchLossy(canvas, encode, options) {
-  const minimum = options.targetMinBytes;
-  const maximum = options.targetMaxBytes;
-  const qualityMin = clamp(options.qualityMin, 0.01, 1);
-  const qualityMax = clamp(options.qualityMax, qualityMin, 1);
-  const steps = Math.max(1, Math.min(16, options.searchSteps));
-  const highest = await encodeQuality(canvas, encode, qualityMax, options.progress);
-  if (maximum === null || highest.size <= maximum) {
-    if (highest.size >= (minimum ?? 0)) return { blob: highest, quality: qualityMax };
-    return { blob: null, quality: qualityMax, belowMinimum: true };
-  }
-
-  const lowest = await encodeQuality(canvas, encode, qualityMin, options.progress);
-  if (lowest.size > maximum) {
-    return { blob: null, quality: qualityMin, overMaximum: true, reference: lowest };
-  }
-  if (lowest.size < (minimum ?? 0)) {
-    return { blob: null, quality: qualityMin, belowMinimum: true };
-  }
-
-  let low = qualityMin;
-  let high = qualityMax;
-  let best = { blob: lowest, quality: qualityMin };
-  for (let step = 0; step < steps; step += 1) {
-    const quality = (low + high) / 2;
-    const blob = await encodeQuality(canvas, encode, quality, options.progress);
-    if (blob.size > maximum) {
-      high = quality;
-    } else {
-      if (blob.size >= (minimum ?? 0) && quality > best.quality) {
-        best = { blob, quality };
-      }
-      low = quality;
-    }
-  }
-  if (!validSize(best.blob, minimum, maximum)) {
-    return { blob: null, quality: best.quality, belowMinimum: best.blob.size < (minimum ?? 0) };
-  }
-  return best;
-}
-
 async function searchPng(canvas, encode, options) {
-  const blob = await encodeQuality(canvas, encode, undefined, options.progress);
+  const blob = await encodeQuality(canvas, encode, undefined, options.progress, options.signal);
   if (validSize(blob, options.targetMinBytes, options.targetMaxBytes)) {
     return { blob, quality: null };
   }
@@ -109,7 +79,8 @@ export async function optimizeEncodedOutput({
   minHeight = 1,
   initialWidth,
   initialHeight,
-  progress
+  progress,
+  signal
 }) {
   if (typeof render !== 'function' || typeof encode !== 'function') {
     throw new ImageProcessingError('PROCESSING_FAILED', 'Optimizer callbacks are required.');
@@ -121,25 +92,30 @@ export async function optimizeEncodedOutput({
   let lastTooLargeBytes = null;
 
   for (let round = 0; round <= resizeRetryLimit; round += 1) {
+    throwIfAborted(signal);
     const rendered = await render(scale, { round, width, height });
+    throwIfAborted(signal);
     const canvas = rendered?.canvas ?? rendered;
     const release = rendered?.release ?? (() => {});
     if (!canvas) throw new ImageProcessingError('PROCESSING_FAILED', 'Renderer returned no canvas.');
     try {
       const found = lossy
-        ? await searchLossy(canvas, encode, {
+        ? await searchLossy({
+          encode: (quality) => encodeQuality(canvas, encode, quality, progress, signal),
           targetMinBytes,
           targetMaxBytes,
           qualityMin,
           qualityMax,
           searchSteps,
-          progress
+          shouldAbort: () => throwIfAborted(signal)
         })
         : await searchPng(canvas, encode, {
           targetMinBytes,
           targetMaxBytes,
-          progress
+          progress,
+          signal
         });
+      throwIfAborted(signal);
       if (found.blob && validSize(found.blob, targetMinBytes, targetMaxBytes)) {
         return {
           blob: found.blob,
@@ -164,6 +140,7 @@ export async function optimizeEncodedOutput({
       release();
     }
 
+    throwIfAborted(signal);
     if (!allowResize || round >= resizeRetryLimit || targetMaxBytes === null) {
       throw new ImageProcessingError('PROCESSING_FAILED', 'Encoded output remains above the maximum size.', {
         targetMaxBytes,
@@ -184,8 +161,8 @@ export async function optimizeEncodedOutput({
     scale = nextScale;
     width = nextWidth;
     height = nextHeight;
+    throwIfAborted(signal);
     report(progress, { stage: 'resize', scale, width, height, round: round + 1 });
   }
   throw new ImageProcessingError('PROCESSING_FAILED', 'Size optimization exhausted its retry limit.');
 }
-
