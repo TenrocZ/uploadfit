@@ -541,4 +541,4 @@ S2 范围：
 - `docs/evidence/S2/fixtures-result.json`
 - `docs/handoffs/S2-handoff.md`
 
-性能与边界：合成 4000×3000、≤10MiB JPEG 在 Chromium 参考环境通过处理总耗时 ≤5 秒断言；最大尺寸输出保持等比。MVP 不引入 PNG 量化；DPI 只展示；Worker/OffscreenCanvas/createImageBitmap/Blob Worker 能力不可用时按证据降级。S2 本地 Git End commit 在最终提交后回填到交接文档。
+性能与边界：合成 4000×3000、≤10MiB JPEG 在 Chromium 参考环境通过处理总耗时 ≤5 秒断言；最大尺寸输出保持等比。MVP 不引入 PNG 量化；DPI 只展示；Worker/OffscreenCanvas/createImageBitmap/Blob Worker 能力不可用时按证据降级。S2 实质 End commit：`463bab7`；交接文档元数据回填为同一提交后的文档留痕提交。

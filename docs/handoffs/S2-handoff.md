@@ -6,7 +6,7 @@
 - Status：`READY_FOR_ACCEPTANCE`
 - 核心门禁：`PASS`
 - Start commit：`115a495`（S1 用户验收登记后启动 S2 前的本地基线）
-- End commit：`TBD`（完成最终门禁后回填）
+- End commit：`463bab7`（S2 实质实现、测试、证据和交接提交）
 - Agent：`Codex / UploadFit S2 Agent`
 - Environment：Windows；Node `v22.20.0`；npm `10.9.3`；Playwright Chromium `1.62.1`
 - Build artifact：`dist/uploadfit.js`，80652 bytes，SHA-256 `FC24CC793CB62E25F83630A16A80932A2837B81ED61E9C7990ECE8C48ED0758E`
@@ -72,4 +72,3 @@ I01–I18 映射、性能门槛、Worker 回退和 fixture 摘要见 `docs/evide
 - 本地自动门禁通过不等于 S2 用户验收通过；当前交接状态仍需用户验收。
 
 Git 仅做本地版本留痕，未推送远程。
-
