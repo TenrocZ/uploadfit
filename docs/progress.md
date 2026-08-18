@@ -285,7 +285,7 @@
 - 新增 `tests/integration/capabilities.test.js`，验证产品版 `detectCapabilities()` 的 File、DataTransfer、`input.files`、Canvas、Worker、Blob Worker、OffscreenCanvas 和 AI UNKNOWN 状态。
 - `docs/tabbit-capabilities.md` 修正 Blob Worker 矛盾记录，并索引当前 Tabbit 平台证据。
 - 执行 `npm ci`，随后完成单测、构建、静态检查和 7 个浏览器测试；临时测试端口均已关闭。
-- 初始化并保留 Git 整改留痕；最终 End commit 在提交后回填。
+- 初始化并保留 Git 整改留痕；实质整改提交为 `c3dd4a5`，基线为 `edbdce2`。
 
 最终验证摘要：
 

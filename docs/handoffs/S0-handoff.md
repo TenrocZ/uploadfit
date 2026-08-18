@@ -7,7 +7,7 @@
 - Status：`BLOCKED`
 - 核心门禁：`PASS`
 - Start commit：`edbdce2`（S0 整改前的可核验基线）
-- End commit（实质整改范围）：`PENDING`（最终 Git 提交完成后回填）
+- End commit（实质整改范围）：`c3dd4a5`
 - Agent：`Codex / UploadFit S0 Agent`
 - Environment：Windows；Node `v22.20.0`；npm `10.9.3`；Tabbit Browser `1.9.22.0`；Playwright Chromium
 - Build artifact：`dist/uploadfit.js`，8711 bytes，SHA-256 `44351FECB57784C90C3F8F4AECD7EF14C64FDCCA7C27721668FC3A494BA6B04F`
