@@ -34,7 +34,7 @@ export const STATE_TRANSITIONS = Object.freeze({
   ]),
   PASSTHROUGH: Object.freeze(['ARMED', 'STOPPED', 'DISPOSED']),
   WAITING_REJECTION: Object.freeze(['INSPECTING', 'STOPPED', 'DISPOSED']),
-  NEEDS_CONFIRMATION: Object.freeze(['PROCESSING', 'STOPPED', 'DISPOSED']),
+  NEEDS_CONFIRMATION: Object.freeze(['PASSTHROUGH', 'PROCESSING', 'STOPPED', 'DISPOSED']),
   PROCESSING: Object.freeze(['INJECTING', 'SUCCESS', 'STOPPED', 'DISPOSED']),
   INJECTING: Object.freeze(['RETRYING', 'SUCCESS', 'STOPPED', 'DISPOSED']),
   RETRYING: Object.freeze(['SUCCESS', 'STOPPED', 'DISPOSED']),
@@ -130,4 +130,3 @@ export function createStateMachine({
 
   return machine;
 }
-

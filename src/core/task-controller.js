@@ -212,26 +212,41 @@ function quickViolations(file, rules) {
   return violations;
 }
 
+function requiresAsyncDecision(rules) {
+  if (!rules?.actionable) return false;
+  const hasDimensionConstraint = [rules.width, rules.height]
+    .some((rule) => Object.values(rule ?? {}).some((value) => Number.isFinite(value)));
+  return hasDimensionConstraint
+    || Boolean(rules.aspectRatio)
+    || Boolean(rules.formats?.length)
+    || rules.background !== null && rules.background !== undefined;
+}
+
 function hasRequiredConfirmation(plan) {
   return Boolean(plan?.confirmations?.some((item) => item.required && !item.resolved));
 }
 
-function addRuleConfidenceConfirmation(plan) {
-  const next = cloneValue(plan);
-  next.confirmations = [
-    {
-      id: createRandomId('confirmation'),
-      type: 'RULE_CONFIDENCE',
-      required: true,
-      resolved: false,
-      accepted: null,
-      payload: null
-    },
-    ...(next.confirmations ?? [])
-  ];
-  next.executable = false;
-  next.passthrough = false;
-  return next;
+function createRuleConfidenceConfirmation() {
+  return {
+    id: createRandomId('confirmation'),
+    type: 'RULE_CONFIDENCE',
+    required: true,
+    resolved: false,
+    accepted: null,
+    payload: null
+  };
+}
+
+function safeConfirmation(confirmation) {
+  if (!confirmation || typeof confirmation !== 'object') return null;
+  return {
+    id: confirmation.id ?? null,
+    type: confirmation.type ?? null,
+    required: Boolean(confirmation.required),
+    resolved: Boolean(confirmation.resolved),
+    accepted: confirmation.accepted === true ? true : confirmation.accepted === false ? false : null,
+    payload: cloneValue(confirmation.payload)
+  };
 }
 
 function stableErrorCode(error, fallback = 'PROCESSING_FAILED') {
@@ -303,6 +318,8 @@ export class TaskController {
     this.started = false;
     this.disposed = false;
     this.clickListener = null;
+    this.changeCaptureListener = null;
+    this.handledEvents = new WeakSet();
   }
 
   start() {
@@ -317,6 +334,35 @@ export class TaskController {
         root: this.documentRef,
         onDiscover: (context) => this.registerUploader(context)
       });
+    }
+
+    if (this.documentRef?.addEventListener) {
+      this.changeCaptureListener = (event) => {
+        if (event?.type !== 'change' || this.disposed || this.handledEvents.has(event)) return;
+        let input = event.target;
+        let record = this.uploaders.get(input);
+        if (!record) {
+          const context = this.discovery?.discoverFromEvent?.(event);
+          input = context?.input ?? input;
+          record = this.uploaders.get(input);
+        }
+        if (!record) return;
+        this.handledEvents.add(event);
+        const result = this.handleFileChange(event, record.context);
+        result?.catch?.((error) => {
+          if (record.currentTask) this._stopTask(
+            record.currentTask,
+            stableErrorCode(error),
+            error
+          );
+        });
+      };
+      this.documentRef.addEventListener('change', this.changeCaptureListener, true);
+      this.resources.add(() => this.documentRef.removeEventListener(
+        'change',
+        this.changeCaptureListener,
+        true
+      ));
     }
     this.discovery.start?.();
 
@@ -372,6 +418,8 @@ export class TaskController {
       cleanupListener: null
     };
     record.listener = (event) => {
+      if (this.handledEvents.has(event)) return;
+      this.handledEvents.add(event);
       const result = this.handleFileChange(event, context);
       result?.catch?.((error) => {
         if (record.currentTask) this._stopTask(
@@ -469,6 +517,7 @@ export class TaskController {
       metadata: null,
       validation: null,
       plan: null,
+      policyConfirmation: null,
       abortController,
       stateMachine,
       eventBlocked: false,
@@ -477,7 +526,8 @@ export class TaskController {
       rejection: null,
       rejectionStopper: null,
       cancelled: false,
-      retryDispatched: false
+      retryDispatched: false,
+      eventReleased: false
     };
     return task;
   }
@@ -527,13 +577,14 @@ export class TaskController {
       || resolved.rules.safetyFlags?.length
       || resolved.rules.conflicts?.length;
     const quick = quickViolations(file, resolved.rules);
-    if (shouldInspect && (
+    const mediumConfidence = resolved.rules.confidence >= CONFIRM_RULE_CONFIDENCE
+      && resolved.rules.confidence < AUTO_RULE_CONFIDENCE;
+    const shouldBlockBeforeDecision = shouldInspect && (
       quick.length > 0
-      || (
-        resolved.rules.confidence >= CONFIRM_RULE_CONFIDENCE
-        && resolved.rules.confidence < AUTO_RULE_CONFIDENCE
-      )
-    )) {
+      || mediumConfidence
+      || requiresAsyncDecision(resolved.rules)
+    );
+    if (shouldBlockBeforeDecision) {
       event.stopImmediatePropagation?.();
       event.preventDefault?.();
       task.eventBlocked = true;
@@ -588,17 +639,22 @@ export class TaskController {
 
       if (validation.valid && task.rules.confidence >= AUTO_RULE_CONFIDENCE) {
         if (task.eventBlocked) {
-          this._stopTask(task, 'USER_CONFIRMATION_REQUIRED');
+          if (!this._releaseOriginalEvent(task)) {
+            this._stopTask(task, 'INJECTION_FAILED');
+          } else {
+            this._completePassthrough(task);
+          }
         } else {
           this._completePassthrough(task);
         }
         return;
       }
 
-      let plan = this.createProcessingPlan(metadata, task.rules);
+      const plan = this.createProcessingPlan(metadata, task.rules);
+      task.policyConfirmation = null;
       if (task.rules.confidence >= CONFIRM_RULE_CONFIDENCE
         && task.rules.confidence < AUTO_RULE_CONFIDENCE) {
-        plan = addRuleConfidenceConfirmation(plan);
+        task.policyConfirmation = createRuleConfidenceConfirmation();
       }
       task.plan = plan;
 
@@ -608,7 +664,7 @@ export class TaskController {
           : plan.unfixable[0]);
         return;
       }
-      if (hasRequiredConfirmation(plan)) {
+      if (task.policyConfirmation || hasRequiredConfirmation(plan)) {
         this._needConfirmation(task, record);
         this._requestConfirmation(task);
         return;
@@ -635,10 +691,38 @@ export class TaskController {
     this.logger.emit(validation.valid ? 'FILE_VALID' : 'FILE_INVALID', fields);
   }
 
+  _releaseOriginalEvent(task) {
+    if (!task?.eventBlocked || task.eventReleased) return true;
+    const input = task.inputElement;
+    if (!input?.isConnected) return false;
+    const EventConstructor = input.ownerDocument?.defaultView?.Event
+      ?? EVENT_CONSTRUCTOR_FALLBACK;
+    if (typeof EventConstructor !== 'function') return false;
+    try {
+      armInjectionGuard(input, 'change');
+      input.dispatchEvent(new EventConstructor('input', {
+        bubbles: true,
+        composed: true
+      }));
+      input.dispatchEvent(new EventConstructor('change', {
+        bubbles: true,
+        composed: true
+      }));
+      task.eventReleased = true;
+      return true;
+    } catch {
+      return false;
+    } finally {
+      clearInjectionGuard(input);
+    }
+  }
+
   _completePassthrough(task) {
     this._transitionTask(task, 'PASSTHROUGH');
-    this._transitionSession('PASSTHROUGH');
-    this._transitionSession('ARMED');
+    this._transitionSession('PASSTHROUGH', { taskId: task.taskId });
+    if (this.sessionMachine.state === 'PASSTHROUGH') {
+      this._transitionSession('ARMED', { reason: 'PASSTHROUGH_COMPLETE' });
+    }
     this.logger.emit('TASK_SUCCEEDED', { taskId: task.taskId });
     this._publish();
   }
@@ -648,7 +732,7 @@ export class TaskController {
     if (task.status !== 'WAITING_REJECTION') {
       this._transitionTask(task, 'WAITING_REJECTION');
     }
-    this._transitionSession('WAITING_REJECTION');
+    this._transitionSession('WAITING_REJECTION', { taskId: task.taskId });
     this._startRejectionObserver(task, record);
     this._publish();
   }
@@ -656,20 +740,23 @@ export class TaskController {
   _needConfirmation(task, record) {
     if (!isTaskCurrent(task, record)) return;
     this._transitionTask(task, 'NEEDS_CONFIRMATION');
-    this._transitionSession('NEEDS_CONFIRMATION');
+    this._transitionSession('NEEDS_CONFIRMATION', { taskId: task.taskId });
     this.logger.emit('CONFIRMATION_REQUIRED', { taskId: task.taskId });
     this._publish();
   }
 
   _requestConfirmation(task) {
     if (typeof this.confirmationResolver !== 'function') return;
-    const pending = task.plan?.confirmations?.find((item) => item.required && !item.resolved);
+    const pending = task.policyConfirmation?.required && !task.policyConfirmation.resolved
+      ? task.policyConfirmation
+      : task.plan?.confirmations?.find((item) => item.required && !item.resolved);
     if (!pending) return;
     Promise.resolve()
       .then(() => this.confirmationResolver({
         taskId: task.taskId,
         type: pending.type,
-        plan: safePlan(task.plan)
+        plan: safePlan(task.plan),
+        policyConfirmation: safeConfirmation(task.policyConfirmation)
       }))
       .then((confirmation) => {
         if (confirmation) return this.confirmTask(task.taskId, confirmation);
@@ -695,12 +782,24 @@ export class TaskController {
       if (!task || !record || !isTaskCurrent(task, record) || task.status === 'STOPPED') {
         continue;
       }
+      this._prepareSessionForProcessing();
       this.processingTask = task;
       void this._processTask(task, record).finally(() => {
         if (this.processingTask === task) this.processingTask = null;
         this._pumpQueue();
       });
       return;
+    }
+  }
+
+  _prepareSessionForProcessing() {
+    const state = this.sessionMachine.state;
+    if (['SUCCESS', 'STOPPED', 'PASSTHROUGH'].includes(state)) {
+      this.sessionMachine.transition('ARMED', { reason: 'QUEUE_NEXT' });
+      return;
+    }
+    if (state === 'WAITING_REJECTION') {
+      this.sessionMachine.transition('INSPECTING', { reason: 'QUEUE_NEXT' });
     }
   }
 
@@ -949,10 +1048,11 @@ export class TaskController {
       task.metadata = metadata;
       task.validation = this.validateFile(metadata, task.rules);
       this._logValidation(task, metadata, task.validation);
-      let plan = this.createProcessingPlan(metadata, task.rules);
+      const plan = this.createProcessingPlan(metadata, task.rules);
+      task.policyConfirmation = null;
       if (task.rules.confidence >= CONFIRM_RULE_CONFIDENCE
         && task.rules.confidence < AUTO_RULE_CONFIDENCE) {
-        plan = addRuleConfidenceConfirmation(plan);
+        task.policyConfirmation = createRuleConfidenceConfirmation();
       }
       task.plan = plan;
       if (task.validation.valid && plan.passthrough) {
@@ -965,7 +1065,7 @@ export class TaskController {
           : plan.unfixable[0]);
         return;
       }
-      if (hasRequiredConfirmation(plan)) {
+      if (task.policyConfirmation || hasRequiredConfirmation(plan)) {
         this._needConfirmation(task, record);
         this._requestConfirmation(task);
         return;
@@ -988,9 +1088,31 @@ export class TaskController {
       return { ok: false, errorCode: 'USER_CONFIRMATION_REQUIRED' };
     }
     try {
-      const nextPlan = this.resolveProcessingConfirmation(task.plan, confirmationPayload);
-      task.plan = nextPlan;
       const accepted = confirmationPayload?.accepted === true;
+      if (confirmationPayload?.type === 'RULE_CONFIDENCE') {
+        const policy = task.policyConfirmation;
+        if (!policy
+          || policy.id !== confirmationPayload.id
+          || policy.type !== confirmationPayload.type
+          || policy.resolved) {
+          throw Object.assign(new Error('Policy confirmation does not match this task.'), {
+            code: 'USER_CONFIRMATION_REQUIRED'
+          });
+        }
+        if (accepted && confirmationPayload?.payload?.allow !== true) {
+          throw Object.assign(new Error('Policy confirmation requires explicit allow.'), {
+            code: 'USER_CONFIRMATION_REQUIRED'
+          });
+        }
+        task.policyConfirmation = {
+          ...policy,
+          resolved: true,
+          accepted,
+          payload: accepted ? cloneValue(confirmationPayload.payload) : null
+        };
+      } else {
+        task.plan = this.resolveProcessingConfirmation(task.plan, confirmationPayload);
+      }
       if (!accepted) {
         if (task.eventBlocked) {
           this.injectFile(task.inputElement, task.originalFile, {
@@ -1001,22 +1123,42 @@ export class TaskController {
         this._stopTask(task, 'USER_CANCELLED');
         return { ok: true, status: task.status };
       }
-      if (hasRequiredConfirmation(nextPlan)) {
-        this._publish();
-        this._requestConfirmation(task);
-        return { ok: true, status: task.status };
-      }
-      if (!nextPlan.executable) {
-        this._stopTask(task, 'USER_CONFIRMATION_REQUIRED');
-        return { ok: false, errorCode: 'USER_CONFIRMATION_REQUIRED' };
-      }
-      this._enqueue(task, record);
-      return { ok: true, status: task.status };
+      return this._continueAfterConfirmation(task, record);
     } catch (error) {
       const code = stableErrorCode(error, 'USER_CONFIRMATION_REQUIRED');
       this._stopTask(task, code, error);
       return { ok: false, errorCode: code };
     }
+  }
+
+  _continueAfterConfirmation(task, record) {
+    if (!isTaskCurrent(task, record)) {
+      return { ok: false, errorCode: 'STALE_TASK' };
+    }
+    if (task.policyConfirmation?.required && !task.policyConfirmation.resolved) {
+      this._publish();
+      this._requestConfirmation(task);
+      return { ok: true, status: task.status };
+    }
+    if (hasRequiredConfirmation(task.plan)) {
+      this._publish();
+      this._requestConfirmation(task);
+      return { ok: true, status: task.status };
+    }
+    if (!task.plan?.executable) {
+      this._stopTask(task, 'USER_CONFIRMATION_REQUIRED');
+      return { ok: false, errorCode: 'USER_CONFIRMATION_REQUIRED' };
+    }
+    if (task.plan.passthrough && task.validation?.valid) {
+      if (task.eventBlocked && !this._releaseOriginalEvent(task)) {
+        this._stopTask(task, 'INJECTION_FAILED');
+        return { ok: false, errorCode: 'INJECTION_FAILED' };
+      }
+      this._completePassthrough(task);
+      return { ok: true, status: task.status };
+    }
+    this._enqueue(task, record);
+    return { ok: true, status: task.status };
   }
 
   cancelTask(taskId) {
@@ -1089,9 +1231,28 @@ export class TaskController {
 
   _transitionSession(next, details = {}) {
     if (this.disposed || this.sessionMachine.state === next) return true;
+    const current = this.sessionMachine.state;
+    const processingStates = new Set(['PROCESSING', 'INJECTING', 'RETRYING']);
+    if (processingStates.has(current)
+      && ['INSPECTING', 'WAITING_REJECTION', 'NEEDS_CONFIRMATION', 'PASSTHROUGH'].includes(next)
+      && this.processingTask?.taskId !== details.taskId) {
+      return true;
+    }
+    if (next === 'STOPPED'
+      && this.processingTask
+      && this.processingTask.taskId !== details.taskId) {
+      return true;
+    }
     if (next === 'INSPECTING'
-      && (this.sessionMachine.state === 'STOPPED' || this.sessionMachine.state === 'SUCCESS')) {
+      && (current === 'STOPPED' || current === 'SUCCESS' || current === 'PASSTHROUGH')) {
       this.sessionMachine.transition('ARMED', { reason: 'NEW_TASK' });
+    }
+    if (next === 'PROCESSING'
+      && ['STOPPED', 'SUCCESS', 'PASSTHROUGH'].includes(this.sessionMachine.state)) {
+      this.sessionMachine.transition('ARMED', { reason: 'QUEUE_NEXT' });
+    }
+    if (next === 'PROCESSING' && this.sessionMachine.state === 'WAITING_REJECTION') {
+      this.sessionMachine.transition('INSPECTING', { reason: 'QUEUE_NEXT' });
     }
     if (next === 'PROCESSING' && this.sessionMachine.state === 'ARMED') {
       this.sessionMachine.transition('INSPECTING');
@@ -1138,6 +1299,7 @@ export class TaskController {
           label: task.label,
           current: safeMetadata(task.metadata),
           rules: safeRuleSet(task.rules),
+          policyConfirmation: safeConfirmation(task.policyConfirmation),
           plan: safePlan(task.plan),
           result: safeResult(task.result),
           errorCode: task.errorCode ?? null,

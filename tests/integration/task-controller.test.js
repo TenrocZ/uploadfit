@@ -32,8 +32,8 @@ test('C01/C02/L02: compliant file passes through without reinjection', async ({ 
     label.append(input);
     wrapper.append(label);
     document.body.append(wrapper);
-    let changes = 0;
-    input.addEventListener('change', () => { changes += 1; });
+    globalThis.__s3Changes = 0;
+    input.addEventListener('change', () => { globalThis.__s3Changes += 1; });
     controller.start();
     const response = await window.fetch('/tests/fixtures/generated/jpeg-390x567-small.jpg');
     const file = new File([await response.arrayBuffer()], 'compliant.jpg', {
@@ -43,11 +43,13 @@ test('C01/C02/L02: compliant file passes through without reinjection', async ({ 
     transfer.items.add(file);
     input.files = transfer.files;
     input.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-    return { input, file, changes };
+    return { input, file, changes: globalThis.__s3Changes };
   });
   await waitForTask(page, 'snapshot => snapshot.activeTask?.status === "PASSTHROUGH"');
   const snapshot = await page.evaluate(() => globalThis.__s3Controller.getSnapshot());
-  expect(result.changes).toBe(1);
+  expect(result.changes).toBe(0);
+  const released = await page.evaluate(() => globalThis.__s3Changes);
+  expect(released).toBe(1);
   expect(snapshot.sessionState).toBe('ARMED');
   expect(snapshot.activeTask.status).toBe('PASSTHROUGH');
   expect(snapshot.activeTask.result).toBeNull();
@@ -243,7 +245,8 @@ test('D4 confidence routing blocks until a separate RULE_CONFIDENCE decision', a
     const task = globalThis.__s3Controller.getSnapshot().activeTask;
     return {
       taskId: task.taskId,
-      confirmation: task.plan.confirmations.find((item) => item.type === 'RULE_CONFIDENCE'),
+      confirmation: task.policyConfirmation
+        ?? task.plan.confirmations.find((item) => item.type === 'RULE_CONFIDENCE'),
       changes: globalThis.__s3Changes
     };
   });

@@ -8,7 +8,7 @@
 - 需求事实来源：`C:\Users\蔡天乐\Desktop\黑客松\UploadFit-PRD-v1.0.md`
 - 执行任务书：`C:\Users\蔡天乐\Desktop\黑客松\UploadFit-开发任务书-v1.0`
 - 当前阶段：S3：任务编排与上传闭环
-- 当前状态：S0、S1、S2 已验收并放行；S3 既有自动门禁通过，但独立验收发现 R1～R4，当前为 `REWORK_REQUIRED`；S4 暂不放行。
+- 当前状态：S0、S1、S2 已验收并放行；S3 R1～R4 已返工并通过自动化复验，当前为 `READY_FOR_REACCEPTANCE`，等待独立重新验收；S4 暂不放行。
 - 记录日期：2026-08-19
 
 ## 2026-08-17：S0 / 平台连接确认
@@ -665,3 +665,38 @@ S2 范围：
 - `docs/evidence/S3/acceptance-review-result.json`
 
 外部 Agent 需关闭 R1～R4、增加 Q-S3-001～008、刷新结构化与视觉证据并提交本地 Git 留痕后，再申请独立复验。当前不得启动 S4。
+
+## 2026-08-19：S3 / R1～R4 返工完成，申请重新验收
+
+状态：`READY_FOR_REACCEPTANCE`。本条登记返工、自检和自动化复验完成，不登记用户或独立验收通过；S4 仍未放行。
+
+返工基线：`ce0cb3f`。
+
+完成事项：
+
+- R1：异步尺寸/比例/格式/背景约束在捕获阶段阻断原始 `change`；metadata 与确认决策完成后，合规结果只释放一次原事件，处理结果只注入最终复检通过的文件。
+- R2：`RULE_CONFIDENCE` 独立保存为 S3 `policyConfirmation`，不再污染 S2 canonical plan；自动 resolver、手动确认和图像确认均有独立回归。
+- R3：双 uploader 由唯一 `processingTask` 驱动 FIFO；进入下一任务前合法准备聚合 session，首任务失败后队列继续，diagnostics 为空。
+- R4：补齐 Q-S3-001～008、结构化事件时间线、清理断言、确认前后截图和返工回报。
+
+验证结果：
+
+| 命令 | 结果 |
+|---|---|
+| `npm test -- --run` | PASS：15 个 Vitest 文件、103 个测试 |
+| `npm run check` | PASS：测试、构建和静态检查 |
+| `npm run test:e2e -- --reporter=line --workers=1` | PASS：57 个 Chromium 测试，Q-S3-001～008 全部通过 |
+| `git diff --check` | PASS |
+| 产物 | `dist/uploadfit.js`，122812 bytes |
+| 产物 SHA-256 | `D8254518DD14F304A70A67457375171C8F6A1C9D13CC30F23AE690F5C2280D43` |
+
+证据与交接：
+
+- `docs/handoffs/S3-rework-report.md`
+- `docs/handoffs/S3-handoff.md`
+- `docs/evidence/S3/README.md`
+- `docs/evidence/S3/s3-result.json`
+- `docs/evidence/S3/s3-confirmation-before.png`
+- `docs/evidence/S3/s3-confirmation-after.png`
+
+截图由本地 Playwright 使用无敏感数据的合成 fixture 生成并人工检查；当前会话 in-app Browser connector 无可用浏览器实例，未将截图冒充为 Tabbit 实测。Git 仅本地留痕，未推送远程。

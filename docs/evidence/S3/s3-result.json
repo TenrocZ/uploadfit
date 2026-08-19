@@ -1,9 +1,11 @@
 {
   "stage": "S3 task orchestration and rejection observation",
-  "status": "REWORK_REQUIRED",
-  "automationStatus": "PASS_HISTORICAL",
+  "status": "READY_FOR_REACCEPTANCE",
+  "automationStatus": "PASS",
   "acceptanceReview": "docs/evidence/S3/acceptance-review-result.json",
   "baselineCommit": "1e2d0d9",
+  "reworkBaselineCommit": "ce0cb3f",
+  "reworkStatus": "R1_R4_FIXED_AND_VERIFIED",
   "scope": [
     "session and state machine",
     "uploader registration and adapter registry",
@@ -51,6 +53,66 @@
     "noFormalUi": true
   },
   "observedScenarios": {
+    "asyncPreflight": {
+      "Q-S3-001": {
+        "status": "NEEDS_CONFIRMATION",
+        "confirmation": "CROP",
+        "pageChangeBeforeDecision": 0,
+        "originalEventBlocked": true
+      },
+      "Q-S3-002": {
+        "status": "PASSTHROUGH",
+        "metadataBeforePageChange": true,
+        "originalPageChangeEvents": 1,
+        "processCalls": 0,
+        "injectionCalls": 0
+      },
+      "Q-S3-003": {
+        "status": "SUCCESS",
+        "originalPageChangeEvents": 0,
+        "processedPageChangeEvents": 1,
+        "outputOperation": "RESIZE"
+      }
+    },
+    "policyConfirmation": {
+      "Q-S3-004": {
+        "resolverPath": "automatic",
+        "status": "SUCCESS",
+        "processCalls": 1,
+        "injectionCalls": 1,
+        "ruleConfidenceInS2Plan": false
+      },
+      "Q-S3-005": {
+        "acceptedPassthrough": {
+          "status": "PASSTHROUGH",
+          "processCalls": 0,
+          "injectionCalls": 0
+        },
+        "rejected": {
+          "status": "STOPPED",
+          "errorCode": "USER_CANCELLED"
+        }
+      },
+      "Q-S3-006": {
+        "partialConfirmationProcessCalls": 0,
+        "allConfirmedProcessCalls": 1,
+        "policyAndImageConfirmationIndependent": true
+      }
+    },
+    "queue": {
+      "Q-S3-007": {
+        "fifo": ["A", "B"],
+        "maxProcessingOrInjecting": 1,
+        "taskStatuses": ["SUCCESS", "SUCCESS"],
+        "diagnostics": []
+      },
+      "Q-S3-008": {
+        "fifo": ["A", "B"],
+        "maxProcessingOrInjecting": 1,
+        "taskStatuses": ["STOPPED", "SUCCESS"],
+        "diagnostics": []
+      }
+    },
     "passthrough": {
       "status": "PASSTHROUGH",
       "originalChangeDelivered": true,
@@ -94,13 +156,36 @@
   "automation": {
     "vitestFiles": 15,
     "vitestTests": 103,
-    "chromiumTests": 49,
-    "buildBytes": 119062,
+    "chromiumTests": 57,
+    "reworkTests": 8,
+    "buildBytes": 122812,
     "buildLimitBytes": 150000,
-    "sha256": "7F0DEDA9CE989911A5D24D1BFA0A73B55D0B8ACDEF8B9B272B8A79E2BBBAC514",
+    "sha256": "D8254518DD14F304A70A67457375171C8F6A1C9D13CC30F23AE690F5C2280D43",
     "staticCheck": "PASS",
-    "diffCheck": "PASS"
+    "diffCheck": "PASS",
+    "qS3": "Q-S3-001..008 PASS"
   },
+  "artifact": {
+    "path": "dist/uploadfit.js",
+    "format": "single JavaScript IIFE",
+    "bytes": 122812,
+    "sha256": "D8254518DD14F304A70A67457375171C8F6A1C9D13CC30F23AE690F5C2280D43"
+  },
+  "eventTimelines": {
+    "blockedBeforeDecision": ["capture", "metadata", "NEEDS_CONFIRMATION"],
+    "compliantRelease": ["capture", "metadata", "release-original-change", "PASSTHROUGH"],
+    "safeResize": ["capture", "metadata", "PROCESSING", "INJECTING", "processed-change", "SUCCESS"],
+    "sensitiveDataExcluded": true
+  },
+  "cleanup": {
+    "pagehideAndDispose": "PASS",
+    "observersAndListenersReleased": true,
+    "staleResultInjection": false
+  },
+  "visualEvidence": [
+    "docs/evidence/S3/s3-confirmation-before.png",
+    "docs/evidence/S3/s3-confirmation-after.png"
+  ],
   "forbiddenScopeChecks": {
     "formalS4Ui": false,
     "realTabbitAiProvider": false,
