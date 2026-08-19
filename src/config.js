@@ -16,6 +16,3 @@ export const ENCODE_QUALITY_MAX = 0.95;
 export const ENCODE_SEARCH_STEPS = 8;
 export const RESIZE_RETRY_LIMIT = 3;
 export const TARGET_MAX_RATIO = 0.90;
-
-export const BUILD_LIMIT_BYTES = 168_000;
-

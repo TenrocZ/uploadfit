@@ -1,46 +1,31 @@
-# S4 返工回报
+# S4 返工最终回报
 
 - 日期：2026-08-19
 - 返工基线：`2161939`
-- 当前状态：`REWORK_INCOMPLETE`
-- S5：未放行
-- Git：仅本地留痕，未推送远程
+- 最终状态：`ACCEPTED`
+- S5：已放行
+- Git：本地提交留痕，未推送远程
 
-## 返工结果
+## 闭合结果
 
-| 项目 | 结果 | 说明 |
-|---|---|---|
-| R1 | `PASS` | 最终 production bundle 在真实 CNIPA 页面等待 Vue 渲染后现场通过 ready/actionable、390×567、30KB—120KB 和无登录安全旗标；同时通过噪声 fixture |
-| R2/A11 | `BLOCKED` | 当前 in-app Browser 无可用 Tabbit 实例；没有用 mock 或旧证据替代，见 `docs/evidence/S4/tabbit-ai-result.json` |
-| R3 | `DEFERRED_BY_USER` | 用户要求暂跳过体积上限；production 为 169114 bytes，未视为通过 |
-| R4 | `PASS` | AI 完整 token/单位 evidence、aspect ratio 来源、exact/range/ratio 一致性已补齐 |
-| R5 | `PASS` | normalized crop 由 controller 权威校验并转换为 canonical pixels |
-| R6 | `PASS` | snapshot 保留有界脱敏 evidence，UI 显示来源和原文且使用 textContent |
-| R7 | `PASS` | 按钮语义、live/alert、crop Escape 作用域、discovery 边界和清理已闭合 |
-| R8 | `PASS_LOCAL_VISUAL_EVIDENCE` | U09/U12、pointer drag 和本地合成视觉证据已补齐 |
+R1、R4–R8 的返工实现及行为证据均通过。复验另发现并直接修复三项残余问题：
 
-## 回归结果
+1. AI 的 byte claim 可借用相同像素数字，ratio claim 可借用版本号；现改为类型化字节 evidence 和带比例上下文的 evidence。
+2. AI 可通过对象输出把比例容差放宽到 1；现禁止未知嵌套字段并锁定不超过 0.015。
+3. Tabbit 1.10.16.0 只在粘贴源码含字面量 `LLMBridge.` 时注入官方桥接；生产代码现显式保留该触发 token，并兼容作用域变量与 window 属性两种运行方式。
 
-- `npm test -- --run`：18 个文件、145 个测试通过。
-- `npm run test:e2e -- --reporter=line --workers=1`：89 个 Chromium 测试通过。
-- `npm run build`：`dist/uploadfit.js` 169114 bytes；SHA-256 `CF39073EDD0F533003A12ABCF16C3A112BB1125EA87408CCDE6E9115B9F02EFE`。
-- `npm run static-check`：仅因体积子门禁报错；按用户裁决记录为延后，源码禁止模式未报错。
-- `git diff --check`：通过。
+R2/A11 已由最终生产包在官方 Tabbit 私有脚本中通过：Bridge 可用、调用 0→1、732ms 返回，结构化规则和 evidence 通过本地校验。临时妙招取证后已删除。
 
-## 视觉与平台证据
+R3 根据用户最终裁决改为“体积全量放行”：不设固定上限，当前 169,536 bytes 仅记录。PRD、共享契约、S5/S6 任务书、追踪矩阵、最终验收手册、static-check 与 ADR-003 已同步。单 IIFE、直接粘贴保存运行、无运行时远程依赖和静态安全仍为硬门禁。
 
-本地 Playwright 使用无敏感合成 fixture 生成：
+## 最终验证
 
-- `docs/evidence/S4/s4-rule-evidence.png`
-- `docs/evidence/S4/s4-crop-before.png`
-- `docs/evidence/S4/s4-crop-after.png`
-- `docs/evidence/S4/s4-flatten-confirmation.png`
-- `docs/evidence/S4/s4-upscale-warning.png`
-- `docs/evidence/S4/s4-success-form.png`
-- `docs/evidence/S4/s4-failure-alert.png`
-- `docs/evidence/S4/s4-cnipa-fixture.png`（结构等价 fixture，不是真实 CNIPA 页面）
-- `docs/evidence/S4/s4-cnipa-live.png`（最终 production bundle 的真实 CNIPA 页面现场截图）
+| 检查 | 结果 |
+|---|---|
+| `npm run check` | PASS：18 文件 / 148 测试；169,536 bytes；static-check PASS |
+| `npm run test:e2e -- --reporter=line --workers=1` | PASS：90/90 |
+| 真实 CNIPA 页 | PASS：ready/actionable、JPG、30–120KB、390×567、无诊断 |
+| Tabbit A11 | PASS：最终 SHA `67879C...AE840`，真实调用与校验通过 |
+| `git diff --check` | PASS |
 
-真实 Tabbit 截图未生成，因为官方运行时不可用；不得把普通 Chromium mock 或 S0 历史证据写成 A11 通过。共享契约仍保持 150,000 bytes，ADR-003 已记录否决和本轮用户暂缓裁决。R2/A11、R3 及真实公开页现场复测闭合前，不申请 S4 通过，也不启动 S5。
-
-结构化明细：`docs/evidence/S4/rework-result.json`。
+详细结论：`docs/handoffs/S4-final-acceptance.md`。结构化证据：`docs/evidence/S4/rework-result.json`。

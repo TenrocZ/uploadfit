@@ -1,5 +1,7 @@
 # S4 独立验收报告
 
+> 历史报告：本报告记录 2026-08-19 首轮否决，已由 `S4-final-acceptance.md` 覆盖。R1–R8 均已闭合，固定体积门禁已按用户最终产品裁决取消，S4 当前为 `ACCEPTED`。
+
 - 验收日期：2026-08-19
 - 验收对象：`2161939 feat: implement S4 UI confirmations and Tabbit AI provider`
 - 上游基线：`d950253`（S3 已通过独立复验）

@@ -1,8 +1,10 @@
 # S4 Handoff：UI 确认与 Tabbit AI
 
-> **独立验收与返工覆盖（2026-08-19）**：历史状态由 `READY_FOR_ACCEPTANCE` 改为 `REWORK_REQUIRED`，S5 未放行。下方原交接内容保留作返工前追溯；当前状态和结论以文末“返工后复核”及 `docs/evidence/S4/rework-result.json` 为准，不代表 S4 已验收通过。
+> **最终验收覆盖（2026-08-19）**：S4 已 `ACCEPTED`，S5 已放行。最终结论见 `docs/handoffs/S4-final-acceptance.md`；本文中早期 `BLOCKED`、`DEFERRED_BY_USER`、150,000/168,000-byte 门禁和旧 SHA 仅保留为历史追溯，不再是当前状态。
 
-- Status: REWORK_INCOMPLETE（R2/A11 阻塞；R3 按用户裁决暂缓；原提交状态保留在正文供追溯）
+> **历史独立验收与返工记录（2026-08-19）**：该轮曾把状态从 `READY_FOR_ACCEPTANCE` 改为 `REWORK_REQUIRED`。下方原交接和“返工后复核”保留作追溯；它们已被文末“最终独立验收覆盖”和 `S4-final-acceptance.md` 取代。
+
+- Status: ACCEPTED（最终 bundle 已通过真实 CNIPA、Tabbit A11 与全量回归）
 - Start commit: `d950253`（S3 独立复验通过）
 - End commit: 本次 S4 提交（见当前 HEAD，本地 Git 留痕）
 - Agent: Claude / UploadFit S4 Agent
@@ -127,3 +129,12 @@
 | `git diff --check` | PASS |
 
 视觉证据：`docs/evidence/S4/s4-rule-evidence.png`、`s4-crop-before.png`、`s4-crop-after.png`、`s4-flatten-confirmation.png`、`s4-upscale-warning.png`、`s4-success-form.png`、`s4-failure-alert.png`、`s4-cnipa-fixture.png`、`s4-cnipa-live.png`。除 live 文件外均为无敏感合成 fixture；A11 截图因阻塞不存在。
+
+## 最终独立验收覆盖（2026-08-19）
+
+- R2/A11 已在 Tabbit 1.10.16.0 官方私有脚本中使用最终 production bundle 通过；调用 0→1、732ms 返回并通过 Schema/evidence 校验，截图为 `s4-tabbit-ai-live.png`。
+- 生产代码补齐 Tabbit 执行器要求的字面量 `LLMBridge.` 注入触发，并兼容作用域 Bridge 与 window Bridge。
+- AI byte/ratio evidence 串用和比例容差放宽已修复并增加对抗测试。
+- 用户最终裁决取消固定体积门禁；当前产物 169,536 bytes，SHA-256 `67879C73748432DEAF7526ED645842575EAE36AD710313082BCF38B2003AE840`，bytes 仅留痕。
+- 最终门禁：18 文件/148 Vitest、90/90 Chromium、static-check、真实 CNIPA 与 Tabbit A11 全部通过。
+- 临时 Tabbit 妙招与本地 8766 服务已清理。S5 可启动。

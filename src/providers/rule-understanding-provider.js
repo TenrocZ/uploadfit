@@ -1,4 +1,4 @@
-import { AI_TEXT_LIMIT } from '../config.js';
+import { AI_TEXT_LIMIT, ASPECT_RATIO_TOLERANCE } from '../config.js';
 import { normalizeRuleText, normalizeFormats, toBytes } from '../rules/normalizer.js';
 import { createRuleCandidate } from '../rules/schema.js';
 import { ALLOWED_SEMANTICS, validateRuleCandidate } from '../rules/validators.js';
@@ -16,6 +16,7 @@ const ALLOWED_OUTPUT_FIELDS = new Set([
 ]);
 const ALLOWED_DIMENSION_FIELDS = new Set(['exact', 'min', 'max']);
 const ALLOWED_SIZE_FIELDS = new Set(['value', 'unit']);
+const ALLOWED_ASPECT_RATIO_FIELDS = new Set(['value', 'tolerance']);
 const AI_MAX_DIMENSION = 100000;
 const AI_MAX_BYTES = 10 * 1024 * 1024 * 1024;
 const MAX_EVIDENCE_ITEMS = 32;
@@ -42,6 +43,7 @@ function invalid(errors) {
 const NUMBER_TOKEN_PATTERN = /(?<![\d.])\d+(?:[.,]\d+)?(?![\d.])/g;
 const BYTE_TOKEN_PATTERN = /(\d+(?:[.,]\d+)?)\s*(mb|m\b|kb|k\b|b)\b/gi;
 const RATIO_TOKEN_PATTERN = /(\d+(?:[.,]\d+)?)\s*[:\/]\s*(\d+(?:[.,]\d+)?)/g;
+const CONTEXTUAL_RATIO_PATTERN = /(?:宽高比|(?:图片|照片|图像)?比例|aspect\s*ratio)\s*(?:为|是|=|:|：)?\s*(\d+(?:[.,]\d+)?)/gi;
 
 function normalizedNumber(value) {
   const number = Number.parseFloat(String(value).replace(',', '.'));
@@ -81,6 +83,12 @@ function ratioValuesFromText(text) {
     if (numerator > 0 && denominator > 0) values.push(numerator / denominator);
   }
   return values;
+}
+
+function contextualRatioValuesFromText(text) {
+  return [...normalizeRuleText(text).matchAll(CONTEXTUAL_RATIO_PATTERN)]
+    .map((match) => normalizedNumber(match[1]))
+    .filter((value) => Number.isFinite(value) && value > 0);
 }
 
 function numberMatches(actual, source) {
@@ -195,18 +203,25 @@ function readAspectRatio(value, errors) {
       errors.push('ASPECT_RATIO_INVALID');
       return null;
     }
-    return { value, tolerance: 0.015 };
+    return { value, tolerance: ASPECT_RATIO_TOLERANCE };
   }
   if (isPlainObject(value)) {
+    for (const key of Object.keys(value)) {
+      if (!ALLOWED_ASPECT_RATIO_FIELDS.has(key)) {
+        errors.push(`ASPECT_RATIO_FIELD_${key}_UNKNOWN`);
+      }
+    }
     const { value: ratio, tolerance } = value;
     if (!Number.isFinite(ratio) || ratio <= 0 || ratio > 100) {
       errors.push('ASPECT_RATIO_INVALID');
       return null;
     }
     const resolvedTolerance = tolerance === undefined || tolerance === null
-      ? 0.015
+      ? ASPECT_RATIO_TOLERANCE
       : tolerance;
-    if (!Number.isFinite(resolvedTolerance) || resolvedTolerance <= 0 || resolvedTolerance > 1) {
+    if (!Number.isFinite(resolvedTolerance)
+      || resolvedTolerance <= 0
+      || resolvedTolerance > ASPECT_RATIO_TOLERANCE) {
       errors.push('ASPECT_RATIO_TOLERANCE_INVALID');
       return null;
     }
@@ -255,15 +270,14 @@ function byteClaimHasSource(value, evidenceTexts, field) {
   const kind = field === 'minBytes' ? 'min' : 'max';
   return evidenceTexts.some((text) => (
     byteValuesFromText(text, kind).some((candidate) => candidate === value)
-      || numericTokens(text).some((candidate) => candidate === value)
   ));
 }
 
 function claimHasSource(claim, evidenceTexts) {
   if (claim.kind === 'ratio') {
     return evidenceTexts.some((text) => (
-      numericTokens(text).some((candidate) => numberMatches(candidate, claim.value))
-        || ratioValuesFromText(text).some((candidate) => numberMatches(candidate, claim.value))
+      ratioValuesFromText(text).some((candidate) => numberMatches(candidate, claim.value))
+        || contextualRatioValuesFromText(text).some((candidate) => numberMatches(candidate, claim.value))
     ));
   }
   return evidenceTexts.some((text) => numericTokens(text).some((candidate) => (

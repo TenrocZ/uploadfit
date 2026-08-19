@@ -1,7 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BUILD_LIMIT_BYTES } from '../src/config.js';
 
 const rootDir = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const sourceDir = path.join(rootDir, 'src');
@@ -31,16 +30,18 @@ for (const filePath of listJavaScriptFiles(sourceDir)) {
   }
 }
 
+let artifactBytes = null;
 if (!existsSync(buildPath)) {
   violations.push('dist/uploadfit.js is missing');
-} else if (statSync(buildPath).size > BUILD_LIMIT_BYTES) {
-  violations.push(`dist/uploadfit.js exceeds ${BUILD_LIMIT_BYTES} bytes`);
+} else {
+  // Product decision (2026-08-19): artifact size is informational only. Runtime
+  // safety, a standalone IIFE and direct Tabbit paste/save/run remain hard gates.
+  artifactBytes = statSync(buildPath).size;
 }
 
 if (violations.length > 0) {
   console.error(violations.join('\n'));
   process.exitCode = 1;
 } else {
-  console.log('Static security check passed.');
+  console.log(`Static security check passed. Artifact bytes=${artifactBytes} (informational; no size gate).`);
 }
-

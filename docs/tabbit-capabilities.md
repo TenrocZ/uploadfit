@@ -6,12 +6,12 @@
 
 | 项目 | 值 |
 |---|---|
-| Tabbit Browser | 1.9.22.0 |
+| Tabbit Browser | 1.10.16.0（S4 最终复验；S0 历史证据为 1.9.22.0） |
 | 操作系统 | Windows |
 | Node | v22.20.0 |
 | npm | 10.9.3 |
-| 探针日期 | 2026-08-18 |
-| 当前页面 | `https://web.tabbit.com/panel?mode=mi&hl=zh-CN` |
+| 探针日期 | 2026-08-19 |
+| 当前页面 | Tabbit 官方私有脚本 + `http://127.0.0.1:8766/test-pages/probe.html`（取证后已清理） |
 
 ## 能力矩阵
 
@@ -30,7 +30,7 @@
 | OffscreenCanvas | PASS | 1.9.22.0 | 页面能力摘要为 true | S2 再验证实际转码路径 |
 | Tabbit AI 官方接口 | PASS | 1.9.22.0 | 用户提供的官方调用指南确认 `LLMBridge.chat()`；私有官方脚本实测 JSON 模式 1730ms 成功，返回可解析 JSON 字符串；空参数以 `Error: content is required` 拒绝 | 仅在启用且页面匹配的官方脚本运行时可用；产品强制 3000ms 超时、解析并校验 JSON |
 | CSP/外部依赖限制 | PASS | 1.9.22.0 | Tabbit 托管脚本、`LLMBridge.chat`、当前单文件 bundle 与 Blob Worker 均在实机运行；未加载任何远程运行时代码 | 继续禁止 CDN/远程脚本；外部 CDN 不作为产品路径探测 |
-| 单脚本体积/发布限制 | PASS | 1.9.22.0 | `dist/uploadfit.js` 为 9308 bytes，无 ESM import/export，低于 150000 bytes 目标 | Tabbit 最终发布上限仍待确认 |
+| 单脚本粘贴/保存/运行与实际体积 | PASS | 1.10.16.0 | 169,536-byte production IIFE 随 172,028-byte 验收脚本成功保存并自动运行；无 ESM import/export | 官方未声明固定上限；按 PRD 仅记录 bytes/SHA，不设体积门禁 |
 | 安装、更新、分享方式 | PASS | 1.9.22.0 | 私有探针创建和保存更新均成功；分享弹层生成 `https://web.tabbit.com/share/skill/<opaque-id>`，可见范围为“仅自己”，未分发；探针最终删除 | 正式交付时再生成并分发安装链接；S0 不公开临时探针 |
 
 ## 已确认的平台连接差异
@@ -48,6 +48,8 @@ C:\Users\蔡天乐\AppData\Local\Tabbit Browser\User Data\DevToolsActivePort
 2026-08-17 在 Tabbit 1.9.22.0 的本地探针页加载当前 `dist/uploadfit.js`，已验证产品 bundle 的单例启动、DataTransfer/input.files 注入、input/change 事件链和 cleanup/rebootstrap。详见 `docs/evidence/S0/tabbit-bundle-result.json`。
 
 2026-08-18 的补充探针使用 Tabbit 官方“创建妙招 → 脚本”完整创建和更新路径：限定 `127.0.0.1:8768/*`，启用自动运行后刷新匹配页，`LLMBridge.chat` 成功返回；关闭自动运行并保存后刷新不再注入。分享弹层可生成私有链接，临时探针最后删除。结果见 `docs/evidence/S0/tabbit-llmbridge-result.json`。
+
+2026-08-19 的 S4 最终探针发现 Tabbit 1.10.16.0 会扫描脚本源码中的字面量 `LLMBridge.`，命中后才注入 MAIN-world bridge。最终 production bundle 已固定保留该 token；官方脚本实际调用 0→1 并通过本地 Schema/evidence 校验。结果见 `docs/evidence/S4/tabbit-ai-result.json`，临时私有妙招已删除。
 
 ## 证据索引
 

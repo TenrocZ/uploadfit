@@ -1,10 +1,12 @@
+import { resolveTabbitAiBridge } from './providers/tabbit-ai.js';
+
 /**
  * Detect browser capabilities without touching a page-owned form control.
  * @param {Document} documentRef
  * @returns {Record<string, unknown>}
  */
 export function detectCapabilities(documentRef = globalThis.document) {
-  const tabbitAiAvailable = typeof globalThis.LLMBridge?.chat === 'function';
+  const tabbitAiAvailable = typeof resolveTabbitAiBridge(globalThis)?.chat === 'function';
   const capabilities = {
     file: typeof globalThis.File === 'function',
     blob: typeof globalThis.Blob === 'function',

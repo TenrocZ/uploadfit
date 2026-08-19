@@ -763,3 +763,15 @@ S2 范围：
 验证：18 个 Vitest 文件/145 测试通过；89 个 Chromium E2E 通过；diff check 通过。生产 bundle 为 169114 bytes，SHA-256 `CF39073EDD0F533003A12ABCF16C3A112BB1125EA87408CCDE6E9115B9F02EFE`。
 
 用户裁决：体积上限暂跳过，R3 记为 `DEFERRED_BY_USER`，没有修改共享契约，也没有把超限视为通过。A11 记为 `BLOCKED`，因为当前 in-app Browser/Tabbit 实例不可用；没有用 mock 或 S0 证据替代。真实 CNIPA 页面最终 bundle 已在获准网络环境等待 Vue 渲染后现场通过，保存 `s4-cnipa-live.png`。详见 `docs/handoffs/S4-handoff.md`、`docs/evidence/S4/rework-result.json`、`docs/evidence/S4/tabbit-ai-result.json`。
+
+## 2026-08-19：S4 / 最终独立验收通过
+
+状态：`ACCEPTED`，S5 已放行。
+
+回扫在返工基础上直接修复三项残余：byte evidence 不再借用像素数字；decimal ratio 必须有比例上下文且 AI 不能放宽 0.015 容差；生产包保留 Tabbit 1.10.16.0 执行器注入官方 Bridge 所需的字面量 `LLMBridge.`。新增对抗单测及 production lexical-Bridge E2E。
+
+用户最终裁决“体积问题全量放行”：PRD、共享契约、S5/S6 任务书、追踪矩阵、最终验收手册和 ADR-003 已统一为“记录 raw bytes/SHA，不设固定体积门禁”。static-check 保留安全阻断，只把体积作为信息输出。
+
+最终 `dist/uploadfit.js` 为 169,536 bytes，SHA-256 `67879C73748432DEAF7526ED645842575EAE36AD710313082BCF38B2003AE840`。`npm run check` 18 文件/148 测试通过，Chromium 90/90 通过。真实 CNIPA 页面得到 ready/actionable、JPG、30–120KB、390×567 且无诊断；Tabbit 官方私有脚本真实调用 `LLMBridge.chat` 一次并通过本地校验。临时妙招、页面和 8766 服务均已清理。
+
+最终报告：`docs/handoffs/S4-final-acceptance.md`。结构化证据：`docs/evidence/S4/rework-result.json`、`docs/evidence/S4/tabbit-ai-result.json`。

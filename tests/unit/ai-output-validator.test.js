@@ -91,6 +91,19 @@ test('A03: byte evidence uses equivalent units, not a larger-number substring', 
   expect(invalid.errors).toContain('NUMERIC_MINBYTES_UNSOURCED');
 });
 
+test('A03: byte evidence cannot borrow an equal pixel count', () => {
+  const result = validateAiRuleOutput({
+    ...VALID_OUTPUT,
+    minSize: { value: 30, unit: 'KB' },
+    maxSize: null,
+    width: null,
+    height: null,
+    evidence: ['JPG格式', '宽30720像素']
+  }, 'JPG格式，宽30720像素。');
+  expect(result.ok).toBe(false);
+  expect(result.errors).toContain('NUMERIC_MINBYTES_UNSOURCED');
+});
+
 test('A03: an aspect ratio must be sourced by a numeric ratio or value', () => {
   const missing = validateAiRuleOutput({
     ...VALID_OUTPUT,
@@ -112,6 +125,53 @@ test('A03: an aspect ratio must be sourced by a numeric ratio or value', () => {
     evidence: ['JPG格式', '比例3:2', '宽390像素', '高567像素']
   }, 'JPG格式，比例3:2，宽390像素，高567像素。');
   expect(sourced.ok).toBe(true);
+});
+
+test('A03: a decimal aspect ratio needs ratio context and cannot borrow a version number', () => {
+  const borrowed = validateAiRuleOutput({
+    ...VALID_OUTPUT,
+    minSize: null,
+    maxSize: null,
+    width: null,
+    height: null,
+    aspectRatio: 1.5,
+    evidence: ['JPG格式', '版本1.5']
+  }, 'JPG格式，版本1.5。');
+  expect(borrowed.ok).toBe(false);
+  expect(borrowed.errors).toContain('NUMERIC_ASPECTRATIO.VALUE_UNSOURCED');
+
+  const contextual = validateAiRuleOutput({
+    ...VALID_OUTPUT,
+    minSize: null,
+    maxSize: null,
+    width: null,
+    height: null,
+    aspectRatio: 1.5,
+    evidence: ['JPG格式', '宽高比1.5']
+  }, 'JPG格式，宽高比1.5。');
+  expect(contextual.ok).toBe(true);
+});
+
+test('A04: AI cannot widen aspect-ratio tolerance or add nested fields', () => {
+  const widened = validateAiRuleOutput({
+    ...VALID_OUTPUT,
+    width: null,
+    height: null,
+    aspectRatio: { value: 1.5, tolerance: 1 },
+    evidence: ['JPG格式', '30KB到120KB', '比例3:2']
+  }, 'JPG格式，30KB到120KB，比例3:2。');
+  expect(widened.ok).toBe(false);
+  expect(widened.errors).toContain('ASPECT_RATIO_TOLERANCE_INVALID');
+
+  const nestedUnknown = validateAiRuleOutput({
+    ...VALID_OUTPUT,
+    width: null,
+    height: null,
+    aspectRatio: { value: 1.5, tolerance: 0.015, action: 'ignore' },
+    evidence: ['JPG格式', '30KB到120KB', '比例3:2']
+  }, 'JPG格式，30KB到120KB，比例3:2。');
+  expect(nestedUnknown.ok).toBe(false);
+  expect(nestedUnknown.errors).toContain('ASPECT_RATIO_FIELD_action_UNKNOWN');
 });
 
 test('A03: min/max byte values require a KB/MB source', () => {

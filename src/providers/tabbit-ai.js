@@ -19,6 +19,21 @@ const SYSTEM_CONSTRAINTS = [
 const OUTPUT_SCHEMA_HINT = '{"formats":["jpg"],"minSize":{"value":30,"unit":"KB"},"maxSize":{"value":120,"unit":"KB"},"width":{"exact":390,"min":null,"max":null},"height":{"exact":567,"min":null,"max":null},"aspectRatio":null,"semanticRequirements":["不得拉伸"],"evidence":["JPG格式","30KB—120KB","宽390像素，高567像素"],"confidence":0.97}';
 
 /**
+ * Tabbit supplies LLMBridge as a variable in the pasted script's execution
+ * scope. Some harnesses expose it on window instead, so support both without
+ * requiring either environment to mutate page globals.
+ */
+export function resolveTabbitAiBridge(globalRef = globalThis) {
+  // Keep the direct `LLMBridge.chat` spelling: Tabbit 1.10.16 scans pasted
+  // source for this token before injecting its MAIN-world bridge.
+  const scopedBridge = typeof LLMBridge !== 'undefined'
+    && typeof LLMBridge.chat === 'function'
+    ? LLMBridge
+    : null;
+  return scopedBridge ?? globalRef?.LLMBridge ?? null;
+}
+
+/**
  * Build the provider prompt. Exported for tests; never includes anything but
  * the task name, locale, page type and the already-sanitized text.
  */
@@ -62,7 +77,7 @@ export class TabbitAiProvider extends RuleUnderstandingProvider {
   }
 
   _chatFunction() {
-    const bridge = this.bridge ?? this.globalRef?.LLMBridge;
+    const bridge = this.bridge ?? resolveTabbitAiBridge(this.globalRef);
     const chat = bridge?.chat;
     return typeof chat === 'function' ? chat.bind(bridge) : null;
   }
