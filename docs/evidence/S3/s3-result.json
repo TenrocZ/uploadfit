@@ -1,11 +1,13 @@
 {
   "stage": "S3 task orchestration and rejection observation",
-  "status": "READY_FOR_REACCEPTANCE",
+  "status": "ACCEPTED",
   "automationStatus": "PASS",
   "acceptanceReview": "docs/evidence/S3/acceptance-review-result.json",
+  "reacceptanceReview": "docs/evidence/S3/reacceptance-result.json",
   "baselineCommit": "1e2d0d9",
   "reworkBaselineCommit": "ce0cb3f",
-  "reworkStatus": "R1_R4_FIXED_AND_VERIFIED",
+  "reworkStatus": "R1_R4_AND_REACCEPTANCE_RESIDUAL_FIXED",
+  "reacceptanceFixCommit": "09e7d3d",
   "scope": [
     "session and state machine",
     "uploader registration and adapter registry",
@@ -113,6 +115,20 @@
         "diagnostics": []
       }
     },
+    "reacceptance": {
+      "Q-S3-009": {
+        "bareInputUpgraded": true,
+        "taskStatus": "WAITING_REJECTION",
+        "originalType": "image/png"
+      },
+      "Q-S3-010": {
+        "realS2Pipeline": true,
+        "confidence": 0.8,
+        "status": "SUCCESS",
+        "outputValidation": true,
+        "outputMime": "image/jpeg"
+      }
+    },
     "passthrough": {
       "status": "PASSTHROUGH",
       "originalChangeDelivered": true,
@@ -156,20 +172,20 @@
   "automation": {
     "vitestFiles": 15,
     "vitestTests": 103,
-    "chromiumTests": 57,
-    "reworkTests": 8,
-    "buildBytes": 122812,
+    "chromiumTests": 59,
+    "reworkTests": 10,
+    "buildBytes": 122865,
     "buildLimitBytes": 150000,
-    "sha256": "D8254518DD14F304A70A67457375171C8F6A1C9D13CC30F23AE690F5C2280D43",
+    "sha256": "4483FC94F140F892F9A0FCF16AF27797639C41B44F8E863AD9FEDE2F4897702D",
     "staticCheck": "PASS",
     "diffCheck": "PASS",
-    "qS3": "Q-S3-001..008 PASS"
+    "qS3": "Q-S3-001..010 PASS"
   },
   "artifact": {
     "path": "dist/uploadfit.js",
     "format": "single JavaScript IIFE",
-    "bytes": 122812,
-    "sha256": "D8254518DD14F304A70A67457375171C8F6A1C9D13CC30F23AE690F5C2280D43"
+    "bytes": 122865,
+    "sha256": "4483FC94F140F892F9A0FCF16AF27797639C41B44F8E863AD9FEDE2F4897702D"
   },
   "eventTimelines": {
     "blockedBeforeDecision": ["capture", "metadata", "NEEDS_CONFIRMATION"],

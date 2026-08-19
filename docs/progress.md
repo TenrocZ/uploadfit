@@ -7,8 +7,8 @@
 - 工程目录：`C:\Users\蔡天乐\Desktop\黑客松\main`
 - 需求事实来源：`C:\Users\蔡天乐\Desktop\黑客松\UploadFit-PRD-v1.0.md`
 - 执行任务书：`C:\Users\蔡天乐\Desktop\黑客松\UploadFit-开发任务书-v1.0`
-- 当前阶段：S3：任务编排与上传闭环
-- 当前状态：S0、S1、S2 已验收并放行；S3 R1～R4 已返工并通过自动化复验，当前为 `READY_FOR_REACCEPTANCE`，等待独立重新验收；S4 暂不放行。
+- 当前阶段：S3 已验收；待启动 S4
+- 当前状态：S0、S1、S2、S3 已验收并放行；S3 返工和独立复验残留均已关闭，当前为 `ACCEPTED`；允许启动 S4。
 - 记录日期：2026-08-19
 
 ## 2026-08-17：S0 / 平台连接确认
@@ -700,3 +700,13 @@ S2 范围：
 - `docs/evidence/S3/s3-confirmation-after.png`
 
 截图由本地 Playwright 使用无敏感数据的合成 fixture 生成并人工检查；当前会话 in-app Browser connector 无可用浏览器实例，未将截图冒充为 Tabbit 实测。Git 仅本地留痕，未推送远程。
+
+## 2026-08-19：S3 / 返工后独立复验通过
+
+状态：`ACCEPTED`，S4 已放行。
+
+独立复验确认 R1～R4 与 Q-S3-001～008 均通过。复验额外发现裸 `input[type=file]` 首次选择图片时，S3 调用 discovery 未传本次 `File.type`，导致目标 input 没有 uploader/task；已在 `09e7d3d` 修复，并增加 Q-S3-009。Q-S3-010 使用真实 S2 pipeline 验证中置信规则接受后可完成 PNG→JPEG、最终复检和回填。
+
+最终门禁：15 个 Vitest 文件、103 个测试通过；59 个 Chromium 测试通过；生产 IIFE 122865 bytes，SHA-256 `4483FC94F140F892F9A0FCF16AF27797639C41B44F8E863AD9FEDE2F4897702D`；静态检查和 diff check 通过，8765 端口关闭。
+
+最终报告与证据：`docs/handoffs/S3-reacceptance-review.md`、`docs/evidence/S3/reacceptance-result.json`。任务书声明的早注册 document/window 捕获监听边界与 `isTrusted=false` 限制继续保留，不扩大为全站兼容承诺。

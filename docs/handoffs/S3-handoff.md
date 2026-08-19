@@ -4,19 +4,20 @@
 - 工程目录：C:\Users\蔡天乐\Desktop\黑客松\main
 - 对应任务书：40-S3-任务编排与上传闭环.md
 - 共享契约：01-共享契约与接口基线.md
-- Status：READY_FOR_REACCEPTANCE
-- 核心门禁：AUTOMATION_PASS / REWORK_VERIFIED / ACCEPTANCE_PENDING
+- Status：ACCEPTED
+- 核心门禁：AUTOMATION_PASS / INDEPENDENT_REACCEPTANCE_PASS
 - 基线提交：1e2d0d9
 - 返工基线：ce0cb3f
 - 返工实现提交：5cec842
+- 独立复验修复提交：09e7d3d
 - 结束留痕：本次返工纳入本地 Git 提交，最终提交号见当前 HEAD
 - Agent：Codex / UploadFit S3 Agent
 - 环境：Windows；Node v22.20.0；npm 10.9.3；Playwright Chromium 1.62.1
 - 生产产物：dist/uploadfit.js
-- 产物 bytes：122812
-- SHA-256：D8254518DD14F304A70A67457375171C8F6A1C9D13CC30F23AE690F5C2280D43
+- 产物 bytes：122865
+- SHA-256：4483FC94F140F892F9A0FCF16AF27797639C41B44F8E863AD9FEDE2F4897702D
 
-> 2026-08-19 独立验收发现的 R1～R4 已按返工单关闭，Q-S3-001～008 和视觉证据已补齐；当前仅申请独立重新验收，尚不表示 S3 已验收。正式历史结论见 `docs/handoffs/S3-acceptance-review.md`，施工边界见 `docs/handoffs/S3-acceptance-rework-order.md`，详细返工回报见 `docs/handoffs/S3-rework-report.md`。S4 暂不放行。
+> 2026-08-19 独立复验已通过。R1～R4 关闭；复验新增的裸 file input 残留也已在 `09e7d3d` 修复并由 Q-S3-009/010 验证。最终结论见 `docs/handoffs/S3-reacceptance-review.md`，S4 已放行。
 
 本文以下内容描述 `ce0cb3f` 基础上的 S3 交付；R1～R4 的返工变更和证据以 `docs/handoffs/S3-rework-report.md`、`docs/evidence/S3/README.md` 及当前 HEAD 为准。
 
@@ -58,9 +59,9 @@ TaskController 是跨模块副作用唯一入口；view/测试只通过 start、
 | 命令 | 结果 |
 |---|---|
 | npm test -- --run | PASS：15 个 Vitest 文件、103 个测试 |
-| npm run build | PASS：纯 JavaScript IIFE，122812 bytes |
+| npm run build | PASS：纯 JavaScript IIFE，122865 bytes |
 | npm run static-check | PASS |
-| npm run test:e2e -- --reporter=line --workers=1 | PASS：57 个 Chromium 测试，含 Q-S3-001～008，测试服务自动清理 |
+| npm run test:e2e -- --reporter=line --workers=1 | PASS：59 个 Chromium 测试，含 Q-S3-001～010，测试服务自动清理 |
 | git diff --check | PASS |
 
 专项测试文件：
@@ -72,6 +73,7 @@ TaskController 是跨模块副作用唯一入口；view/测试只通过 start、
 - tests/integration/rejection-observer.test.js
 - tests/integration/cleanup.test.js
 - tests/integration/s3-acceptance-rework.test.js
+- tests/integration/s3-reacceptance-probe.test.js
 
 权威结构化证据：docs/evidence/S3/s3-result.json。返工回报：docs/handoffs/S3-rework-report.md。
 
@@ -85,4 +87,4 @@ TaskController 是跨模块副作用唯一入口；view/测试只通过 start、
 
 ## 6. 验收入口
 
-R1～R4 已完成返工并通过全量门禁，现以新 evidence 和本地 Git 留痕申请独立重新验收。当前 S3 状态为 `READY_FOR_REACCEPTANCE`；在独立验收结论返回前，S4 暂不放行。
+R1～R4 及独立复验残留均已关闭，全量门禁和结构化证据通过。当前 S3 状态为 `ACCEPTED`，允许以当前 HEAD 为基线启动 S4。

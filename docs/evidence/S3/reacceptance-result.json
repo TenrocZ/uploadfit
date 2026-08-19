@@ -1,0 +1,55 @@
+{
+  "stage": "S3 task orchestration and upload loop",
+  "reviewDate": "2026-08-19",
+  "reworkBaselineCommit": "ce0cb3f",
+  "externalReworkCommit": "5cec842",
+  "reviewedCommit": "25087d0",
+  "reviewFixCommit": "09e7d3d",
+  "status": "ACCEPTED",
+  "nextStageAllowed": true,
+  "findings": {
+    "R1": "PASS",
+    "R2": "PASS",
+    "R3": "PASS",
+    "R4": "PASS",
+    "R5": {
+      "status": "FIXED_AND_VERIFIED",
+      "title": "Bare file input first image selection did not create an S3 task",
+      "fix": "Pass the sole selected File.type into discovery.discoverFromEvent during capture",
+      "tests": ["Q-S3-009", "Q-S3-010"]
+    }
+  },
+  "regressionCases": {
+    "Q-S3-001..008": "PASS",
+    "Q-S3-009": {
+      "result": "PASS",
+      "uploaderRegistered": true,
+      "taskStatus": "WAITING_REJECTION",
+      "originalType": "image/png"
+    },
+    "Q-S3-010": {
+      "result": "PASS",
+      "pipeline": "real S2",
+      "confidence": 0.8,
+      "status": "SUCCESS",
+      "outputValidation": true,
+      "outputMime": "image/jpeg"
+    }
+  },
+  "automation": {
+    "vitestFiles": 15,
+    "vitestTests": 103,
+    "chromiumTests": 59,
+    "staticCheck": "PASS",
+    "diffCheck": "PASS",
+    "testPortClosed": true
+  },
+  "artifact": {
+    "path": "dist/uploadfit.js",
+    "format": "single JavaScript IIFE",
+    "bytes": 122865,
+    "limitBytes": 150000,
+    "sha256": "4483FC94F140F892F9A0FCF16AF27797639C41B44F8E863AD9FEDE2F4897702D"
+  },
+  "knownBoundary": "A site capture listener registered earlier on document/window may observe the event first; isTrusted=false remains a documented platform limitation."
+}
