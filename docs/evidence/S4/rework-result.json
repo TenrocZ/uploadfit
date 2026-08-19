@@ -1,0 +1,97 @@
+{
+  "date": "2026-08-19",
+  "stage": "S4",
+  "status": "REWORK_INCOMPLETE",
+  "releaseS5": false,
+  "baselineCommit": "2161939",
+  "environment": {
+    "os": "Windows",
+    "node": "v22.20.0",
+    "npm": "10.9.3",
+    "vitest": "4.1.10",
+    "playwright": "1.62.1",
+    "browserEvidence": "local Playwright Chromium; in-app Browser connector unavailable"
+  },
+  "artifact": {
+    "path": "dist/uploadfit.js",
+    "bytes": 169114,
+    "sha256": "CF39073EDD0F533003A12ABCF16C3A112BB1125EA87408CCDE6E9115B9F02EFE",
+    "format": "single-file minified IIFE, production auto-bootstrap",
+    "sharedContractLimitBytes": 150000,
+    "configuredBuildLimitBytes": 168000,
+    "sizeStatus": "DEFERRED_BY_USER"
+  },
+  "requirements": {
+    "R1": {
+      "status": "PASS",
+      "details": "最终 production bundle 在真实 CNIPA 页面等待 Vue 渲染后现场通过：pageCard=ready、actionable=true、390×567、30KB—120KB、无 PERMISSION_OR_LOGIN；另有完整噪声 fixture 回归。"
+    },
+    "R2_A11": {
+      "status": "BLOCKED",
+      "details": "Tabbit 官方运行时不可用；详见 tabbit-ai-result.json。"
+    },
+    "R3": {
+      "status": "DEFERRED_BY_USER",
+      "details": "用户明确要求暂跳过体积上限；未修改共享契约，未将超限标为通过。"
+    },
+    "R4": {
+      "status": "PASS",
+      "details": "完整 numeric token、B/KB/MB 等价来源、aspect ratio 来源和 exact/range/ratio 内部一致性均有回归。"
+    },
+    "R5": {
+      "status": "PASS",
+      "details": "UI 发送 normalized crop；controller 验证边界/尺寸并转换为 canonical pixel crop，篡改路径拒绝。"
+    },
+    "R6": {
+      "status": "PASS",
+      "details": "snapshot 保留有界脱敏 evidence，卡片展示来源/优先级/原文，textContent 防 HTML 执行。"
+    },
+    "R7": {
+      "status": "PASS",
+      "details": "同级按钮、常驻 live region、单一 alert、crop Escape 作用域和 dispose 清理均有测试。"
+    },
+    "R8": {
+      "status": "PASS_LOCAL_VISUAL_EVIDENCE",
+      "details": "U09、窄视口、等效 200% CSS 视口、reduced motion、真实 pointer drag 和合成视觉证据已补齐。"
+    }
+  },
+  "commands": [
+    {
+      "command": "npm test -- --run",
+      "result": "PASS: 18 files / 145 tests"
+    },
+    {
+      "command": "npm run build",
+      "result": "PASS: 169114 bytes; SHA-256 deterministic"
+    },
+    {
+      "command": "npm run static-check",
+      "result": "DEFERRED_SIZE_FAILURE: dist/uploadfit.js exceeds configured 168000 bytes; no forbidden source pattern reported"
+    },
+    {
+      "command": "npm run test:e2e -- --reporter=line --workers=1",
+      "result": "PASS: 89 Chromium tests"
+    },
+    {
+      "command": "git diff --check",
+      "result": "PASS"
+    }
+  ],
+  "visualEvidence": [
+    "docs/evidence/S4/s4-rule-evidence.png",
+    "docs/evidence/S4/s4-crop-before.png",
+    "docs/evidence/S4/s4-crop-after.png",
+    "docs/evidence/S4/s4-flatten-confirmation.png",
+    "docs/evidence/S4/s4-upscale-warning.png",
+    "docs/evidence/S4/s4-success-form.png",
+    "docs/evidence/S4/s4-failure-alert.png",
+    "docs/evidence/S4/s4-cnipa-fixture.png",
+    "docs/evidence/S4/s4-cnipa-live.png"
+  ],
+  "visualEvidenceProvenance": "s4-*.png 由本地 Playwright Chromium 生成；s4-cnipa-fixture.png 使用无敏感结构等价 fixture，s4-cnipa-live.png 为最终 production bundle 在公开 CNIPA 页面等待 Vue 渲染后的现场截图；没有生成或伪造 Tabbit 截图。",
+  "blockers": [
+    "R2/A11: Tabbit official runtime unavailable",
+    "R3: user-deferred size gate"
+  ],
+  "nextAction": "等待 Tabbit/真实页面运行环境和用户对体积项的后续放行；在此之前不得启动 S5。"
+}

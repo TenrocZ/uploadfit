@@ -11,7 +11,7 @@ import {
 
 const BYTE_PATTERN = /(\d+(?:[.,]\d+)?)\s*(mb|m\b|kb|k\b|b)\b/gi;
 const DIMENSION_PAIR_PATTERN = /(\d+(?:[.,]\d+)?)\s*x\s*(\d+(?:[.,]\d+)?)(?:\s*(?:像素|px))?/gi;
-const AXIS_PATTERN = /(宽(?:度)?|高(?:度)?)\s*(?:(不低于|至少|不超过|最多|最低|最高|>=|<=|≥|≤)\s*)?(\d+(?:[.,]\d+)?)(?:\s*(?:至|到|-)\s*(\d+(?:[.,]\d+)?))?(?:\s*(?:像素|px))?/gi;
+const AXIS_PATTERN = /(宽(?:度)?|高(?:度)?)\s*(?:[:：]\s*)?(?:(不低于|至少|不超过|最多|最低|最高|>=|<=|≥|≤)\s*)?(\d+(?:[.,]\d+)?)(?:\s*(?:至|到|-)\s*(\d+(?:[.,]\d+)?))?(?:\s*(?:像素|px))?/gi;
 const FORMAT_PATTERN = /(?:image\/(?:jpeg|png|webp)|\.?\b(?:jpg|jpeg|png|webp)\b)/gi;
 const RATIO_PATTERN = /(?:宽高比|比例)\s*(?:为|是|=|:)?\s*(\d+(?:[.,]\d+)?)\s*[:\/]\s*(\d+(?:[.,]\d+)?)/i;
 const DIMENSION_QUALIFIER = /(?:不低于|至少|最低|>=|≥)/;

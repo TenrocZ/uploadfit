@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 async function load(page) {
   await page.goto('/test-pages/probe.html');
-  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
   await page.evaluate(() => globalThis.__uploadfit_debug_bundle__.cleanupSession());
 }
 

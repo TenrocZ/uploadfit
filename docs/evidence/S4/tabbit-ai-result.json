@@ -1,0 +1,36 @@
+{
+  "date": "2026-08-19",
+  "stage": "S4",
+  "case": "A11",
+  "status": "BLOCKED",
+  "finalBundle": {
+    "path": "dist/uploadfit.js",
+    "bytes": 169114,
+    "sha256": "CF39073EDD0F533003A12ABCF16C3A112BB1125EA87408CCDE6E9115B9F02EFE"
+  },
+  "requiredRuntime": "Tabbit official script runtime with LLMBridge.chat",
+  "attempts": [
+    {
+      "action": "in-app Browser agent.browsers.get('iab')",
+      "result": "Browser is not available: iab"
+    },
+    {
+      "action": "in-app Browser agent.browsers.list()",
+      "result": "[]"
+    }
+  ],
+  "blockReason": "当前会话没有可用的 in-app Browser/Tabbit 实例，无法加载官方脚本并执行最终 bundle 的真实 LLMBridge.chat。",
+  "notSubstitutedBy": [
+    "普通 Chromium 中的 provider mock",
+    "A11-shape 测试",
+    "S0 历史 LLMBridge 证据"
+  ],
+  "evidence": {
+    "callCount": null,
+    "latencyMs": null,
+    "validatorResult": null,
+    "pageCardState": null,
+    "screenshot": null
+  },
+  "cleanup": "未创建临时 Tabbit 脚本、临时服务或额外端口；无需清理。"
+}

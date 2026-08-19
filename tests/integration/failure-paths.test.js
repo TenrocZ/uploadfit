@@ -12,7 +12,7 @@ function expectedFailure(errorCode) {
 
 test('returns stable fallback results for S0 injection failure paths', async ({ page }) => {
   await page.goto('/test-pages/probe.html');
-  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
 
   const result = await page.evaluate(() => {
     const api = globalThis.__uploadfit_debug_bundle__;
@@ -66,7 +66,7 @@ test('returns stable fallback results for S0 injection failure paths', async ({ 
 
 test('cleanupSession is idempotent and permits a clean rebootstrap', async ({ page }) => {
   await page.goto('/test-pages/probe.html');
-  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
 
   const result = await page.evaluate(() => {
     const api = globalThis.__uploadfit_debug_bundle__;
@@ -118,7 +118,7 @@ test('cleanupSession is idempotent and permits a clean rebootstrap', async ({ pa
 
 test('reports an untrusted event block without claiming upload success', async ({ page }) => {
   await page.goto('/test-pages/probe.html');
-  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
 
   const result = await page.evaluate(() => {
     const api = globalThis.__uploadfit_debug_bundle__;

@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 async function setup(page, options = {}) {
   await page.goto('/test-pages/probe.html');
-  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
   await page.evaluate((setupOptions) => {
     globalThis.__uploadfit_debug_bundle__.cleanupSession();
     const api = globalThis.__uploadfit_debug_bundle__;
@@ -56,7 +56,7 @@ function makeUploader(labelText) {
 
 test('U01: hostile page CSS cannot break the Shadow DOM UI', async ({ page }) => {
   await page.goto('/test-pages/probe.html');
-  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
   await page.evaluate(() => {
     globalThis.__uploadfit_debug_bundle__.cleanupSession();
     // 敌意样式：全局选择器 + important + 通配 reset
@@ -81,7 +81,7 @@ test('U01: hostile page CSS cannot break the Shadow DOM UI', async ({ page }) =>
   });
   const readable = await page.evaluate(() => {
     const host = document.querySelector('[data-uploadfit-ui-host]');
-    const pill = host.shadowRoot.querySelector('.uf-pill');
+    const pill = host.shadowRoot.querySelector('.uf-pill-toggle');
     const pillText = host.shadowRoot.querySelector('.uf-pill-text');
     const styles = getComputedStyle(pillText);
     return {
@@ -221,6 +221,75 @@ test('U04: conflicting rules show a conflict and no auto-start', async ({ page }
   await cleanup();
 });
 
+test('R6: rule evidence is rendered as bounded text, never executable markup', async ({ page }) => {
+  const cleanup = await setup(page);
+  await page.evaluate(() => {
+    const controller = globalThis.__s4Controller;
+    const fakeTask = {
+      taskId: 'task-evidence-test',
+      status: 'NEEDS_CONFIRMATION',
+      label: '证件照',
+      source: 'preflight',
+      current: { mime: 'image/jpeg', size: 50000, width: 390, height: 567 },
+      rules: {
+        formats: ['image/jpeg'],
+        minBytes: 30720,
+        maxBytes: 120000,
+        width: { exact: 390, min: null, max: null },
+        height: { exact: 567, min: null, max: null },
+        aspectRatio: null,
+        semanticRequirements: [],
+        confidence: 0.9,
+        sources: [{
+          type: 'nearby-text',
+          priority: 400,
+          evidence: ['<img src=x onerror=alert(1)>', '</style><script>bad()</script>'],
+          confidence: 0.9
+        }],
+        conflicts: [],
+        actionable: true
+      },
+      policyConfirmation: {
+        id: 'evidence-confirmation',
+        type: 'RULE_CONFIDENCE',
+        required: true,
+        resolved: false,
+        accepted: null,
+        payload: null
+      },
+      plan: { operations: ['RESIZE'] },
+      result: null,
+      errorCode: null,
+      retryCount: 0,
+      warnings: []
+    };
+    controller.getSnapshot = () => ({
+      sessionState: 'NEEDS_CONFIRMATION',
+      uploaderCount: 1,
+      activeTask: fakeTask,
+      pageCard: null
+    });
+    globalThis.__s4Ui.expand();
+  });
+  const evidence = await page.evaluate(() => {
+    const host = document.querySelector('[data-uploadfit-ui-host]');
+    const shadow = host.shadowRoot;
+    const box = shadow.querySelector('.uf-evidence');
+    return {
+      text: box?.textContent ?? '',
+      imageCount: box?.querySelectorAll('img').length ?? 0,
+      scriptCount: box?.querySelectorAll('script').length ?? 0,
+      styleCount: box?.querySelectorAll('style').length ?? 0
+    };
+  });
+  expect(evidence.text).toContain('<img src=x onerror=alert(1)>');
+  expect(evidence.text).toContain('</style><script>bad()</script>');
+  expect(evidence.imageCount).toBe(0);
+  expect(evidence.scriptCount).toBe(0);
+  expect(evidence.styleCount).toBe(0);
+  await cleanup();
+});
+
 test('U10: dispose removes host, listeners and object URLs', async ({ page }) => {
   const cleanup = await setup(page);
   await page.evaluate(() => {
@@ -267,15 +336,17 @@ test('U11: close button has an accessible name and live region announces state',
     const host = document.querySelector('[data-uploadfit-ui-host]');
     const close = host.shadowRoot.querySelector('.uf-pill-close');
     const card = host.shadowRoot.querySelector('.uf-card');
-    const pill = host.shadowRoot.querySelector('.uf-pill');
+    const pill = host.shadowRoot.querySelector('.uf-pill-toggle');
     return {
       closeLabel: close?.getAttribute('aria-label'),
       pillExpanded: pill?.getAttribute('aria-expanded'),
       cardRole: card?.getAttribute('role'),
       cardLabel: card?.getAttribute('aria-label'),
       liveRegion: Boolean(host.shadowRoot.querySelector('[aria-live="polite"]')),
+      liveText: host.shadowRoot.querySelector('.uf-status-live')?.textContent,
       pillIsButton: pill?.tagName,
-      closeType: close?.getAttribute('type')
+      closeType: close?.getAttribute('type'),
+      nestedButtons: host.shadowRoot.querySelectorAll('button button').length
     };
   });
   expect(info.closeLabel).toBeTruthy();
@@ -285,6 +356,76 @@ test('U11: close button has an accessible name and live region announces state',
   expect(info.cardRole).toBe('region');
   expect(info.cardLabel).toBeTruthy();
   expect(info.liveRegion).toBe(true);
+  expect(info.liveText).toBe('UploadFit启动中');
+  expect(info.nestedButtons).toBe(0);
+  await cleanup();
+});
+
+test('U11: status live text changes once per state and errors use one alert', async ({ page }) => {
+  const cleanup = await setup(page);
+  const result = await page.evaluate(() => {
+    const controller = globalThis.__s4Controller;
+    const ui = globalThis.__s4Ui;
+    const states = ['BOOTING', 'ARMED', 'PROCESSING', 'SUCCESS'];
+    const liveTexts = [];
+    for (const sessionState of states) {
+      controller.getSnapshot = () => ({
+        sessionState,
+        uploaderCount: sessionState === 'ARMED' ? 1 : 0,
+        activeTask: null,
+        pageCard: null
+      });
+      ui.collapse();
+      ui.expand();
+      liveTexts.push(document.querySelector('[data-uploadfit-ui-host]')
+        .shadowRoot.querySelector('.uf-status-live').textContent);
+    }
+    const errorTask = {
+      taskId: 'u11-error', status: 'STOPPED', errorCode: 'PROCESSING_FAILED', source: 'preflight',
+      current: null, rules: null, plan: null, result: null, retryCount: 0, warnings: []
+    };
+    controller.getSnapshot = () => ({
+      sessionState: 'STOPPED', uploaderCount: 1, activeTask: errorTask, pageCard: null
+    });
+    ui.collapse();
+    ui.expand();
+    const host = document.querySelector('[data-uploadfit-ui-host]');
+    return {
+      liveTexts,
+      errorLive: host.shadowRoot.querySelector('.uf-status-live').textContent,
+      alerts: host.shadowRoot.querySelectorAll('[role="alert"]').length
+    };
+  });
+  expect(result.liveTexts).toEqual([
+    'UploadFit启动中', '已监听1个上传区域', '正在适配图片', '图片已适配'
+  ]);
+  expect(result.errorLive).toBe('');
+  expect(result.alerts).toBe(1);
+  await cleanup();
+});
+
+test('U09: form success card explains the next step without clicking business controls', async ({ page }) => {
+  const cleanup = await setup(page);
+  const result = await page.evaluate(() => {
+    const controller = globalThis.__s4Controller;
+    controller.getSnapshot = () => ({
+      sessionState: 'SUCCESS',
+      uploaderCount: 1,
+      activeTask: {
+        taskId: 'u09-success', status: 'SUCCESS', source: 'preflight', errorCode: null,
+        current: { mime: 'image/jpeg', size: 50000, width: 390, height: 567 },
+        rules: null, plan: { operations: ['RESIZE'] },
+        result: { metadata: { mime: 'image/jpeg', size: 50000, width: 390, height: 567 }, operations: ['RESIZE'] },
+        retryCount: 0, warnings: []
+      },
+      pageCard: null
+    });
+    globalThis.__s4Ui.expand();
+    const host = document.querySelector('[data-uploadfit-ui-host]');
+    return host.shadowRoot.querySelector('.uf-card').textContent;
+  });
+  expect(result).toContain('已适配并放回上传框');
+  expect(result).toContain('保存 / 下一步 / 提交');
   await cleanup();
 });
 
@@ -322,6 +463,45 @@ test('U12: narrow viewport keeps the card inside the screen', async ({ page }) =
   await cleanup();
 });
 
+test('U12: 200 percent zoom and reduced motion remain reachable', async ({ page }) => {
+  const cleanup = await setup(page);
+  // 桌面浏览器 200% 缩放会把 CSS 视口折半；用等效 CSS 视口验证固定 UI 的可达性。
+  await page.setViewportSize({ width: 195, height: 350 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const result = await page.evaluate(() => {
+    const controller = globalThis.__s4Controller;
+    controller.getSnapshot = () => ({
+      sessionState: 'PROCESSING', uploaderCount: 1,
+      activeTask: {
+        taskId: 'u12-processing', status: 'PROCESSING', source: 'preflight', errorCode: null,
+        current: { mime: 'image/jpeg', size: 50000, width: 390, height: 567 },
+        rules: null, plan: { operations: ['RESIZE'] }, result: null, retryCount: 0, warnings: []
+      },
+      pageCard: null
+    });
+    globalThis.__s4Ui.expand();
+    const host = document.querySelector('[data-uploadfit-ui-host]');
+    const card = host.shadowRoot.querySelector('.uf-card');
+    const progress = host.shadowRoot.querySelector('.uf-progress-bar');
+    const rect = card.getBoundingClientRect();
+    return {
+      left: rect.left,
+      right: rect.right,
+      top: rect.top,
+      bottom: rect.bottom,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+      animationName: getComputedStyle(progress).animationName
+    };
+  });
+  expect(result.left).toBeGreaterThanOrEqual(-1);
+  expect(result.right).toBeLessThanOrEqual(result.viewportWidth + 1);
+  expect(result.top).toBeGreaterThanOrEqual(-1);
+  expect(result.bottom).toBeLessThanOrEqual(result.viewportHeight + 1);
+  expect(result.animationName).toBe('none');
+  await cleanup();
+});
+
 test('U07/U08: flatten and upscale confirmations only proceed after explicit accept', async ({ page }) => {
   const cleanup = await setup(page);
   // 处理函数被替换为计数器：未确认时绝不能调用
@@ -352,7 +532,7 @@ test('pill expands the card on click and closes the session via close button', a
   });
   await page.evaluate(() => {
     const host = document.querySelector('[data-uploadfit-ui-host]');
-    const pill = host.shadowRoot.querySelector('.uf-pill');
+    const pill = host.shadowRoot.querySelector('.uf-pill-toggle');
     pill.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
   });
   const cardVisible = await page.evaluate(() => {

@@ -178,7 +178,7 @@ export function createCropper({
   }
 
   function onKeyDown(event) {
-    if (destroyed) return;
+    if (destroyed || event.key !== 'Escape' || !root.contains(event.target)) return;
     if (event.key === 'Escape') {
       event.stopPropagation();
       onCancel?.();
@@ -190,7 +190,6 @@ export function createCropper({
   stage.addEventListener('pointerup', onPointerUp);
   stage.addEventListener('pointercancel', onPointerUp);
   box.addEventListener('keydown', onBoxKeyDown);
-  documentRef.addEventListener('keydown', onKeyDown);
 
   const onResize = () => layout();
   const view = documentRef.defaultView;
@@ -203,6 +202,7 @@ export function createCropper({
 
   const root = documentRef.createElement('div');
   root.append(stage, anchorRow, actions);
+  root.addEventListener('keydown', onKeyDown);
   layout();
 
   return {
@@ -218,7 +218,7 @@ export function createCropper({
       stage.removeEventListener('pointerup', onPointerUp);
       stage.removeEventListener('pointercancel', onPointerUp);
       box.removeEventListener('keydown', onBoxKeyDown);
-      documentRef.removeEventListener('keydown', onKeyDown);
+      root.removeEventListener('keydown', onKeyDown);
       view?.removeEventListener?.('resize', onResize);
     }
   };

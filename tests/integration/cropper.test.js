@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 async function openApi(page) {
   await page.goto('/test-pages/probe.html');
-  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
   // dist 加载即自动 bootstrap 全局 session；先清理再手工构建受控 controller。
   await page.evaluate(() => globalThis.__uploadfit_debug_bundle__.cleanupSession());
 }
@@ -392,9 +392,154 @@ test('U06 (cropper component): pointer drag moves the box within image bounds', 
   await openApi(page);
   const result = await page.evaluate(() => {
     const api = globalThis.__uploadfit_debug_bundle__;
-    // 直接实例化 cropper：dist 导出链上未暴露，改为通过 UI 管道验证（见上）。
-    void api;
-    return true;
+    const confirmed = [];
+    let cancelCount = 0;
+    const cropper = api.createCropper({
+      documentRef: document,
+      imageUrl: '',
+      sourceWidth: 800,
+      sourceHeight: 600,
+      cropWidth: 450,
+      cropHeight: 600,
+      targetWidth: 300,
+      targetHeight: 400,
+      onConfirm: (value) => confirmed.push(value.normalized),
+      onCancel: () => { cancelCount += 1; }
+    });
+    document.body.append(cropper.element);
+    const stage = cropper.element.querySelector('.uf-crop-stage');
+    stage.style.width = '800px';
+    window.dispatchEvent(new Event('resize'));
+    const before = cropper.getRect();
+    const box = cropper.element.querySelector('.uf-crop-box');
+    const boxRect = box.getBoundingClientRect();
+    const pointerId = 41;
+    box.dispatchEvent(new PointerEvent('pointerdown', {
+      bubbles: true, button: 0, pointerId,
+      clientX: boxRect.left + 20, clientY: boxRect.top + 20
+    }));
+    stage.dispatchEvent(new PointerEvent('pointermove', {
+      bubbles: true, pointerId,
+      clientX: boxRect.left + 120, clientY: boxRect.top + 20
+    }));
+    stage.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId }));
+    const afterDrag = cropper.getRect();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    cropper.primaryButton.click();
+    cropper.destroy();
+    cropper.element.remove();
+    return { before, afterDrag, confirmed: confirmed[0] ?? null, cancelCount };
   });
-  expect(result).toBe(true);
+  expect(result.afterDrag.pixel.x).toBeGreaterThan(result.before.pixel.x);
+  expect(result.afterDrag.normalized.x).toBeGreaterThanOrEqual(0);
+  expect(result.afterDrag.normalized.x + result.afterDrag.normalized.width).toBeLessThanOrEqual(1);
+  expect(result.confirmed).toEqual(result.afterDrag.normalized);
+  expect(result.cancelCount).toBe(1);
+});
+
+test('U06: controller receives normalized crop intent and runs the canonical pipeline', async ({ page }) => {
+  await openApi(page);
+  const result = await page.evaluate(async () => {
+    const api = globalThis.__uploadfit_debug_bundle__;
+    const rules = {
+      formats: ['image/jpeg'], extensions: ['jpg', 'jpeg'], minBytes: null, maxBytes: null,
+      width: { exact: 300, min: null, max: null }, height: { exact: 400, min: null, max: null },
+      aspectRatio: null, dpi: null, count: { max: 1 }, background: null,
+      semanticRequirements: [], confidence: 0.96,
+      sources: [{ type: 'nearby-text', priority: 400, evidence: ['宽300像素，高400像素'], confidence: 0.96 }],
+      conflicts: [], advisories: [], safetyFlags: [], actionable: true
+    };
+    const controller = api.createTaskController({
+      documentRef: document,
+      globalRef: window,
+      parseRulesFn: () => [],
+      resolveRulesFn: () => rules,
+      processImageFn: (file, plan, progress, options) => api.processImage(
+        file, plan, progress, { ...(options ?? {}), useWorker: false }
+      )
+    });
+    globalThis.__s4Controller = controller;
+    const ui = api.createUploadFitUi({
+      documentRef: document, globalRef: window, controller, config: { shadowMode: 'open' }
+    });
+    globalThis.__s4Ui = ui;
+    let seen = null;
+    const originalConfirm = controller.confirmTask.bind(controller);
+    controller.confirmTask = (taskId, payload) => {
+      seen = payload;
+      return originalConfirm(taskId, payload);
+    };
+    controller.start();
+    const label = document.createElement('label');
+    label.textContent = 'JPG格式，宽300像素，高400像素';
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/jpeg';
+    label.append(input);
+    document.body.append(label);
+    const canvas = document.createElement('canvas');
+    canvas.width = 800;
+    canvas.height = 600;
+    canvas.getContext('2d').fillRect(0, 0, 800, 600);
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.9));
+    const file = new File([blob], 'normalized-crop.jpg', { type: 'image/jpeg' });
+    const transfer = new DataTransfer();
+    transfer.items.add(file);
+    input.files = transfer.files;
+    for (let attempt = 0; attempt < 50 && !controller.uploaders.get(input); attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    input.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+    for (let attempt = 0; attempt < 200 && controller.getSnapshot().activeTask?.status !== 'NEEDS_CONFIRMATION'; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    ui.expand();
+    const confirm = ui.shadowRoot.querySelector('[data-uf-action="confirm-crop"]');
+    confirm?.click();
+    for (let attempt = 0; attempt < 200 && !['SUCCESS', 'STOPPED'].includes(controller.getSnapshot().activeTask?.status); attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    const final = controller.getSnapshot();
+    return {
+      seen,
+      finalStatus: final.activeTask?.status,
+      output: final.activeTask?.result?.metadata ?? null
+    };
+  });
+  expect(result.seen.type).toBe('CROP');
+  expect(result.seen.payload.x).toBeGreaterThanOrEqual(0);
+  expect(result.seen.payload.x + result.seen.payload.width).toBeLessThanOrEqual(1);
+  expect(result.seen.payload.y + result.seen.payload.height).toBeLessThanOrEqual(1);
+  expect(result.finalStatus).toBe('SUCCESS');
+  expect(result.output.width).toBe(300);
+  expect(result.output.height).toBe(400);
+  await page.evaluate(() => globalThis.__s4Ui?.dispose());
+  await page.evaluate(() => globalThis.__s4Controller?.dispose());
+});
+
+test('R5: controller rejects tampered crop intent and owns pixel conversion', async ({ page }) => {
+  await openApi(page);
+  const result = await page.evaluate(() => {
+    const api = globalThis.__uploadfit_debug_bundle__;
+    const controller = api.createTaskController({ documentRef: document, globalRef: window });
+    const task = {
+      metadata: { width: 800, height: 600 },
+      plan: { proposedCrop: { x: 175, y: 0, width: 450, height: 600 } }
+    };
+    const canonical = controller._normalizeCropConfirmation(task, {
+      x: 0.21875, y: 0, width: 0.5625, height: 1
+    });
+    let errorCode = null;
+    try {
+      controller._normalizeCropConfirmation(task, {
+        x: 0, y: 0, width: 0.5, height: 1
+      });
+    } catch (error) {
+      errorCode = error.code;
+    }
+    return { canonical, errorCode };
+  });
+  expect(result.canonical).toEqual({ x: 175, y: 0, width: 450, height: 600 });
+  expect(result.errorCode).toBe('USER_CONFIRMATION_REQUIRED');
 });

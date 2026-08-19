@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test('injects a File, dispatches events, and keeps one session host', async ({ page }) => {
   await page.goto('/test-pages/probe.html');
-  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
 
   const result = await page.evaluate(() => {
     const api = globalThis.__uploadfit_debug_bundle__;
@@ -51,7 +51,7 @@ test('injects a File, dispatches events, and keeps one session host', async ({ p
 
 test('restores the saved original File through the product API', async ({ page }) => {
   await page.goto('/test-pages/probe.html');
-  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
 
   const result = await page.evaluate(async () => {
     const api = globalThis.__uploadfit_debug_bundle__;

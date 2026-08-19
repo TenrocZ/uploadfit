@@ -23,6 +23,13 @@ function isFileInput(node) {
   return isElement(node) && node.matches?.(FILE_INPUT_SELECTOR) === true;
 }
 
+function isUploadFitUiInput(input) {
+  if (!input) return false;
+  if (input.closest?.('[data-uploadfit-ui-host]')) return true;
+  const root = input.getRootNode?.();
+  return Boolean(root?.host?.matches?.('[data-uploadfit-ui-host]'));
+}
+
 function normalizeText(value) {
   return typeof value === 'string'
     ? value.replace(/\s+/g, ' ').trim().slice(0, MAX_DISCOVERY_LABEL_LENGTH)
@@ -92,7 +99,7 @@ function acceptContainsImage(accept) {
  * intentionally left for the later file-MIME upgrade path.
  */
 export function isImageUploader(input) {
-  if (!isFileInput(input)) return false;
+  if (!isFileInput(input) || isUploadFitUiInput(input)) return false;
   const accept = input.getAttribute('accept');
   return acceptContainsImage(accept)
     || getAssociatedTexts(input).some((text) => IMAGE_TEXT_PATTERN.test(text));
@@ -273,6 +280,7 @@ export function createUploaderDiscovery({
 
   const registerInput = (input, mime = null) => {
     if (!active || !isFileInput(input) || registeredInputs.has(input)) return null;
+    if (isUploadFitUiInput(input)) return null;
     if (!isInputInRoot(input) || (!isImageUploader(input) && !isImageMime(mime))) return null;
     registeredInputs.add(input);
     const context = createUploaderContext(input);

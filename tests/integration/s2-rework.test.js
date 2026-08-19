@@ -9,7 +9,7 @@ const fixtureDir = path.join(rootDir, 'tests', 'fixtures', 'generated');
 
 async function openApi(page) {
   await page.goto('/test-pages/probe.html');
-  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
 }
 
 function rules(overrides = {}) {

@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 async function openApi(page) {
   await page.goto('/test-pages/probe.html');
-  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
 }
 
 test('I16: worker success and CSP/constructor failure fall back to one main-thread result', async ({ page }) => {

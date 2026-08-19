@@ -64,6 +64,56 @@ test('A03: numbers without evidence source are rejected', () => {
   expect(result.errors).toContain('NUMERIC_WIDTH.EXACT_UNSOURCED');
 });
 
+test('A03: numeric evidence uses complete tokens, so 39 cannot borrow 390', () => {
+  const output = {
+    ...VALID_OUTPUT,
+    width: { exact: 39, min: null, max: null },
+    evidence: ['JPG格式', '30KB到120KB', '宽390像素', '高567像素']
+  };
+  const result = validateAiRuleOutput(output, INPUT);
+  expect(result.ok).toBe(false);
+  expect(result.errors).toContain('NUMERIC_WIDTH.EXACT_UNSOURCED');
+});
+
+test('A03: byte evidence uses equivalent units, not a larger-number substring', () => {
+  const valid = validateAiRuleOutput({
+    ...VALID_OUTPUT,
+    evidence: ['JPG格式', '30KB（30720B）到120KB', '宽390像素', '高567像素']
+  }, 'JPG格式，30KB（30720B）到120KB，宽390像素，高567像素。');
+  expect(valid.ok).toBe(true);
+
+  const invalid = validateAiRuleOutput({
+    ...VALID_OUTPUT,
+    minSize: { value: 31, unit: 'KB' },
+    evidence: ['JPG格式', '30KB到120KB', '宽390像素', '高567像素']
+  }, INPUT);
+  expect(invalid.ok).toBe(false);
+  expect(invalid.errors).toContain('NUMERIC_MINBYTES_UNSOURCED');
+});
+
+test('A03: an aspect ratio must be sourced by a numeric ratio or value', () => {
+  const missing = validateAiRuleOutput({
+    ...VALID_OUTPUT,
+    width: null,
+    height: null,
+    aspectRatio: 1.5,
+    evidence: ['JPG格式', '30KB到120KB', '宽390像素', '高567像素']
+  }, INPUT);
+  expect(missing.ok).toBe(false);
+  expect(missing.errors).toContain('NUMERIC_ASPECTRATIO.VALUE_UNSOURCED');
+
+  const sourced = validateAiRuleOutput({
+    ...VALID_OUTPUT,
+    minSize: null,
+    maxSize: null,
+    width: null,
+    height: null,
+    aspectRatio: 1.5,
+    evidence: ['JPG格式', '比例3:2', '宽390像素', '高567像素']
+  }, 'JPG格式，比例3:2，宽390像素，高567像素。');
+  expect(sourced.ok).toBe(true);
+});
+
 test('A03: min/max byte values require a KB/MB source', () => {
   const output = {
     ...VALID_OUTPUT,
@@ -97,6 +147,34 @@ test('A04: width min>max is rejected', () => {
   const result = validateAiRuleOutput(output, INPUT);
   expect(result.ok).toBe(false);
   expect(result.errors).toContain('WIDTH_RANGE_REVERSED');
+});
+
+test('A04: exact dimensions must satisfy their own ranges', () => {
+  const output = {
+    ...VALID_OUTPUT,
+    width: { exact: 390, min: 500, max: 600 },
+    evidence: ['JPG格式', '30KB到120KB', '宽390像素，至少500像素，最多600像素', '高567像素']
+  };
+  const result = validateAiRuleOutput(
+    output,
+    'JPG格式，30KB到120KB，宽390像素，至少500像素，最多600像素，高567像素。'
+  );
+  expect(result.ok).toBe(false);
+  expect(result.errors).toContain('WIDTH_EXACT_BELOW_MIN');
+});
+
+test('A04: exact dimensions must agree with an aspect ratio', () => {
+  const output = {
+    ...VALID_OUTPUT,
+    aspectRatio: 1.5,
+    evidence: ['JPG格式', '30KB到120KB', '宽390像素', '高567像素', '比例3:2']
+  };
+  const result = validateAiRuleOutput(
+    output,
+    'JPG格式，30KB到120KB，宽390像素，高567像素，比例3:2。'
+  );
+  expect(result.ok).toBe(false);
+  expect(result.errors).toContain('ASPECT_RATIO_DIMENSION_CONFLICT');
 });
 
 test('A05: unknown formats are rejected individually', () => {

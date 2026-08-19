@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test('L03/L04/L06: explicit rejection adapts once and redispatches without a business click', async ({ page }) => {
   await page.goto('/test-pages/probe.html');
-  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
   await page.evaluate(() => {
     globalThis.__uploadfit_debug_bundle__.cleanupSession();
     const api = globalThis.__uploadfit_debug_bundle__;
@@ -73,7 +73,7 @@ test('L03/L04/L06: explicit rejection adapts once and redispatches without a bus
 
 test('L07: two uploaders keep tasks and rejection nodes isolated', async ({ page }) => {
   await page.goto('/test-pages/probe.html');
-  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
   await page.evaluate(() => {
     const api = globalThis.__uploadfit_debug_bundle__;
     api.cleanupSession();

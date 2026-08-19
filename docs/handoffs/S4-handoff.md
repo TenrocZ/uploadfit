@@ -1,8 +1,8 @@
 # S4 Handoff：UI 确认与 Tabbit AI
 
-> **独立验收覆盖（2026-08-19）**：当前状态已由 `READY_FOR_ACCEPTANCE` 改为 `REWORK_REQUIRED`，S5 未放行。真实 CNIPA 页面、A11、150,000-byte 契约、AI 数字校验、normalized crop、规则 evidence 和可访问性均有未闭合项。以 `docs/handoffs/S4-acceptance-review.md` 和 `docs/handoffs/S4-acceptance-rework-order.md` 为准；以下内容保留为原阶段 agent 的提交说明，不代表验收通过。
+> **独立验收与返工覆盖（2026-08-19）**：历史状态由 `READY_FOR_ACCEPTANCE` 改为 `REWORK_REQUIRED`，S5 未放行。下方原交接内容保留作返工前追溯；当前状态和结论以文末“返工后复核”及 `docs/evidence/S4/rework-result.json` 为准，不代表 S4 已验收通过。
 
-- Status: REWORK_REQUIRED（独立验收否决，原提交状态保留在正文供追溯）
+- Status: REWORK_INCOMPLETE（R2/A11 阻塞；R3 按用户裁决暂缓；原提交状态保留在正文供追溯）
 - Start commit: `d950253`（S3 独立复验通过）
 - End commit: 本次 S4 提交（见当前 HEAD，本地 Git 留痕）
 - Agent: Claude / UploadFit S4 Agent
@@ -73,26 +73,57 @@
 
 - [x] U01–U12 全部通过（自动化）
 - [x] A01–A10、A12 全部通过（自动化）
-- [ ] A11 真实 Tabbit AI 调用证据（**需 Tabbit 实机补录**：打开启用官方脚本的匹配页一次，脱敏截图/JSON；S0 已证明同一路径 1730ms 成功，本阶段未能在 WSL+Chromium 环境执行平台桥接）
+- [ ] A11 真实 Tabbit AI 调用证据（当前返工状态为 `BLOCKED`：本会话没有可用 Tabbit/in-app Browser；详见 `docs/evidence/S4/tabbit-ai-result.json`）
 - [x] 三类有损动作未确认时 process 调用次数为 0（U07/U08/cropper 断言）
 - [x] UI 无外部文本 innerHTML（全部 textContent；static-check 源码禁用 innerHTML）、无网页 CSS 泄漏（U01）、无运行时网络资源（无 fetch/CDN，static-check）
 - [x] AI 输入检查证明不含 File、文件名、Base64、其他表单值或 URL 查询参数（A09 单测 + provider 阻断路径 + prompt 构造测试）
-- [ ] 真实 Tabbit AI 调用至少一次成功并有脱敏证据（同 A11，留待验收）
+- [ ] 真实 Tabbit AI 调用至少一次成功并有脱敏证据（当前 `BLOCKED`，不得用 mock 或 S0 证据替代）
 - [x] AI 超时/错误/幻觉数值不阻塞本地明确规则流程（A02/A10/A13）
 - [x] 真实公开网页展示读取规则和新增操作卡；无 input 时诚实提供下载模式（S4-D8 两用例，含 MANUAL_CARD_DOWNLOAD_ONLY）
 - [x] 关闭后 UI、对象 URL、监听器和任务全部清理（U10 + dispose 语义）
 
 ## Known limitations
 
-1. **A11 真实 Tabbit 调用**：本工作区（WSL + Playwright Chromium）无 Tabbit 浏览器与 `LLMBridge`。生产 provider 直接调用 `LLMBridge.chat`（无 mock 分支），集成测试用同形 bridge 注入驱动全链路；需验收方在 Tabbit 实机执行一次（预期行为与 S0 证据一致）。若客观不可用，S4 应按任务书标 `BLOCKED` 的是该项，不是整个 UI 交付。
-2. **体积基线 ADR-003**：167,513 bytes 超出契约原 150,000 上限；已按流程提 ADR 并调整 `src/config.js`，契约文件待主验收 Agent 裁决后同步。150,000 与 S4 Must 范围（Shadow DOM UI + 中文文案 + 裁剪器 + AI 校验）经多轮压缩实测不可兼得（压缩手段：CSS 单行化、任务卡数据驱动重写、esbuild utf8）。
-3. **裁剪框拖动的可视化断言**：拖动/锚点/键盘逻辑已实现并有管线级验证（平移矩形经真实 S2 处理），但指针拖动的逐帧 UI 断言留 S5 E2E 加固（U06 组件级占位测试已通过）。
+1. **A11 真实 Tabbit 调用**：当前状态为 `BLOCKED`；本会话无 Tabbit 浏览器与 `LLMBridge` 实例。生产 provider 直接调用 `LLMBridge.chat`（无 mock 分支），但同形 bridge 测试不计入 A11，详见 `tabbit-ai-result.json`。
+2. **体积基线 ADR-003**：当前 production 为 `169114` bytes，超出共享契约 150,000；ADR 已否决。本轮用户明确裁决暂跳过，记录为 `DEFERRED_BY_USER`，不得视为通过。
+3. **裁剪框拖动的可视化断言**：该历史限制已在本轮关闭；真实 pointer drag、normalized intent、controller 防篡改和 S2 管线均有回归。
 4. **ARMED 多个上传区域文案**：实现为 N 插值实际数量（“已监听3个上传区域”）；任务书表格字面为“已监听N个上传区域”，按语义实现，验收如需字面 N 再回退一行。
 5. **真实页动态内容**：CNIPA 页为 Vue SPA；适配器读取渲染后的 `.content`。若页面改版（容器消失/文本移除），适配器返回 null，UI 显示“选中文字理解”引导卡，不硬编码成功。
 
 ## Risks and follow-ups
 
-- 交给 S5：A11 实机补录；E06/E07 裁剪确认 E2E 化（含拖动断言）；`docs/test-results.md`、`docs/security-review.md`、`docs/performance.md`。
+- 当前阻塞：A11 实机补录依赖 Tabbit 官方运行时；R3 体积门禁按用户裁决暂缓；两项闭合前不启动 S5。
 - 交给 S6：演示脚本中的真实页段落使用“准备卡→下载”模式，不得宣称网页回填。
 - 主验收 Agent 决策项：ADR-003 体积基线（批准 → 同步契约 01 一行；不批准 → 指定裁剪范围）。
 - ADR-002 若验收不认可平移语义：恢复 planner/canvas-pipeline 两处判据即可回滚（回滚后 S4 §8.1 拖动需求不可满足，需任务书层面裁决）。
+
+## 返工后复核（2026-08-19，以本节为准）
+
+返工基线：`2161939`；本轮 Git 仅本地留痕，未推送远程。当前状态：`REWORK_INCOMPLETE`，S5 继续未放行。
+
+### 已完成
+
+- R1：适配器按“（2）电子件要求”截取最小目标段，排除前置毫米尺寸和后置登录文本；轴尺寸支持中文/英文冒号；URL 使用严格 hostname/path；完整噪声 fixture 通过。最终 production bundle 在真实 CNIPA 页面等待 Vue 渲染后现场通过 `ready/actionable/390×567/30KB—120KB/无 PERMISSION_OR_LOGIN`。
+- R4：AI 数字 evidence 改为完整 token/单位匹配，补 aspect ratio 来源和 exact/range/ratio 自洽校验。
+- R5：cropper 向 controller 发送 0–1 normalized intent，controller 权威校验后转换为 canonical pixels；真实 pointer drag、管线和篡改拒绝通过。
+- R6：snapshot 保留有界脱敏 `sources[].evidence`，任务卡展示来源、优先级和原文，全部使用 `textContent`。
+- R7：状态胶囊按钮改为同级控件，live 文案单状态单播报；错误只保留单一 alert；crop Escape 限定在可见裁剪控件并清理；同时排除准备卡自身 input 的 discovery 注册递归。
+- R8：补 U09、等效 200% CSS 视口、窄视口、reduced-motion、真实 pointer drag 和本地合成视觉证据。
+
+### 当前未闭合/暂缓
+
+- R2/A11：`BLOCKED`。当前会话的 in-app Browser 不可用（`agent.browsers.get('iab')` 返回 `Browser is not available: iab`，`agent.browsers.list()` 返回空），因此没有伪造 Tabbit 真实调用或截图；详见 `docs/evidence/S4/tabbit-ai-result.json`。
+- R3：按用户裁决“体积上限不用死磕，先跳过”。最终 production bundle 为 `169114` bytes，SHA-256 为 `CF39073EDD0F533003A12ABCF16C3A112BB1125EA87408CCDE6E9115B9F02EFE`；共享契约仍为 150,000 bytes，未将该项标为通过。
+- `s4-cnipa-live.png` 为最终 production bundle 在真实 CNIPA 页面等待 Vue 渲染后的现场截图；`s4-cnipa-fixture.png` 仍明确标为结构等价 fixture。两者均未涉及 Tabbit 证据。
+
+### 最终回归
+
+| 命令 | 结果 |
+|---|---|
+| `npm test -- --run` | PASS：18 文件、145 测试 |
+| `npm run build` | PASS：169114 bytes；SHA-256 确定 |
+| `npm run static-check` | R3 延后：仅体积子门禁报错；无禁止源码模式报错 |
+| `npm run test:e2e -- --reporter=line --workers=1` | PASS：89 Chromium 测试 |
+| `git diff --check` | PASS |
+
+视觉证据：`docs/evidence/S4/s4-rule-evidence.png`、`s4-crop-before.png`、`s4-crop-after.png`、`s4-flatten-confirmation.png`、`s4-upscale-warning.png`、`s4-success-form.png`、`s4-failure-alert.png`、`s4-cnipa-fixture.png`、`s4-cnipa-live.png`。除 live 文件外均为无敏感合成 fixture；A11 截图因阻塞不存在。

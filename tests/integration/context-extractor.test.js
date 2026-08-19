@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test('extracts bounded uploader context and excludes sensitive or unrelated DOM text', async ({ page }) => {
   await page.goto('/test-pages/probe.html');
-  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
 
   const result = await page.evaluate(() => {
     const api = globalThis.__uploadfit_debug_bundle__;
@@ -54,7 +54,7 @@ test('extracts bounded uploader context and excludes sensitive or unrelated DOM 
 
 test('keeps contexts isolated and applies the 6000-character budget', async ({ page }) => {
   await page.goto('/test-pages/probe.html');
-  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
 
   const result = await page.evaluate(() => {
     const api = globalThis.__uploadfit_debug_bundle__;
@@ -85,7 +85,7 @@ test('keeps contexts isolated and applies the 6000-character budget', async ({ p
 
 test('isolates two uploaders in one form while retaining explicitly shared text', async ({ page }) => {
   await page.goto('/test-pages/probe.html');
-  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
 
   const result = await page.evaluate(() => {
     const api = globalThis.__uploadfit_debug_bundle__;

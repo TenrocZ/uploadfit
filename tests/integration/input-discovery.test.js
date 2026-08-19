@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test('discovers image uploaders once across ordinary DOM and open shadow roots', async ({ page }) => {
   await page.goto('/test-pages/probe.html');
-  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
 
   const result = await page.evaluate(() => {
     const api = globalThis.__uploadfit_debug_bundle__;
@@ -54,7 +54,7 @@ test('discovers image uploaders once across ordinary DOM and open shadow roots',
 
 test('observes added subtrees, debounces SPA route events, and cleans up', async ({ page }) => {
   await page.goto('/test-pages/probe.html');
-  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
 
   const result = await page.evaluate(async () => {
     const api = globalThis.__uploadfit_debug_bundle__;
@@ -125,7 +125,7 @@ test('observes added subtrees, debounces SPA route events, and cleans up', async
 
 test('discovers an input inside an open shadow root added as a dynamic subtree', async ({ page }) => {
   await page.goto('/test-pages/probe.html');
-  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
 
   const result = await page.evaluate(async () => {
     const api = globalThis.__uploadfit_debug_bundle__;
@@ -156,7 +156,7 @@ test('discovers an input inside an open shadow root added as a dynamic subtree',
 
 test('uses composedPath for an open-shadow event and reports cross-origin frame protection', async ({ page }) => {
   await page.goto('/test-pages/probe.html');
-  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
 
   const result = await page.evaluate(() => {
     const api = globalThis.__uploadfit_debug_bundle__;
@@ -210,7 +210,7 @@ test('uses composedPath for an open-shadow event and reports cross-origin frame 
 
 test('upgrades a bare file input only through a verified image MIME', async ({ page }) => {
   await page.goto('/test-pages/probe.html');
-  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
 
   const result = await page.evaluate(async () => {
     const api = globalThis.__uploadfit_debug_bundle__;
@@ -261,7 +261,7 @@ test('upgrades a bare file input only through a verified image MIME', async ({ p
 
 test('discovers a late-created open shadow input on its first composed event', async ({ page }) => {
   await page.goto('/test-pages/probe.html');
-  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
 
   const result = await page.evaluate(async () => {
     const api = globalThis.__uploadfit_debug_bundle__;
@@ -294,7 +294,7 @@ test('discovers a late-created open shadow input on its first composed event', a
 
 test('discovers an already-loaded same-origin srcdoc iframe', async ({ page }) => {
   await page.goto('/test-pages/probe.html');
-  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
 
   const result = await page.evaluate(async () => {
     const api = globalThis.__uploadfit_debug_bundle__;
@@ -314,7 +314,7 @@ test('discovers an already-loaded same-origin srcdoc iframe', async ({ page }) =
 
 test('tracks dynamic same-origin iframe loads without stale observers or duplicate callbacks', async ({ page }) => {
   await page.goto('/test-pages/probe.html');
-  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
 
   const result = await page.evaluate(async () => {
     const api = globalThis.__uploadfit_debug_bundle__;

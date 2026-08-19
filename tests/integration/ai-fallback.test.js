@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 async function openApi(page) {
   await page.goto('/test-pages/probe.html');
-  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
   await page.evaluate(() => globalThis.__uploadfit_debug_bundle__.cleanupSession());
 }
 
@@ -190,31 +190,11 @@ test('S4-D8: real public guide page renders the preparation card with rules', as
       + '并不得使用拉伸严重的照片。';
     container.append(heading, paragraph);
     document.body.append(container);
-    // 全角冒号写法本地解析不出宽高 → Tabbit AI 补充（mock 模拟真实响应形状）
+    // 全角冒号与完整文章噪声由本地确定性解析处理；此验收不伪造 Tabbit 响应。
     const controller = api.createTaskController({
       documentRef: document,
       globalRef: window,
-      ruleProvider: {
-        extractRules: async () => ({
-          ok: true,
-          candidate: {
-            sourceType: 'ai',
-            sourcePriority: 200,
-            evidence: ['宽：390像素，高：567像素', 'JPG格式', '文件大小介于30KB—120KB之间'],
-            confidence: 0.97,
-            rules: {
-              formats: ['image/jpeg'], extensions: ['jpg', 'jpeg'],
-              minBytes: 30720, maxBytes: 120000,
-              width: { exact: 390, min: null, max: null },
-              height: { exact: 567, min: null, max: null },
-              aspectRatio: null, dpi: null, count: { max: 1 }, background: null,
-              semanticRequirements: []
-            },
-            advisoryOnly: false,
-            safetyFlags: []
-          }
-        })
-      }
+      ruleProvider: null
     });
     globalThis.__s4Controller = controller;
     controller.start();
@@ -246,8 +226,8 @@ test('S4-D8: real public guide page renders the preparation card with rules', as
   expect(result.rules.width).toBe(390);
   expect(result.rules.height).toBe(567);
   expect(result.rules.dpi).toBe(300);
-  // AI 候选与本地候选并存于 sources：优先级裁决由 resolver 完成
-  expect(result.rules.sources).toContain('ai');
+  // 规则完整时走本地候选，不能用 mock AI 掩盖页面解析问题。
+  expect(result.rules.sources).toContain('nearby-text');
   await page.evaluate(() => {
     globalThis.__s4Controller?.dispose();
     document.querySelector('.content')?.remove();
@@ -338,7 +318,18 @@ test('S4-D8: manual card produces a download-only result without any input refil
       const target = policy && !policy.resolved
         ? { id: policy.id, type: policy.type, payload: { allow: true } }
         : planPending
-          ? { id: planPending.id, type: planPending.type, payload: planPending.suggestedPayload }
+          ? {
+            id: planPending.id,
+            type: planPending.type,
+            payload: planPending.type === 'CROP'
+              ? {
+                x: planPending.suggestedPayload.x / (task.current.displayWidth ?? task.current.width),
+                y: planPending.suggestedPayload.y / (task.current.displayHeight ?? task.current.height),
+                width: planPending.suggestedPayload.width / (task.current.displayWidth ?? task.current.width),
+                height: planPending.suggestedPayload.height / (task.current.displayHeight ?? task.current.height)
+              }
+              : planPending.suggestedPayload
+          }
           : null;
       if (!target) break;
       const confirmResult = await controller.confirmTask(task.taskId, {
@@ -437,7 +428,7 @@ test('A11-shape: prepareManualCard consults the provider only when local rules a
     // 场景2：模糊文本（本地解析不出完整规则）→ 调用 AI
     const weak = document.createElement('div');
     weak.className = 'content';
-    weak.textContent = '证件照要求见下文电子件说明，格式为JPG。';
+    weak.textContent = '（2）电子件要求：格式为JPG。';
     document.body.append(weak);
     const controller2 = api.createTaskController({
       documentRef: document,
@@ -451,7 +442,7 @@ test('A11-shape: prepareManualCard consults the provider only when local rules a
       register: () => false,
       unregister: () => false
     };
-    await controller2.prepareManualCard();
+    await controller2.prepareManualCard({ selectedText: weak.textContent });
     weak.remove();
     return { callsAfterComplete, callsAfterWeak: calls.length };
   });

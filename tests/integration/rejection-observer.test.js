@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test('L05: ambiguous upload failure stops safely without processing or retry', async ({ page }) => {
   await page.goto('/test-pages/probe.html');
-  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
   await page.evaluate(() => {
     const api = globalThis.__uploadfit_debug_bundle__;
     api.cleanupSession();
@@ -65,7 +65,7 @@ test('L05: ambiguous upload failure stops safely without processing or retry', a
 
 test('C10/C11: detached input and dispose abort stale processing before injection', async ({ page }) => {
   await page.goto('/test-pages/probe.html');
-  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
   await page.evaluate(() => {
     const api = globalThis.__uploadfit_debug_bundle__;
     api.cleanupSession();
@@ -126,7 +126,7 @@ test('C10/C11: detached input and dispose abort stale processing before injectio
 
 test('C11/L12: session dispose or pagehide prevents a pending result from touching the page', async ({ page }) => {
   await page.goto('/test-pages/probe.html');
-  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
   await page.evaluate(() => {
     const api = globalThis.__uploadfit_debug_bundle__;
     api.cleanupSession();

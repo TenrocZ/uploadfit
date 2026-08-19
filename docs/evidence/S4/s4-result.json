@@ -74,11 +74,22 @@
   "knownLimitations": [
     "A11 real Tabbit LLMBridge call requires the Tabbit browser environment (official script enabled on a matching page); this workspace (WSL + Chromium) cannot execute the platform bridge. The provider is wired to LLMBridge.chat per docs/tabbit-capabilities.md S0 evidence (real call once succeeded in 1730ms), the call path is production code, and integration tests exercise the identical path with an LLMBridge-shaped mock. A single real-call evidence capture in Tabbit remains for acceptance.",
     "The build size baseline was raised to 168000 bytes by ADR-003; the shared contract file 01 still says 150000 and must be reconciled at acceptance (main agent decision).",
-    "U06 pointer-drag of the crop box is implemented in cropper.js (pointer events + anchors + keyboard) but the drag interaction itself is covered indirectly (bounds logic + pipeline acceptance); a visual drag assertion is left for S5 E2E hardening.",
+    "Historical limitation superseded by currentRework: U06 pointer-drag now has real pointerdown/move/up, normalized controller, tamper rejection and pipeline coverage.",
     "ARMED_MANY pill text now interpolates the real uploader count (was a literal 'N'); fixed text table in the spec is preserved, only N is substituted."
   ],
   "adrs": [
     "docs/decisions/ADR-002-S4裁剪确认允许平移.md (crop confirmation may translate at locked size; touches S2 planner/canvas-pipeline as a cross-stage public fix)",
     "docs/decisions/ADR-003-产物体积基线S4调整.md (build limit 150000 -> 168000; src/config.js BUILD_LIMIT_BYTES updated; contract file intentionally not edited pending main-agent approval)"
-  ]
+  ],
+  "currentRework": {
+    "source": "docs/evidence/S4/rework-result.json",
+    "status": "REWORK_INCOMPLETE",
+    "artifactBytes": 169114,
+    "artifactSha256": "CF39073EDD0F533003A12ABCF16C3A112BB1125EA87408CCDE6E9115B9F02EFE",
+    "vitest": "18 files / 145 tests PASS",
+    "e2e": "89 Chromium tests PASS",
+    "staticCheck": "size subcheck deferred by user; current artifact exceeds configured 168000",
+    "a11": "BLOCKED: no in-app Browser/Tabbit instance",
+    "releaseS5": false
+  }
 }

@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test('reports browser capabilities without claiming Tabbit AI outside its script runtime', async ({ page }) => {
   await page.goto('/test-pages/probe.html');
-  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
 
   const capabilities = await page.evaluate(() => {
     const api = globalThis.__uploadfit_debug_bundle__;
@@ -30,7 +30,7 @@ test('reports browser capabilities without claiming Tabbit AI outside its script
 
 test('detects the documented LLMBridge.chat entry in a Tabbit-like script runtime', async ({ page }) => {
   await page.goto('/test-pages/probe.html');
-  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
 
   const tabbitAi = await page.evaluate(() => {
     globalThis.LLMBridge = { chat() {} };

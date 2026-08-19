@@ -34,28 +34,38 @@ export function statusText(sessionState, uploaderCount) {
  * value and only emits toggle/close intents through callbacks.
  */
 export function createStatusPill({ documentRef, onToggle, onClose }) {
-  const pill = documentRef.createElement('button');
-  pill.type = 'button';
+  const pill = documentRef.createElement('div');
   pill.className = 'uf-pill';
-  pill.setAttribute('aria-expanded', 'false');
-  pill.setAttribute('aria-label', 'UploadFit 状态，单击展开详情');
+  pill.setAttribute('role', 'group');
+  pill.setAttribute('aria-label', 'UploadFit 状态');
+
+  const toggle = documentRef.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'uf-pill-toggle';
+  toggle.setAttribute('aria-expanded', 'false');
+  toggle.setAttribute('aria-label', 'UploadFit 状态，单击展开详情');
 
   const text = documentRef.createElement('span');
   text.className = 'uf-pill-text';
-  pill.append(text);
+  toggle.append(text);
 
   const close = documentRef.createElement('button');
   close.type = 'button';
   close.className = 'uf-pill-close';
   close.setAttribute('aria-label', '关闭 UploadFit');
   close.textContent = '关闭';
-  pill.append(close);
+
+  const live = documentRef.createElement('span');
+  live.className = 'uf-status-live';
+  live.setAttribute('aria-live', 'polite');
+  live.setAttribute('aria-atomic', 'true');
+  pill.append(toggle, close, live);
 
   let lastAnnounced = null;
   const announce = (value) => {
-    if (value === lastAnnounced) return value; // 同一状态不重复播报
+    if (value === lastAnnounced) return false;
     lastAnnounced = value;
-    return value;
+    return true;
   };
 
   const handleToggle = (event) => {
@@ -66,21 +76,24 @@ export function createStatusPill({ documentRef, onToggle, onClose }) {
     event.stopPropagation();
     onClose?.();
   };
-  pill.addEventListener('click', handleToggle);
+  toggle.addEventListener('click', handleToggle);
   close.addEventListener('click', handleClose);
 
   return {
     element: pill,
     focus() {
-      pill.focus();
+      toggle.focus();
     },
-    update({ sessionState, uploaderCount, expanded }) {
-      const value = announce(statusText(sessionState, uploaderCount));
+    update({ sessionState, uploaderCount, expanded, suppressLive = false }) {
+      const value = statusText(sessionState, uploaderCount);
+      const changed = announce(value);
       text.textContent = value;
-      pill.setAttribute('aria-expanded', String(Boolean(expanded)));
+      toggle.setAttribute('aria-expanded', String(Boolean(expanded)));
+      if (suppressLive) live.textContent = '';
+      else if (changed) live.textContent = value;
     },
     destroy() {
-      pill.removeEventListener('click', handleToggle);
+      toggle.removeEventListener('click', handleToggle);
       close.removeEventListener('click', handleClose);
     }
   };

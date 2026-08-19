@@ -39,8 +39,54 @@ function invalid(errors) {
   return { ok: false, errorCode: 'AI_INVALID_OUTPUT', errors: [...new Set(errors)] };
 }
 
-function containsDigits(value, digits) {
-  return String(value).includes(String(digits));
+const NUMBER_TOKEN_PATTERN = /(?<![\d.])\d+(?:[.,]\d+)?(?![\d.])/g;
+const BYTE_TOKEN_PATTERN = /(\d+(?:[.,]\d+)?)\s*(mb|m\b|kb|k\b|b)\b/gi;
+const RATIO_TOKEN_PATTERN = /(\d+(?:[.,]\d+)?)\s*[:\/]\s*(\d+(?:[.,]\d+)?)/g;
+
+function normalizedNumber(value) {
+  const number = Number.parseFloat(String(value).replace(',', '.'));
+  return Number.isFinite(number) ? number : null;
+}
+
+function numericTokens(value) {
+  const normalized = normalizeRuleText(String(value ?? ''));
+  return [...normalized.matchAll(NUMBER_TOKEN_PATTERN)]
+    .map((match) => normalizedNumber(match[0]))
+    .filter((number) => Number.isFinite(number));
+}
+
+function byteValue(number, unit, kind) {
+  const value = normalizedNumber(number);
+  const token = String(unit ?? 'B').toUpperCase();
+  if (!Number.isFinite(value)) return null;
+  const multiplier = token === 'MB' || token === 'M'
+    ? (kind === 'min' ? 1024 ** 2 : 1000 ** 2)
+    : token === 'KB' || token === 'K'
+      ? (kind === 'min' ? 1024 : 1000)
+      : 1;
+  return Math.round(value * multiplier);
+}
+
+function byteValuesFromText(text, kind) {
+  return [...normalizeRuleText(text).matchAll(BYTE_TOKEN_PATTERN)]
+    .map((match) => byteValue(match[1], match[2], kind))
+    .filter((value) => Number.isFinite(value));
+}
+
+function ratioValuesFromText(text) {
+  const values = [];
+  for (const match of normalizeRuleText(text).matchAll(RATIO_TOKEN_PATTERN)) {
+    const numerator = normalizedNumber(match[1]);
+    const denominator = normalizedNumber(match[2]);
+    if (numerator > 0 && denominator > 0) values.push(numerator / denominator);
+  }
+  return values;
+}
+
+function numberMatches(actual, source) {
+  return Number.isFinite(actual)
+    && Number.isFinite(source)
+    && Math.abs(actual - source) <= Math.max(1e-9, Math.abs(actual) * 1e-9);
 }
 
 /**
@@ -199,25 +245,55 @@ function numericClaims(rules) {
   for (const field of ['minBytes', 'maxBytes']) {
     if (Number.isFinite(rules[field])) claims.push({ field, value: rules[field] });
   }
+  if (Number.isFinite(rules.aspectRatio?.value)) {
+    claims.push({ field: 'aspectRatio.value', value: rules.aspectRatio.value, kind: 'ratio' });
+  }
   return claims;
 }
 
-function byteClaimHasSource(value, evidenceTexts, inputText) {
-  // 字节值可能以 KB/MB 表述（30720 vs "30KB"）：按任务书大小解析规则反查表述来源。
-  const candidates = new Set([value]);
-  for (const divisor of [1024, 1024 ** 2, 1000, 1000 ** 2]) {
-    const scaled = value / divisor;
-    if (scaled < 1) continue;
-    candidates.add(Number.isInteger(scaled) ? scaled : Math.round(scaled * 100) / 100);
-  }
-  for (const claim of candidates) {
-    if (evidenceTexts.some((text) => containsDigits(text, claim))) return true;
-  }
-  return containsDigits(inputText, value);
+function byteClaimHasSource(value, evidenceTexts, field) {
+  const kind = field === 'minBytes' ? 'min' : 'max';
+  return evidenceTexts.some((text) => (
+    byteValuesFromText(text, kind).some((candidate) => candidate === value)
+      || numericTokens(text).some((candidate) => candidate === value)
+  ));
 }
 
 function claimHasSource(claim, evidenceTexts) {
-  return evidenceTexts.some((text) => containsDigits(text, claim.value));
+  if (claim.kind === 'ratio') {
+    return evidenceTexts.some((text) => (
+      numericTokens(text).some((candidate) => numberMatches(candidate, claim.value))
+        || ratioValuesFromText(text).some((candidate) => numberMatches(candidate, claim.value))
+    ));
+  }
+  return evidenceTexts.some((text) => numericTokens(text).some((candidate) => (
+    numberMatches(candidate, claim.value)
+  )));
+}
+
+function validateInternalConsistency(rules, errors) {
+  for (const field of ['width', 'height']) {
+    const dimension = rules[field];
+    if (!dimension) continue;
+    if (Number.isFinite(dimension.exact) && Number.isFinite(dimension.min)
+      && dimension.exact < dimension.min) {
+      errors.push(`${field.toUpperCase()}_EXACT_BELOW_MIN`);
+    }
+    if (Number.isFinite(dimension.exact) && Number.isFinite(dimension.max)
+      && dimension.exact > dimension.max) {
+      errors.push(`${field.toUpperCase()}_EXACT_ABOVE_MAX`);
+    }
+  }
+  if (rules.aspectRatio && Number.isFinite(rules.width?.exact)
+    && Number.isFinite(rules.height?.exact)) {
+    const actual = rules.width.exact / rules.height.exact;
+    const tolerance = Number.isFinite(rules.aspectRatio.tolerance)
+      ? rules.aspectRatio.tolerance
+      : 0.015;
+    if (Math.abs(actual - rules.aspectRatio.value) > tolerance) {
+      errors.push('ASPECT_RATIO_DIMENSION_CONFLICT');
+    }
+  }
 }
 
 /**
@@ -284,6 +360,7 @@ export function validateAiRuleOutput(rawOutput, inputText) {
   const aspectRatio = readAspectRatio(parsed.aspectRatio, errors);
   const formats = readFormats(parsed.formats, errors);
   const semanticRequirements = readSemanticRequirements(parsed.semanticRequirements, errors);
+  validateInternalConsistency({ width, height, aspectRatio, minBytes, maxBytes }, errors);
   if (errors.length) return invalid(errors);
 
   const rules = {
@@ -314,7 +391,7 @@ export function validateAiRuleOutput(rawOutput, inputText) {
   const sourced = [];
   for (const claim of numericClaims(rules)) {
     const hasSource = claim.field === 'minBytes' || claim.field === 'maxBytes'
-      ? byteClaimHasSource(claim.value, evidenceTexts, text)
+      ? byteClaimHasSource(claim.value, evidenceTexts, claim.field)
       : claimHasSource(claim, evidenceTexts);
     if (!hasSource) {
       errors.push(`NUMERIC_${claim.field.toUpperCase()}_UNSOURCED`);

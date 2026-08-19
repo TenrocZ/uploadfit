@@ -1,6 +1,6 @@
 # S4 UI 确认与 Tabbit AI 证据
 
-状态：`REWORK_REQUIRED`（2026-08-19 独立验收否决）。基线提交：`d950253`，受验提交：`2161939`。
+状态：`REWORK_INCOMPLETE`（2026-08-19 独立验收否决后返工；历史矩阵不代表当前通过）。基线提交：`d950253`，受验提交：`2161939`。
 
 独立验收结论与返工依据：
 
@@ -33,7 +33,7 @@
 
 - U01–U12：ui-controller.test.js（9 项）+ cropper.test.js（6 项）。
 - A01–A10、A12：ai-output-validator.test.js（23 项）+ provider.test.js（11 项）+ ai-fallback.test.js（3 项降级/优先级）。
-- A11（真实 Tabbit 调用）：**部分留待验收**——本工作区无 Tabbit 实机。调用路径与 S0 实测的 `LLMBridge.chat` 完全一致（生产代码零 mock 分支），集成测试用同形 mock 驱动全链路；需验收方在 Tabbit 中打开一次启用官方脚本的页面补一次真实调用截图（预期 2 秒内返回，见 docs/tabbit-capabilities.md S0 证据）。
+- A11（真实 Tabbit 调用）：历史交接未执行；当前返工结论为 `BLOCKED`，因为本会话无可用 Tabbit/in-app Browser。生产代码仍无 mock 分支，但同形 mock 只作为代码回归，不计入 A11；详见 `tabbit-ai-result.json`。
 - A08：ai-fallback.test.js（高优先规则不被 AI 覆盖）。
 - S4-D8 场景 5/6：ai-fallback.test.js 两个 manual-card 用例（含真实 S2 处理管线产出 390×567、30–120KB 内文件）。
 
@@ -49,3 +49,22 @@
 1. `npm ci && npm run check && npm run test:e2e -- --reporter=line --workers=1`
 2. `npm run serve:test` 后浏览器打开 `http://127.0.0.1:8765/test-pages/probe.html` 手工注入 dist 产物，观察状态胶囊 → 选择不合规图 → 确认卡 → 裁剪 → 成功卡文案“已适配并放回上传框”。
 3. 真实公开页验证：Tabbit 中打开 `https://ggfw-dlsks.cnipa.gov.cn/home_item_Text_details?nid=6387`（2026-08-19 已确认可访问且文本仍在：JPG、30KB—120KB、390×567、300dpi），启用含 dist 产物的官方脚本，验证“按本页要求准备照片”卡与下载闭环，并补 A11 真实调用证据。
+
+## 返工后当前复核（2026-08-19）
+
+当前唯一有效的结构化结论见 `rework-result.json`；上面的交付矩阵和命令结果是返工前历史记录。
+
+| 项目 | 当前结果 | 证据 |
+|---|---|---|
+| R1 页面规则 | `PASS` | 最终 production bundle 真实 CNIPA 页面现场探针：ready、actionable、390×567、30–120KB、无登录安全旗标；另有噪声 fixture |
+| R2/A11 Tabbit | `BLOCKED` | `tabbit-ai-result.json`；不得用 mock/S0 证据替代 |
+| R3 体积 | `DEFERRED_BY_USER` | production `169114` bytes；用户明确要求暂跳过，不视为通过 |
+| R4 AI 校验 | `PASS` | `tests/unit/ai-output-validator.test.js` |
+| R5 normalized crop | `PASS` | `tests/integration/cropper.test.js` |
+| R6 evidence | `PASS` | `task-controller.js` snapshot + UI 对抗样例 |
+| R7 可访问性/生命周期 | `PASS` | `ui-controller.test.js`、cropper Escape/cleanup |
+| R8 U09/U12/视觉 | `PASS（本地合成证据）` | `tests/e2e/s4-rework-evidence.spec.js` 与 `s4-*.png` |
+
+返工回归：`npm test -- --run` 为 18 文件/145 测试通过；本地 `npm run test:e2e -- --reporter=line --workers=1` 为 89/89 通过；真实 CNIPA 现场探针另在获准网络环境通过；`git diff --check` 通过。`npm run static-check` 仅因当前体积超过配置的 168000 bytes 报错，其余禁止模式未报错；该 R3 子门禁按用户裁决暂缓。
+
+视觉文件由本地 Playwright Chromium 生成：`s4-cnipa-fixture.png` 是结构等价 fixture，`s4-cnipa-live.png` 是最终 production bundle 在真实 CNIPA 页面等待 Vue 渲染后的现场截图；没有生成 Tabbit 截图。R2/A11 和 R3 未闭合前不得启动 S5。

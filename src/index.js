@@ -13,6 +13,7 @@ import {
 } from './providers/rule-understanding-provider.js';
 import { TabbitAiProvider, buildAiPrompt, createTabbitAiProvider } from './providers/tabbit-ai.js';
 import { createUploadFitUi } from './ui/host.js';
+import { createCropper } from './ui/cropper.js';
 import { STATUS_TEXTS, statusText } from './ui/status-pill.js';
 import { parseRulesDeterministically } from './rules/deterministic-parser.js';
 import { normalizeRuleText } from './rules/normalizer.js';
@@ -83,6 +84,7 @@ export {
   containsSensitiveAiInput,
   validateAiRuleOutput,
   createUploadFitUi,
+  createCropper,
   STATUS_TEXTS,
   statusText,
   injectFile,

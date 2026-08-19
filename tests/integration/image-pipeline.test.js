@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 async function openApi(page) {
   await page.goto('/test-pages/probe.html');
-  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
 }
 
 test('I01/I02/I18: inspects, passes through compliant JPEG and converts PNG to real JPEG', async ({ page }) => {

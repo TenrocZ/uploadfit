@@ -31,6 +31,16 @@ const OPERATION_TEXTS = {
   COMPRESS: '压缩文件大小'
 };
 
+const SOURCE_LABELS = Object.freeze({
+  adapter: '页面适配器',
+  rejection: '网页拒收反馈',
+  'html-attribute': '上传框属性',
+  'nearby-text': '附近文字',
+  'selected-text': '选中文字',
+  ai: 'AI 候选',
+  'weak-page-text': '弱页面文字'
+});
+
 export function errorText(code) {
   return ERROR_TEXTS[code] ?? `处理失败（${code}），因此没有修改文件。`;
 }
@@ -96,12 +106,8 @@ export function createTaskCardView({ documentRef, callbacks }) {
   const root = el('div', 'uf-card');
   root.setAttribute('role', 'region');
   root.setAttribute('aria-label', 'UploadFit 任务详情');
-  const live = el('div', 'uf-live');
-  live.setAttribute('aria-live', 'polite');
-  root.append(live);
 
   let cropper = null;
-  let lastAnnouncedError = null;
   let detailsOpen = false;
 
   const confirm = (taskId, confirmation) => callbacks.onConfirm({ taskId, confirmation });
@@ -146,8 +152,12 @@ export function createTaskCardView({ documentRef, callbacks }) {
     }
     if (rules.sources?.length) {
       const box = el('div', 'uf-evidence');
-      box.append('规则原文证据：');
+      box.append(el('div', 'uf-evidence-title', '规则来源与原文证据：'));
       for (const source of rules.sources.slice(0, 4)) {
+        const label = SOURCE_LABELS[source.type] ?? source.type ?? '未知来源';
+        const sourceLine = el('div', 'uf-evidence-source', `${label}（优先级 ${source.priority ?? '未知'}）`);
+        if (source.type === 'ai') sourceLine.textContent += '，仅作候选';
+        box.append(sourceLine);
         for (const item of (source.evidence ?? []).slice(0, 3)) {
           box.append(el('span', null, `“${item}”`), documentRef.createElement('br'));
         }
@@ -293,8 +303,8 @@ export function createTaskCardView({ documentRef, callbacks }) {
       cropHeight: proposed.height,
       targetWidth: plan.targetWidth,
       targetHeight: plan.targetHeight,
-      onConfirm: ({ pixel }) => confirm(task.taskId, {
-        id: pending.id, type: 'CROP', accepted: true, payload: pixel
+      onConfirm: ({ normalized }) => confirm(task.taskId, {
+        id: pending.id, type: 'CROP', accepted: true, payload: normalized
       }),
       onCancel: () => callbacks.onCancelTask(task.taskId)
     });
@@ -376,10 +386,6 @@ export function createTaskCardView({ documentRef, callbacks }) {
     const message = errorText(task.errorCode);
     card.append(el('div', cancelled ? 'uf-status-warn' : 'uf-status-error', message));
     if (!cancelled) {
-      if (message !== lastAnnouncedError) {
-        lastAnnouncedError = message;
-        live.textContent = `处理失败：${message}`;
-      }
       const alertBox = el('div', 'uf-alert', message);
       alertBox.setAttribute('role', 'alert');
       card.append(alertBox);
@@ -453,8 +459,7 @@ export function createTaskCardView({ documentRef, callbacks }) {
       cropper.destroy();
       cropper = null;
     }
-    while (root.children.length > 1) root.lastChild.remove();
-    live.textContent = '';
+    while (root.firstChild) root.firstChild.remove();
     const task = viewModel.task;
     const hasCard = Boolean(task) || Boolean(viewModel.pageCard);
     root.hidden = !viewModel.expanded || !hasCard;
@@ -465,8 +470,12 @@ export function createTaskCardView({ documentRef, callbacks }) {
       const pending = pendingConfirmationOf(task);
       if (task.status === 'NEEDS_CONFIRMATION' && pending) {
         if (pending.type === 'RULE_CONFIDENCE') focusTarget = renderRuleConfirm(card, task, pending);
-        else if (pending.type === 'CROP') focusTarget = renderCropConfirm(card, task, pending);
-        else if (pending.type === 'FLATTEN_BACKGROUND') focusTarget = renderFlattenConfirm(card, task, pending);
+        else if (pending.type === 'CROP' && viewModel.expanded) {
+          focusTarget = renderCropConfirm(card, task, pending);
+        } else if (pending.type === 'CROP') {
+          card.append(el('div', 'uf-card-title', '需要裁剪照片'));
+          card.append(hint('展开状态卡后调整裁剪范围，或按 Esc 取消。'));
+        } else if (pending.type === 'FLATTEN_BACKGROUND') focusTarget = renderFlattenConfirm(card, task, pending);
         else if (pending.type === 'UPSCALE') focusTarget = renderUpscaleConfirm(card, task, pending);
       } else if (['PROCESSING', 'INJECTING', 'RETRYING'].includes(task.status)) {
         focusTarget = renderProcessing(card, task);

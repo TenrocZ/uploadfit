@@ -73,6 +73,26 @@ function cloneValue(value, seen = new WeakMap()) {
 
 function safeRuleSet(rules) {
   if (!rules || typeof rules !== 'object') return null;
+  let evidenceUsed = 0;
+  const safeSources = (rules.sources ?? []).map((source) => {
+    const evidence = [];
+    for (const item of source.evidence ?? []) {
+      const safeItem = sanitizeEvidenceText(item).slice(0, CONTEXT_TEXT_LIMIT);
+      const available = CONTEXT_TEXT_LIMIT - evidenceUsed;
+      if (!safeItem || available <= 0) break;
+      const bounded = safeItem.slice(0, available);
+      evidence.push(bounded);
+      evidenceUsed += bounded.length;
+      if (bounded.length < safeItem.length) break;
+    }
+    return {
+      type: source.type,
+      priority: source.priority,
+      confidence: source.confidence,
+      advisoryOnly: Boolean(source.advisoryOnly),
+      evidence
+    };
+  });
   return {
     formats: [...(rules.formats ?? [])],
     extensions: [...(rules.extensions ?? [])],
@@ -86,12 +106,7 @@ function safeRuleSet(rules) {
     background: rules.background ?? null,
     semanticRequirements: [...(rules.semanticRequirements ?? [])],
     confidence: rules.confidence ?? 0,
-    sources: (rules.sources ?? []).map((source) => ({
-      type: source.type,
-      priority: source.priority,
-      confidence: source.confidence,
-      advisoryOnly: Boolean(source.advisoryOnly)
-    })),
+    sources: safeSources,
     conflicts: (rules.conflicts ?? []).map((conflict) => ({
       field: conflict.field,
       reason: conflict.reason,
@@ -1245,7 +1260,14 @@ export class TaskController {
           payload: accepted ? cloneValue(confirmationPayload.payload) : null
         };
       } else {
-        task.plan = this.resolveProcessingConfirmation(task.plan, confirmationPayload);
+        const plannerConfirmation = confirmationPayload?.type === 'CROP'
+          && accepted
+          ? {
+            ...confirmationPayload,
+            payload: this._normalizeCropConfirmation(task, confirmationPayload.payload)
+          }
+          : confirmationPayload;
+        task.plan = this.resolveProcessingConfirmation(task.plan, plannerConfirmation);
       }
       if (!accepted) {
         if (task.eventBlocked) {
@@ -1263,6 +1285,48 @@ export class TaskController {
       this._stopTask(task, code, error);
       return { ok: false, errorCode: code };
     }
+  }
+
+  _normalizeCropConfirmation(task, payload) {
+    const sourceWidth = task.metadata?.displayWidth ?? task.metadata?.width;
+    const sourceHeight = task.metadata?.displayHeight ?? task.metadata?.height;
+    const proposed = task.plan?.proposedCrop;
+    if (!Number.isFinite(sourceWidth) || !Number.isFinite(sourceHeight)
+      || sourceWidth <= 0 || sourceHeight <= 0 || !proposed) {
+      throw Object.assign(new Error('Crop metadata is unavailable.'), {
+        code: 'USER_CONFIRMATION_REQUIRED'
+      });
+    }
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      throw Object.assign(new Error('Crop intent must be normalized.'), {
+        code: 'USER_CONFIRMATION_REQUIRED'
+      });
+    }
+    const values = ['x', 'y', 'width', 'height'].map((key) => payload[key]);
+    if (!values.every((value) => Number.isFinite(value) && value >= 0 && value <= 1)
+      || payload.width <= 0 || payload.height <= 0
+      || payload.x + payload.width > 1 + 1e-9
+      || payload.y + payload.height > 1 + 1e-9) {
+      throw Object.assign(new Error('Crop normalized rectangle is out of bounds.'), {
+        code: 'USER_CONFIRMATION_REQUIRED'
+      });
+    }
+    const pixel = {
+      x: Math.round(payload.x * sourceWidth),
+      y: Math.round(payload.y * sourceHeight),
+      width: Math.round(payload.width * sourceWidth),
+      height: Math.round(payload.height * sourceHeight)
+    };
+    if (pixel.width !== Math.round(proposed.width)
+      || pixel.height !== Math.round(proposed.height)
+      || pixel.x < 0 || pixel.y < 0
+      || pixel.x + pixel.width > Math.round(sourceWidth)
+      || pixel.y + pixel.height > Math.round(sourceHeight)) {
+      throw Object.assign(new Error('Crop intent changes the rule-derived crop size.'), {
+        code: 'USER_CONFIRMATION_REQUIRED'
+      });
+    }
+    return pixel;
   }
 
   _continueAfterConfirmation(task, record) {

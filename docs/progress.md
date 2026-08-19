@@ -732,7 +732,7 @@ S2 范围：
 | `npm run static-check` | PASS |
 | `npm run test:e2e -- --reporter=line --workers=1` | PASS：80 个 Chromium 测试（基线 59 + S4 新增 21），S0–S3 全部用例无回归 |
 
-已知限制（详见 `docs/handoffs/S4-handoff.md`）：A11 真实 Tabbit 实机调用需验收方补录一次（本工作区无 Tabbit 浏览器；调用路径为生产代码、S0 已实证同路径可用）；体积基线 ADR-003 待主验收 Agent 裁决；裁剪拖动的逐帧可视化断言留给 S5。
+历史申请验收时的已知限制（已由后续返工节点更新）：A11 真实 Tabbit 实机调用、体积基线和裁剪拖动证据当时未闭合；当前状态以文末 S4 返工封存节点为准。
 
 证据：`docs/evidence/S4/README.md`、`docs/evidence/S4/s4-result.json`。Git 仅本地留痕，未推送远程。
 
@@ -747,3 +747,19 @@ S2 范围：
 其他未闭合项：A11 当前 S4 production provider 的真实 Tabbit 调用证据缺失；crop UI 向 controller 传像素而非 0–1 normalized payload；snapshot 丢弃 source evidence；状态 button 嵌套 close button、live 播报和隐藏 crop Escape 监听不符合 U11；pointer drag 测试为空操作，U09 缺失，U12 未覆盖 200%/reduced-motion。
 
 验收报告：`docs/handoffs/S4-acceptance-review.md`。详细施工单：`docs/handoffs/S4-acceptance-rework-order.md`。结构化证据：`docs/evidence/S4/acceptance-review-result.json`。本轮只写验收/返工文档，未修改 S4 生产代码。
+
+## 2026-08-19：S4 / 返工施工与当前封存
+
+状态：`REWORK_INCOMPLETE`，S5 未放行。
+
+本轮依据 `docs/handoffs/S4-acceptance-rework-order.md` 修复并自检：
+
+- R1：国知局目标段落、全角冒号、严格 URL 与完整噪声文章解析；同时修复准备卡自身 hidden input 被 discovery 递归注册的问题。
+- R4：AI numeric evidence 完整 token/单位溯源及内部一致性校验。
+- R5：normalized crop → controller 权威校验 → canonical pixel pipeline。
+- R6/R7：snapshot evidence、来源展示、textContent 防注入、同级按钮、live/alert、crop Escape 作用域和清理。
+- R8：U09、等效 200% CSS 视口、reduced-motion、真实 pointer drag、视觉证据。
+
+验证：18 个 Vitest 文件/145 测试通过；89 个 Chromium E2E 通过；diff check 通过。生产 bundle 为 169114 bytes，SHA-256 `CF39073EDD0F533003A12ABCF16C3A112BB1125EA87408CCDE6E9115B9F02EFE`。
+
+用户裁决：体积上限暂跳过，R3 记为 `DEFERRED_BY_USER`，没有修改共享契约，也没有把超限视为通过。A11 记为 `BLOCKED`，因为当前 in-app Browser/Tabbit 实例不可用；没有用 mock 或 S0 证据替代。真实 CNIPA 页面最终 bundle 已在获准网络环境等待 Vue 渲染后现场通过，保存 `s4-cnipa-live.png`。详见 `docs/handoffs/S4-handoff.md`、`docs/evidence/S4/rework-result.json`、`docs/evidence/S4/tabbit-ai-result.json`。

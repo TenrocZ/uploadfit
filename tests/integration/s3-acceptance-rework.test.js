@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 async function openController(page) {
   await page.goto('/test-pages/probe.html');
-  await page.addScriptTag({ url: '/dist/uploadfit.js' });
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
   await page.evaluate(() => {
     globalThis.__uploadfit_debug_bundle__.cleanupSession();
     const baseRules = (confidence = 0.95) => ({
@@ -264,7 +264,15 @@ test('Q-S3-006: RULE_CONFIDENCE and CROP remain independent confirmations', asyn
   await page.evaluate((confirmation) => {
     const task = __s3Controller.getSnapshot().activeTask;
     return __s3Controller.confirmTask(task.taskId, {
-      id: confirmation.id, type: 'CROP', accepted: true, payload: { crop: task.plan.proposedCrop }
+      id: confirmation.id,
+      type: 'CROP',
+      accepted: true,
+      payload: {
+        x: task.plan.proposedCrop.x / task.current.width,
+        y: task.plan.proposedCrop.y / task.current.height,
+        width: task.plan.proposedCrop.width / task.current.width,
+        height: task.plan.proposedCrop.height / task.current.height
+      }
     });
   }, crop);
   expect(await page.evaluate(() => __s3Stats.process)).toBe(0);

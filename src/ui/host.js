@@ -196,7 +196,10 @@ export function createUploadFitUi({
       hasOutput: Boolean(task && controller.getTaskOutput?.(task.taskId)),
       downloadUrl: null,
       downloadName: null,
-      focusCard: false
+      focusCard: false,
+      suppressLive: task?.status === 'STOPPED'
+        && task.errorCode
+        && task.errorCode !== 'USER_CANCELLED'
     };
     if (viewModel.hasOutput && task?.source === 'manual-card' && task.status === 'SUCCESS') {
       const info = outputInfo(task.taskId);
