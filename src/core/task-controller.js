@@ -342,7 +342,10 @@ export class TaskController {
         let input = event.target;
         let record = this.uploaders.get(input);
         if (!record) {
-          const context = this.discovery?.discoverFromEvent?.(event);
+          const selectedMime = input?.files?.length === 1
+            ? input.files[0]?.type
+            : null;
+          const context = this.discovery?.discoverFromEvent?.(event, selectedMime);
           input = context?.input ?? input;
           record = this.uploaders.get(input);
         }
