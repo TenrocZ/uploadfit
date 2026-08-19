@@ -1,6 +1,8 @@
 # S4 Handoff：UI 确认与 Tabbit AI
 
-- Status: READY_FOR_ACCEPTANCE
+> **独立验收覆盖（2026-08-19）**：当前状态已由 `READY_FOR_ACCEPTANCE` 改为 `REWORK_REQUIRED`，S5 未放行。真实 CNIPA 页面、A11、150,000-byte 契约、AI 数字校验、normalized crop、规则 evidence 和可访问性均有未闭合项。以 `docs/handoffs/S4-acceptance-review.md` 和 `docs/handoffs/S4-acceptance-rework-order.md` 为准；以下内容保留为原阶段 agent 的提交说明，不代表验收通过。
+
+- Status: REWORK_REQUIRED（独立验收否决，原提交状态保留在正文供追溯）
 - Start commit: `d950253`（S3 独立复验通过）
 - End commit: 本次 S4 提交（见当前 HEAD，本地 Git 留痕）
 - Agent: Claude / UploadFit S4 Agent

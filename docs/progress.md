@@ -735,3 +735,15 @@ S2 范围：
 已知限制（详见 `docs/handoffs/S4-handoff.md`）：A11 真实 Tabbit 实机调用需验收方补录一次（本工作区无 Tabbit 浏览器；调用路径为生产代码、S0 已实证同路径可用）；体积基线 ADR-003 待主验收 Agent 裁决；裁剪拖动的逐帧可视化断言留给 S5。
 
 证据：`docs/evidence/S4/README.md`、`docs/evidence/S4/s4-result.json`。Git 仅本地留痕，未推送远程。
+
+## 2026-08-19：S4 / 独立验收未通过并下发返工单
+
+状态：`REWORK_REQUIRED`，S5 未放行。
+
+独立复跑 `npm run check`（17 文件 / 137 测试）和 `npm run test:e2e`（80 Chromium）均通过，但发现自动化没有覆盖真实行为。连续两次 production build 均为 167,513 bytes、SHA-256 `4656F05C260F676E24DDF4E94D9AB43AFDBE6BF4C2356D2F72071008BEE04509`，相对共享契约 150,000-byte 硬门禁超出 17,513 bytes；ADR-003 未获主验收批准，不能把 `src/config.js` 调高到 168,000 作为通过依据。
+
+真实访问 CNIPA 2026 公告页并注入当前 bundle：页面规则仍含 JPG、30KB—120KB、390×567 和 300dpi，但产品得到 `pageCard.state=insufficient`，误将头部宽度 21mm 解析为宽度 21，height 缺失，并因截入“登录考试系统”触发 `PERMISSION_OR_LOGIN`，S4-D8 失败。另独立复现 AI 数字子串溯源（39 借 390 通过）、无 evidence 的 aspectRatio 通过、exact/min/max 自相矛盾仍通过。
+
+其他未闭合项：A11 当前 S4 production provider 的真实 Tabbit 调用证据缺失；crop UI 向 controller 传像素而非 0–1 normalized payload；snapshot 丢弃 source evidence；状态 button 嵌套 close button、live 播报和隐藏 crop Escape 监听不符合 U11；pointer drag 测试为空操作，U09 缺失，U12 未覆盖 200%/reduced-motion。
+
+验收报告：`docs/handoffs/S4-acceptance-review.md`。详细施工单：`docs/handoffs/S4-acceptance-rework-order.md`。结构化证据：`docs/evidence/S4/acceptance-review-result.json`。本轮只写验收/返工文档，未修改 S4 生产代码。

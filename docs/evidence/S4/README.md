@@ -1,6 +1,14 @@
 # S4 UI 确认与 Tabbit AI 证据
 
-状态：`READY_FOR_ACCEPTANCE`。基线提交：`d950253`（S3 独立复验通过后的 HEAD）。
+状态：`REWORK_REQUIRED`（2026-08-19 独立验收否决）。基线提交：`d950253`，受验提交：`2161939`。
+
+独立验收结论与返工依据：
+
+- `docs/handoffs/S4-acceptance-review.md`
+- `docs/handoffs/S4-acceptance-rework-order.md`
+- `docs/evidence/S4/acceptance-review-result.json`
+
+下方交付矩阵是原阶段 agent 的申请验收记录；其中 S4-D3/D5/D6/D7/D8/D9 及 U06/U09/U11/U12/A03/A04/A11 已被独立复现否决或判定未证明，不再作为当前 PASS 结论。
 工程目录：`C:\Users\蔡天乐\Desktop\黑客松\main`
 任务书：`C:\Users\蔡天乐\Desktop\黑客松\UploadFit-开发任务书-v1.0\50-S4-UI确认与Tabbit-AI.md`
 共享契约：`C:\Users\蔡天乐\Desktop\黑客松\UploadFit-开发任务书-v1.0\01-共享契约与接口基线.md`

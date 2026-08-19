@@ -1,0 +1,96 @@
+{
+  "date": "2026-08-19",
+  "stage": "S4",
+  "reviewType": "independent acceptance",
+  "reviewedCommit": "2161939",
+  "baselineCommit": "d950253",
+  "status": "REWORK_REQUIRED",
+  "releaseS5": false,
+  "environment": {
+    "os": "Windows",
+    "node": "v22.20.0",
+    "npm": "10.9.3",
+    "vitest": "4.1.10",
+    "playwright": "1.62.1"
+  },
+  "automatedGates": [
+    {
+      "command": "npm run check",
+      "result": "PASS_WITH_INVALID_SIZE_BASELINE",
+      "details": "17 Vitest files / 137 tests passed; build and static-check passed only because BUILD_LIMIT_BYTES was changed from the unapproved 150000 contract limit to 168000"
+    },
+    {
+      "command": "npm run test:e2e",
+      "result": "PASS",
+      "details": "80 Chromium tests passed"
+    },
+    {
+      "command": "two independent npm run build executions",
+      "result": "FAIL_SIZE_PASS_DETERMINISM",
+      "details": "both builds produced 167513 bytes and SHA-256 4656F05C260F676E24DDF4E94D9AB43AFDBE6BF4C2356D2F72071008BEE04509; artifact exceeds the 150000-byte contract by 17513 bytes"
+    }
+  ],
+  "realPublicPage": {
+    "url": "https://ggfw-dlsks.cnipa.gov.cn/home_item_Text_details?nid=6387",
+    "checkedAt": "2026-08-19",
+    "pageAccessible": true,
+    "title": "国家知识产权局关于2026年度专利代理师资格考试的公告（第675号）",
+    "expectedTextPresent": [
+      "JPG格式",
+      "30KB—120KB",
+      "390像素",
+      "567像素",
+      "300dpi"
+    ],
+    "productionBundleProbe": {
+      "hostCount": 1,
+      "uploaderCount": 0,
+      "pageCardState": "insufficient",
+      "pageCardActionable": false,
+      "wrongWidthExact": 21,
+      "heightExact": null,
+      "safetyFlags": [
+        "PERMISSION_OR_LOGIN"
+      ],
+      "diagnostics": [
+        "AI_UNAVAILABLE/LLMBRIDGE_MISSING in ordinary Chromium"
+      ],
+      "result": "FAIL"
+    }
+  },
+  "adversarialAiValidation": [
+    {
+      "case": "width 39 with evidence containing only width 390",
+      "actual": "accepted",
+      "expected": "AI_INVALID_OUTPUT",
+      "result": "FAIL"
+    },
+    {
+      "case": "aspectRatio 1.5 with evidence containing only JPG format",
+      "actual": "accepted",
+      "expected": "AI_INVALID_OUTPUT",
+      "result": "FAIL"
+    },
+    {
+      "case": "width exact 390 combined with min 500 and max 600",
+      "actual": "accepted by validateAiRuleOutput",
+      "expected": "AI_INVALID_OUTPUT before resolver",
+      "result": "FAIL"
+    }
+  ],
+  "blockingFindings": [
+    "S4-R1 real CNIPA page produces an insufficient and wrong rule card",
+    "S4-R2 A11 has no current S4 real Tabbit LLMBridge evidence",
+    "S4-R3 production artifact is 17513 bytes over the unapproved 150000-byte contract limit",
+    "S4-R4 AI numeric evidence validation accepts hallucinated or inconsistent numeric rules",
+    "S4-R5 crop UI sends a pixel rectangle to TaskController instead of the required normalized 0-1 rectangle",
+    "S4-R6 TaskController snapshot strips source evidence, so the rule card cannot display source/original evidence",
+    "S4-R7 status/accessibility behavior has invalid nested buttons, non-functional status live announcements, and a document-level hidden crop Escape listener",
+    "S4-R8 test/evidence claims overstate coverage: pointer drag test is a no-op, U09 is absent, and U12 does not cover 200 percent zoom or reduced motion"
+  ],
+  "documents": {
+    "review": "docs/handoffs/S4-acceptance-review.md",
+    "reworkOrder": "docs/handoffs/S4-acceptance-rework-order.md"
+  },
+  "scope": "Acceptance documents and evidence only; no S4 production code was modified"
+}
