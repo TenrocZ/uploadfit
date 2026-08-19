@@ -379,7 +379,11 @@ function cropPayload(payload) {
 
 function cropMatchesProposal(candidate, proposal) {
   if (!candidate || !proposal) return false;
-  return ['x', 'y', 'width', 'height'].every((key) => candidate[key] === proposal[key]);
+  // ADR-002：裁剪框尺寸必须与规则推导的建议矩形一致，用户只能平移位置。
+  return candidate.width === proposal.width
+    && candidate.height === proposal.height
+    && Number.isFinite(candidate.x) && candidate.x >= 0
+    && Number.isFinite(candidate.y) && candidate.y >= 0;
 }
 
 function confirmationResolved(plan) {

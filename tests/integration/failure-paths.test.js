@@ -83,7 +83,9 @@ test('cleanupSession is idempotent and permits a clean rebootstrap', async ({ pa
 
     const afterCleanup = {
       active: firstSession.active,
-      hostCount: document.querySelectorAll('[data-uploadfit-host]').length,
+      hostCount: document.querySelectorAll(
+        '[data-uploadfit-host], [data-uploadfit-ui-host]'
+      ).length,
       sessionPresent: Boolean(globalThis.__uploadfit_session__),
       inputCleanups: firstSession.inputCleanups.size,
       observer: firstSession.observer
@@ -94,7 +96,9 @@ test('cleanupSession is idempotent and permits a clean rebootstrap', async ({ pa
       secondCleanupThrew,
       afterCleanup,
       newSessionCreated: newSession !== firstSession,
-      newHostCount: document.querySelectorAll('[data-uploadfit-host]').length
+      newHostCount: document.querySelectorAll(
+        '[data-uploadfit-host], [data-uploadfit-ui-host]'
+      ).length
     };
   });
 

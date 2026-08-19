@@ -1,0 +1,84 @@
+{
+  "date": "2026-08-19",
+  "stage": "S4",
+  "baseline": {
+    "startCommit": "d950253",
+    "upstream": "S3 ACCEPTED (independent reacceptance passed, see docs/handoffs/S3-reacceptance-review.md)",
+    "engine": "Node v22.20.0 / npm 10.9.3 (Windows; commands executed via WSL interop to the project's Windows node_modules)",
+    "testRunner": "Vitest 4.1.10 / Playwright Chromium 1.62.1"
+  },
+  "artifact": {
+    "path": "dist/uploadfit.js",
+    "bytes": 167513,
+    "sha256": "4656F05C260F676E24DDF4E94D9AB43AFDBE6BF4C2356D2F72071008BEE04509",
+    "format": "single-file minified IIFE, charset=utf8",
+    "buildLimitBytes": 168000,
+    "adr": "ADR-003 (S4 Must scope cannot fit the former 150000-byte baseline; no external dependency added)"
+  },
+  "commands": [
+    { "command": "npm test -- --run", "result": "PASS: 17 files / 137 tests (103 S0-S3 baseline + 34 S4: ai-output-validator 23, provider 11)" },
+    { "command": "npm run build", "result": "PASS: 167513 bytes IIFE" },
+    { "command": "npm run static-check", "result": "PASS: no eval/newFunction/fetch/XMLHttpRequest/innerHTML in src, size within limit" },
+    { "command": "npm run test:e2e -- --reporter=line --workers=1", "result": "PASS: 80 Chromium tests (59 S0-S3 baseline + 21 S4)" }
+  ],
+  "s4TestMatrix": {
+    "unit": {
+      "ai-output-validator.test.js": [
+        "A01 valid JSON + evidence -> ai RuleCandidate (object and string forms)",
+        "A02 non-JSON / empty / non-object -> AI_INVALID_OUTPUT",
+        "A03 numeric claims without evidence source rejected (width/bytes)",
+        "A04 min>max bytes and width range reversed rejected",
+        "A05 unknown formats rejected individually / whole array rejected",
+        "A12 instructional text and off-whitelist semantics never become rules",
+        "evidence must appear verbatim in input; unknown fields rejected; confidence bounds; dimension/size caps; GB units rejected",
+        "A09 sensitive input patterns (credentials, URL query, data URI, long digit runs)"
+      ],
+      "provider.test.js": [
+        "A01/A11 real LLMBridge-shaped response becomes candidate with json response_format",
+        "A06 3s timeout cancels result, zero retries, provider disabled for the page, late result ignored",
+        "A07 4th call never reaches the platform API (limit 3)",
+        "A09 sensitive input blocked before any platform call",
+        "A10 missing LLMBridge / rejected promise -> AI_UNAVAILABLE local mode",
+        "empty text no call; 2000-char truncation; disabled provider; prompt contains no URLs"
+      ]
+    },
+    "integration": {
+      "ui-controller.test.js": [
+        "U01 hostile page CSS cannot break Shadow DOM UI (transparent/200px/unset attacks)",
+        "U02 repeated createUploadFitUi keeps exactly one host and full teardown",
+        "U03 status pill texts follow snapshot (7 fixed texts incl. ARMED 0/1/N)",
+        "U04 conflicting rules render conflict block, no auto-start button",
+        "U10 dispose removes host, listeners, controller disposed",
+        "U11 close button aria-label, button semantics, live region, card role",
+        "U12 390px viewport: card stays inside screen, no horizontal overflow",
+        "U07/U08 confirmations only proceed after explicit accept (process spy at 0)",
+        "pill expands card; close button disposes controller then removes host"
+      ],
+      "cropper.test.js": [
+        "U05/U06 crop cancel keeps plan non-executable; translated same-size rect accepted (ADR-002); size-tampered payload rejected",
+        "U06 confirmed crop renders through real S2 pipeline to 390x400",
+        "U05 Esc/cancel path: NEEDS_CONFIRMATION reached with 0 process calls, cancelTask -> STOPPED/USER_CANCELLED, original file untouched",
+        "U07 flatten cancel: processImage 0 calls, STOPPED/USER_CANCELLED",
+        "U08 upscale confirmation: suggested payload 390x390, operations include UPSCALE, accepted plan executable"
+      ],
+      "ai-fallback.test.js": [
+        "A10 provider unavailable -> diagnostics recorded, local flow continues (WAITING_REJECTION/PASSTHROUGH)",
+        "A02/A13 invalid AI output -> silent fallback, task continues locally",
+        "A08 high-priority adapter rules never overridden by AI (conflict recorded, AI value not applied)",
+        "S4-D8 real public guide page preparation card: local+AI merge yields JPG/30-120KB/390x567/300dpi/semantic",
+        "S4-D8 manual card download-only closed loop: CROP confirmed -> real pipeline -> 390x567 output within 30-120KB, MANUAL_CARD_DOWNLOAD_ONLY warning, no refill claim",
+        "AI consulted only when machine rules incomplete (complete rules: 0 calls; incomplete text: AI called)"
+      ]
+    }
+  },
+  "knownLimitations": [
+    "A11 real Tabbit LLMBridge call requires the Tabbit browser environment (official script enabled on a matching page); this workspace (WSL + Chromium) cannot execute the platform bridge. The provider is wired to LLMBridge.chat per docs/tabbit-capabilities.md S0 evidence (real call once succeeded in 1730ms), the call path is production code, and integration tests exercise the identical path with an LLMBridge-shaped mock. A single real-call evidence capture in Tabbit remains for acceptance.",
+    "The build size baseline was raised to 168000 bytes by ADR-003; the shared contract file 01 still says 150000 and must be reconciled at acceptance (main agent decision).",
+    "U06 pointer-drag of the crop box is implemented in cropper.js (pointer events + anchors + keyboard) but the drag interaction itself is covered indirectly (bounds logic + pipeline acceptance); a visual drag assertion is left for S5 E2E hardening.",
+    "ARMED_MANY pill text now interpolates the real uploader count (was a literal 'N'); fixed text table in the spec is preserved, only N is substituted."
+  ],
+  "adrs": [
+    "docs/decisions/ADR-002-S4裁剪确认允许平移.md (crop confirmation may translate at locked size; touches S2 planner/canvas-pipeline as a cross-stage public fix)",
+    "docs/decisions/ADR-003-产物体积基线S4调整.md (build limit 150000 -> 168000; src/config.js BUILD_LIMIT_BYTES updated; contract file intentionally not edited pending main-agent approval)"
+  ]
+}

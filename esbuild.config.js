@@ -22,6 +22,7 @@ try {
     platform: 'browser',
     target: ['es2022'],
     minify: mode === 'production',
+    charset: 'utf8',
     sourcemap: false,
     legalComments: 'none',
     define: {

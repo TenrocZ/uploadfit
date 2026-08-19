@@ -2,31 +2,13 @@ import { createRandomId } from './utils/ids.js';
 import { createLogger } from './utils/logger.js';
 import { clearInjectionGuard } from './injection/injection-guard.js';
 import { createTaskController } from './core/task-controller.js';
+import { createTabbitAiProvider } from './providers/tabbit-ai.js';
+import { createUploadFitUi } from './ui/host.js';
 
 export const SESSION_KEY = '__uploadfit_session__';
-const HOST_ATTRIBUTE = 'data-uploadfit-host';
 
 function isFileInput(node) {
   return node?.nodeType === 1 && node.matches?.('input[type="file"]');
-}
-
-function createStatusHost(documentRef) {
-  const host = documentRef.createElement('div');
-  host.setAttribute(HOST_ATTRIBUTE, 'true');
-  host.setAttribute('role', 'status');
-  host.tabIndex = -1;
-  host.textContent = 'UploadFit 已启动';
-  host.style.position = 'fixed';
-  host.style.right = '16px';
-  host.style.bottom = '16px';
-  host.style.zIndex = '2147483647';
-  host.style.padding = '8px 12px';
-  host.style.borderRadius = '999px';
-  host.style.background = '#172033';
-  host.style.color = '#ffffff';
-  host.style.font = '13px/1.4 system-ui, sans-serif';
-  (documentRef.body ?? documentRef.documentElement)?.append(host);
-  return host;
 }
 
 function scanInputs(node, callback) {
@@ -46,7 +28,9 @@ function registerSession(globalRef, session) {
 export function bootstrap({
   documentRef = globalThis.document,
   globalRef = globalThis,
-  logger = createLogger()
+  logger = createLogger(),
+  ruleProvider = null,
+  ui = true
 } = {}) {
   if (!documentRef?.createElement || !globalRef) return null;
 
@@ -56,11 +40,11 @@ export function bootstrap({
     return existingSession;
   }
 
-  const host = createStatusHost(documentRef);
   const session = {
     sessionId: createRandomId('session'),
     active: true,
-    host,
+    host: null,
+    ui: null,
     inputs: new Set(),
     inputCleanups: new Map(),
     observer: null,
@@ -96,8 +80,20 @@ export function bootstrap({
     documentRef,
     globalRef,
     logger,
-    sessionId: session.sessionId
+    sessionId: session.sessionId,
+    ruleProvider: ruleProvider ?? createTabbitAiProvider({ globalRef, logger })
   });
+
+  if (ui) {
+    session.ui = createUploadFitUi({
+      documentRef,
+      globalRef,
+      controller: session.controller,
+      logger,
+      onClose: () => session.cleanup()
+    });
+    session.host = session.ui?.host ?? null;
+  }
 
   const onPageHide = () => session.cleanup();
   globalRef.addEventListener?.('pagehide', onPageHide, { once: true });
@@ -107,18 +103,23 @@ export function bootstrap({
     session.active = false;
     session.controller?.dispose?.();
     session.controller = null;
+    session.ui?.dispose?.();
+    session.ui = null;
     session.observer?.disconnect();
     session.observer = null;
     for (const cleanup of session.inputCleanups.values()) cleanup();
     session.inputCleanups.clear();
     session.inputs.clear();
     globalRef.removeEventListener?.('pagehide', onPageHide);
-    host.remove();
+    session.host?.remove?.();
+    session.host = null;
     if (globalRef[SESSION_KEY] === session) delete globalRef[SESSION_KEY];
   };
 
   registerSession(globalRef, session);
   session.controller.start();
+  // 真实公开说明页（如国知局公告页）自动出现“按本页要求准备照片”卡。
+  void Promise.resolve(session.controller.prepareManualCard?.()).catch(() => {});
   return session;
 }
 

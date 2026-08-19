@@ -1,10 +1,12 @@
 import {
   AUTO_RULE_CONFIDENCE,
   CONFIRM_RULE_CONFIDENCE,
+  CONTEXT_TEXT_LIMIT,
   MAX_AUTO_RETRIES
 } from '../config.js';
 import {
-  extractRelevantContext
+  extractRelevantContext,
+  selectAiRelevantText
 } from '../dom/context-extractor.js';
 import {
   createUploaderDiscovery
@@ -32,6 +34,7 @@ import {
 import { asImageProcessingError } from '../image/errors.js';
 import { createRandomId } from '../utils/ids.js';
 import { createLogger } from '../utils/logger.js';
+import { sanitizeEvidenceText } from '../utils/text.js';
 import { createAdapterRegistry } from '../adapters/registry.js';
 import { createCleanupRegistry } from './cleanup.js';
 import { createStateMachine } from './state-machine.js';
@@ -110,7 +113,9 @@ function safeMetadata(metadata) {
     mime: metadata.mime ?? metadata.signatureMime ?? null,
     size: Number.isFinite(metadata.size) ? metadata.size : null,
     width: Number.isFinite(metadata.width) ? metadata.width : null,
-    height: Number.isFinite(metadata.height) ? metadata.height : null
+    height: Number.isFinite(metadata.height) ? metadata.height : null,
+    displayWidth: Number.isFinite(metadata.displayWidth) ? metadata.displayWidth : null,
+    displayHeight: Number.isFinite(metadata.displayHeight) ? metadata.displayHeight : null
   };
 }
 
@@ -153,7 +158,8 @@ function safePlan(plan) {
       required: Boolean(item.required),
       resolved: Boolean(item.resolved),
       accepted: item.accepted === true ? true : item.accepted === false ? false : null,
-      payload: cloneValue(item.payload)
+      payload: cloneValue(item.payload),
+      suggestedPayload: cloneValue(item.suggestedPayload)
     })),
     warnings: (plan.warnings ?? []).map((item) => ({ code: item.code })),
     executable: Boolean(plan.executable),
@@ -254,12 +260,36 @@ function stableErrorCode(error, fallback = 'PROCESSING_FAILED') {
 }
 
 function isTaskCurrent(task, record) {
+  if (!task || record?.currentTask !== task) return false;
+  if (task.abortController?.signal?.aborted === true) return false;
+  if (task.source === 'manual-card' && !task.inputElement) return true;
+  return Boolean(task.inputElement?.isConnected);
+}
+
+function hasSubstantiveRules(rules) {
+  if (!rules) return false;
   return Boolean(
-    task
-    && record?.currentTask === task
-    && task.inputElement?.isConnected
-    && task.abortController?.signal?.aborted !== true
+    rules.formats?.length
+      || Number.isFinite(rules.minBytes)
+      || Number.isFinite(rules.maxBytes)
+      || Object.values(rules.width ?? {}).some((value) => Number.isFinite(value))
+      || Object.values(rules.height ?? {}).some((value) => Number.isFinite(value))
+      || Number.isFinite(rules.aspectRatio?.value)
+      || rules.semanticRequirements?.length
   );
+}
+
+/**
+ * 任务书 50-S4 §10.1：本地规则"不完整"时才允许调用 AI。完整 = 可校验的
+ * 机器约束齐备（格式 + 尺寸/比例 + 大小边界），仅含语义要求不算完整。
+ */
+function machineRulesComplete(rules) {
+  if (!rules?.actionable) return false;
+  const hasDimensions = Object.values(rules.width ?? {}).some((value) => Number.isFinite(value))
+    || Object.values(rules.height ?? {}).some((value) => Number.isFinite(value))
+    || Number.isFinite(rules.aspectRatio?.value);
+  const hasSize = Number.isFinite(rules.minBytes) || Number.isFinite(rules.maxBytes);
+  return Boolean(rules.formats?.length) && hasDimensions && hasSize;
 }
 
 function taskCanBeObserved(task) {
@@ -301,6 +331,10 @@ export class TaskController {
     this.parseRules = options.parseRulesFn ?? options.parseRules ?? parseRulesDeterministically;
     this.resolveRules = options.resolveRulesFn ?? options.resolveRules ?? resolveRules;
     this.confirmationResolver = options.confirmationResolver ?? null;
+    this.ruleProvider = options.ruleProvider ?? null;
+    this.manualRecords = new Map();
+    this.pageCard = null;
+    this.pageCardRules = null;
     this.resources = createCleanupRegistry();
     this.sessionMachine = createStateMachine({
       initial: 'BOOTING',
@@ -339,6 +373,8 @@ export class TaskController {
     if (this.documentRef?.addEventListener) {
       this.changeCaptureListener = (event) => {
         if (event?.type !== 'change' || this.disposed || this.handledEvents.has(event)) return;
+        // S4：UploadFit UI host 内部的 file input（真实公开页准备卡）不参与业务上传器发现。
+        if (event?.target?.closest?.('[data-uploadfit-ui-host]')) return;
         let input = event.target;
         let record = this.uploaders.get(input);
         if (!record) {
@@ -442,6 +478,18 @@ export class TaskController {
     this.logger.emit('UPLOADER_DISCOVERED');
     this._publish();
     return context;
+  }
+
+  _recordForTask(task) {
+    if (!task) return null;
+    return this.uploaders.get(task.inputElement)
+      ?? this.manualRecords.get(task.taskId)
+      ?? null;
+  }
+
+  _inputConnected(task) {
+    if (task?.source === 'manual-card' && !task?.inputElement) return true;
+    return Boolean(task?.inputElement?.isConnected);
   }
 
   _contextBundle(record, selectedText = null, alertTexts = []) {
@@ -605,10 +653,12 @@ export class TaskController {
   }
 
   async _runPreflight(task, record) {
-    if (record.currentTask === task && !task.inputElement.isConnected) {
+    if (record.currentTask === task && !this._inputConnected(task)) {
       this._stopTask(task, 'INPUT_DETACHED');
       return;
     }
+    if (!isTaskCurrent(task, record)) return;
+    await this._maybeAugmentRules(task, record);
     if (!isTaskCurrent(task, record)) return;
     if (!task.rules.actionable) {
       if (task.rules.safetyFlags?.length || task.rules.conflicts?.some((item) => item.unresolvable)) {
@@ -616,12 +666,18 @@ export class TaskController {
           task,
           task.rules.safetyFlags?.length ? 'OFFICIAL_TOOL_REQUIRED' : 'RULE_CONFLICT'
         );
+      } else if (task.source === 'manual-card') {
+        this._stopTask(task, 'AMBIGUOUS_RULES');
       } else {
         this._waitForRejection(task, record);
       }
       return;
     }
     if (task.rules.confidence < CONFIRM_RULE_CONFIDENCE) {
+      if (task.source === 'manual-card') {
+        this._stopTask(task, 'AMBIGUOUS_RULES');
+        return;
+      }
       this._waitForRejection(task, record);
       return;
     }
@@ -631,7 +687,7 @@ export class TaskController {
         signal: task.abortController.signal
       });
       if (task.abortController.signal.aborted || record.currentTask !== task) return;
-      if (!task.inputElement.isConnected) {
+      if (!this._inputConnected(task)) {
         this._stopTask(task, 'INPUT_DETACHED');
         return;
       }
@@ -680,6 +736,62 @@ export class TaskController {
     } catch (error) {
       if (task.abortController.signal.aborted) return;
       this._stopTask(task, stableErrorCode(error), error);
+    }
+  }
+
+  /**
+   * S4: ask the rule-understanding provider for a supplementary candidate only
+   * when the local rules are incomplete. Failures are logged and silently fall
+   * back to local rules (AI_UNAVAILABLE / AI_TIMEOUT / AI_INVALID_OUTPUT).
+   */
+  async _maybeAugmentRules(task, record) {
+    if (!this.ruleProvider || this.disposed) return;
+    const rules = task.rules;
+    if (!rules) return;
+    if (rules.actionable && rules.confidence >= AUTO_RULE_CONFIDENCE && machineRulesComplete(rules)) {
+      return;
+    }
+    const text = selectAiRelevantText(task.contextBundle);
+    if (!text) return;
+    let result = null;
+    try {
+      result = await this.ruleProvider.extractRules({
+        text,
+        locale: 'zh-CN',
+        pageType: task.contextBundle?.pageType ?? null
+      });
+    } catch (error) {
+      this.diagnostics.push({
+        code: 'AI_UNAVAILABLE',
+        reason: String(error?.message ?? error).slice(0, 200),
+        taskId: task.taskId
+      });
+      return;
+    }
+    if (this.disposed || record.currentTask !== task) return;
+    if (result?.ok && result.candidate) {
+      task.ruleCandidates = [...(task.ruleCandidates ?? []), result.candidate];
+      task.rules = this.resolveRules(task.ruleCandidates);
+      this.logger.emit('RULES_PARSED_AI', { taskId: task.taskId });
+      if (task.rules.conflicts?.length) {
+        this.logger.emit('RULE_CONFLICT', { taskId: task.taskId, rules: task.rules });
+      }
+      return;
+    }
+    if (result?.blocked) {
+      this.diagnostics.push({
+        code: 'AI_CALL_BLOCKED',
+        reason: result.blocked,
+        taskId: task.taskId
+      });
+      return;
+    }
+    if (result?.errorCode) {
+      this.diagnostics.push({
+        code: result.errorCode,
+        reason: result.reason ?? null,
+        taskId: task.taskId
+      });
     }
   }
 
@@ -736,7 +848,9 @@ export class TaskController {
       this._transitionTask(task, 'WAITING_REJECTION');
     }
     this._transitionSession('WAITING_REJECTION', { taskId: task.taskId });
-    this._startRejectionObserver(task, record);
+    if (task.source !== 'manual-card') {
+      this._startRejectionObserver(task, record);
+    }
     this._publish();
   }
 
@@ -778,8 +892,9 @@ export class TaskController {
     if (this.disposed || this.processingTask) return;
     while (this.queue.length) {
       const task = this.queue.shift();
-      const record = this.uploaders.get(task?.inputElement);
-      if (task && record && record.currentTask === task && !task.inputElement.isConnected) {
+      const record = this._recordForTask(task);
+      // manual-card 任务无原 input；inputElement 为 null 时按 manual 语义判定连接性。
+      if (task && record && record.currentTask === task && !this._inputConnected(task)) {
         this._stopTask(task, 'INPUT_DETACHED');
       }
       if (!task || !record || !isTaskCurrent(task, record) || task.status === 'STOPPED') {
@@ -807,7 +922,7 @@ export class TaskController {
   }
 
   async _processTask(task, record) {
-    if (record.currentTask === task && !task.inputElement.isConnected) {
+    if (record.currentTask === task && !this._inputConnected(task)) {
       this._stopTask(task, 'INPUT_DETACHED');
       return;
     }
@@ -829,7 +944,7 @@ export class TaskController {
         { signal: task.abortController.signal, taskId: task.taskId }
       );
       if (task.abortController.signal.aborted || record.currentTask !== task) return;
-      if (!task.inputElement.isConnected) {
+      if (!this._inputConnected(task)) {
         this._stopTask(task, 'INPUT_DETACHED');
         return;
       }
@@ -849,9 +964,25 @@ export class TaskController {
         height: result.metadata?.height,
         durationMs: result.durationMs
       });
+      if (task.source === 'manual-card') {
+        // 真实公开说明页没有原上传框：处理成功后只提供结果与下载，不伪装回填。
+        task.injection = {
+          ok: true,
+          inputFilesVerified: false,
+          eventsDispatched: [],
+          fallback: 'download',
+          errorCode: null
+        };
+        task.warnings.push({ code: 'MANUAL_CARD_DOWNLOAD_ONLY' });
+        this._transitionTask(task, 'SUCCESS');
+        this._transitionSession('SUCCESS');
+        this.logger.emit('TASK_SUCCEEDED', { taskId: task.taskId });
+        this._publish();
+        return;
+      }
       if (!this._transitionTask(task, 'INJECTING')) return;
       this._transitionSession('INJECTING');
-      if (!task.inputElement.isConnected || this.uploaders.get(task.inputElement) !== record) {
+      if (!this._inputConnected(task) || this._recordForTask(task) !== record) {
         throw Object.assign(new Error('Input is no longer connected.'), {
           code: 'INPUT_DETACHED'
         });
@@ -881,7 +1012,7 @@ export class TaskController {
       this._afterInjection(task, record);
     } catch (error) {
       if (task.abortController.signal.aborted || record.currentTask !== task) return;
-      if (!task.inputElement.isConnected) {
+      if (!this._inputConnected(task)) {
         this._stopTask(task, 'INPUT_DETACHED');
         return;
       }
@@ -917,7 +1048,7 @@ export class TaskController {
       || task.rejection.related !== true
       || !task.result?.file
       || task.result.validation?.valid !== true
-      || !task.inputElement.isConnected
+      || !this._inputConnected(task)
       || task.cancelled
       || this.disposed) return false;
     let adapterAuto = false;
@@ -1044,7 +1175,7 @@ export class TaskController {
         signal: task.abortController.signal
       });
       if (task.abortController.signal.aborted || record.currentTask !== task) return;
-      if (!task.inputElement.isConnected) {
+      if (!this._inputConnected(task)) {
         this._stopTask(task, 'INPUT_DETACHED');
         return;
       }
@@ -1086,7 +1217,7 @@ export class TaskController {
 
   async confirmTask(taskId, confirmationPayload) {
     const task = this.tasks.get(taskId);
-    const record = this.uploaders.get(task?.inputElement);
+    const record = this._recordForTask(task);
     if (!task || !record || task.status !== 'NEEDS_CONFIRMATION') {
       return { ok: false, errorCode: 'USER_CONFIRMATION_REQUIRED' };
     }
@@ -1197,6 +1328,182 @@ export class TaskController {
     return result;
   }
 
+  /**
+   * S4: build the "prepare photo by this page's rules" card for a real public
+   * guide page. Local parsing first; the AI provider is consulted only when the
+   * local rules are incomplete. Returns null on pages without a page adapter.
+   */
+  async prepareManualCard(options = {}) {
+    if (this.disposed) return null;
+    const url = this.globalRef?.location?.href ?? '';
+    const adapter = this.adapterRegistry.resolve(url);
+    if (typeof adapter?.getPageRuleContext !== 'function') return null;
+
+    let textSource = null;
+    if (options.selectedText) {
+      textSource = sanitizeEvidenceText(String(options.selectedText));
+    }
+    if (!textSource) {
+      try {
+        textSource = adapter.getPageRuleContext(this.documentRef);
+      } catch {
+        textSource = null;
+      }
+    }
+    if (!textSource) {
+      this.pageCard = { state: 'no-rules', hint: 'SELECT_TEXT', source: adapter.id };
+      this.pageCardRules = null;
+      this._publish();
+      return this.pageCard;
+    }
+
+    const bundle = {
+      uploaderId: 'manual-card',
+      label: '本页照片要求',
+      attributes: { accept: null, multiple: false, required: false },
+      selectedText: null,
+      nearbyTexts: [],
+      alertTexts: [],
+      normalizedText: sanitizeEvidenceText(textSource).slice(0, CONTEXT_TEXT_LIMIT),
+      truncated: false
+    };
+    let candidates = this.parseRules(bundle);
+    let rules = this.resolveRules(candidates);
+    this.logger.emit('CONTEXT_EXTRACTED');
+    this.logger.emit('RULES_PARSED_LOCAL', { rules });
+    if (rules.conflicts?.length) {
+      this.logger.emit('RULE_CONFLICT', { rules });
+    }
+
+    if (this.ruleProvider
+      && !(rules.actionable && rules.confidence >= AUTO_RULE_CONFIDENCE && machineRulesComplete(rules))) {
+      const text = selectAiRelevantText(bundle);
+      if (text) {
+        let result = null;
+        try {
+          result = await this.ruleProvider.extractRules({
+            text,
+            locale: 'zh-CN',
+            pageType: 'public-guide'
+          });
+        } catch (error) {
+          this.diagnostics.push({
+            code: 'AI_UNAVAILABLE',
+            reason: String(error?.message ?? error).slice(0, 200)
+          });
+        }
+        if (result?.ok && result.candidate) {
+          candidates = [...candidates, result.candidate];
+          rules = this.resolveRules(candidates);
+          this.logger.emit('RULES_PARSED_AI', {});
+          if (rules.conflicts?.length) {
+            this.logger.emit('RULE_CONFLICT', { rules });
+          }
+        } else if (result?.blocked) {
+          this.diagnostics.push({ code: 'AI_CALL_BLOCKED', reason: result.blocked });
+        } else if (result?.errorCode) {
+          this.diagnostics.push({ code: result.errorCode, reason: result.reason ?? null });
+        }
+      }
+    }
+
+    const ready = rules.actionable && hasSubstantiveRules(rules);
+    this.pageCardRules = rules;
+    this.pageCard = {
+      state: ready ? 'ready' : 'insufficient',
+      hint: ready ? null : 'SELECT_TEXT',
+      rules: safeRuleSet(rules),
+      source: adapter.id
+    };
+    this._publish();
+    return this.pageCard;
+  }
+
+  /**
+   * S4: run the full local pipeline for a file chosen through the UploadFit
+   * manual card (real public guide pages without their own upload input).
+   * The result is download-only; it never claims a page-side refill.
+   */
+  async createManualTask(file, options = {}) {
+    if (this.disposed) return { ok: false, errorCode: 'SESSION_DISPOSED' };
+    const FileConstructor = this.globalRef?.File ?? globalThis.File;
+    if (typeof FileConstructor !== 'function' || !(file instanceof FileConstructor)) {
+      return { ok: false, errorCode: 'FILE_UNAVAILABLE' };
+    }
+    const rules = options.rules ?? this.pageCardRules;
+    if (!rules || !rules.actionable || !hasSubstantiveRules(rules)) {
+      return { ok: false, errorCode: 'AMBIGUOUS_RULES' };
+    }
+    if (this.processingTask) {
+      return { ok: false, errorCode: 'PROCESSING_FAILED' };
+    }
+
+    const record = {
+      context: {
+        input: null,
+        uploaderId: 'manual-card',
+        label: options.label ?? '本页照片要求',
+        nearbyTexts: [],
+        alertTexts: [],
+        pageUrl: this.globalRef?.location?.href ?? '',
+        pageTitle: this.documentRef?.title ?? '',
+        adapter: null
+      },
+      adapter: null,
+      input: null,
+      currentTask: null,
+      listener: null,
+      cleanupListener: null
+    };
+    const bundle = {
+      uploaderId: 'manual-card',
+      label: record.context.label,
+      attributes: { accept: null, multiple: false, required: false },
+      selectedText: null,
+      nearbyTexts: [],
+      alertTexts: [],
+      normalizedText: '',
+      truncated: false
+    };
+    const task = this._makeTask(record, file, null, rules, [], bundle);
+    task.source = 'manual-card';
+    record.currentTask = task;
+    this.manualRecords.set(task.taskId, record);
+    this.tasks.set(task.taskId, task);
+    this.logger.emit('FILE_SELECTED', {
+      taskId: task.taskId,
+      mime: file.type,
+      bytes: file.size
+    });
+    this._transitionTask(task, 'INSPECTING');
+    this._transitionSession('INSPECTING');
+    await this._runPreflight(task, record);
+    return { ok: true, task };
+  }
+
+  /** S4: object URL for UI previews; registered on the task for cleanup. */
+  createTaskPreviewUrl(taskId) {
+    const task = this.tasks.get(taskId);
+    if (!task) return null;
+    const file = task.processedFile ?? task.originalFile;
+    if (!file) return null;
+    const urlApi = this.globalRef?.URL ?? globalThis.URL;
+    const url = urlApi?.createObjectURL?.(file);
+    if (url && !task.objectUrls.includes(url)) task.objectUrls.push(url);
+    return url ?? null;
+  }
+
+  /** S4: expose the processed output for download flows. Never logs the name. */
+  getTaskOutput(taskId) {
+    const task = this.tasks.get(taskId);
+    if (!task?.processedFile) return null;
+    return {
+      taskId,
+      file: task.processedFile,
+      metadata: safeMetadata(task.result?.metadata ?? task.processedFile)
+    };
+  }
+
   _stopTask(task, errorCode = 'PROCESSING_FAILED', error = null) {
     if (!task || task.status === 'DISPOSED' || task.status === 'STOPPED') return false;
     task.errorCode = errorCode;
@@ -1300,6 +1607,7 @@ export class TaskController {
           taskId: task.taskId,
           status: task.status,
           label: task.label,
+          source: task.source,
           current: safeMetadata(task.metadata),
           rules: safeRuleSet(task.rules),
           policyConfirmation: safeConfirmation(task.policyConfirmation),
@@ -1308,6 +1616,14 @@ export class TaskController {
           errorCode: task.errorCode ?? null,
           retryCount: task.retryCount,
           warnings: task.warnings.map((item) => ({ code: item.code }))
+        }
+        : null,
+      pageCard: this.pageCard
+        ? {
+          state: this.pageCard.state,
+          hint: this.pageCard.hint ?? null,
+          rules: this.pageCard.rules ?? null,
+          source: this.pageCard.source ?? null
         }
         : null
     };
@@ -1332,12 +1648,17 @@ export class TaskController {
   dispose() {
     if (this.disposed) return false;
     this.disposed = true;
+    const urlApi = this.globalRef?.URL ?? globalThis.URL;
     for (const task of this.tasks.values()) {
       task.abortController?.abort?.();
       this._stopRejectionObserver(task);
+      task.objectUrls.splice(0).forEach((url) => {
+        urlApi?.revokeObjectURL?.(url);
+      });
       task.stateMachine.transition('DISPOSED', { reason: 'SESSION_DISPOSED' });
       task.status = 'DISPOSED';
     }
+    this.manualRecords.clear();
     this.discovery?.cleanup?.();
     this.resources.cleanup();
     for (const record of this.uploaders.values()) record.cleanupListener?.();

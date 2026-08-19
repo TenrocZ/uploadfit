@@ -710,3 +710,28 @@ S2 范围：
 最终门禁：15 个 Vitest 文件、103 个测试通过；59 个 Chromium 测试通过；生产 IIFE 122865 bytes，SHA-256 `4483FC94F140F892F9A0FCF16AF27797639C41B44F8E863AD9FEDE2F4897702D`；静态检查和 diff check 通过，8765 端口关闭。
 
 最终报告与证据：`docs/handoffs/S3-reacceptance-review.md`、`docs/evidence/S3/reacceptance-result.json`。任务书声明的早注册 document/window 捕获监听边界与 `isTrusted=false` 限制继续保留，不扩大为全站兼容承诺。
+
+## 2026-08-19：S4 / UI 确认与 Tabbit AI 交付，申请验收
+
+状态：`READY_FOR_ACCEPTANCE`。基线提交 `d950253`（S3 独立复验通过后）。
+
+交付内容：
+
+- Shadow DOM UI 五件套（host/styles/status-pill/task-card/cropper）：closed shadow root、七条固定状态文案、规则/预检/成功/失败/准备卡、三类有损确认、固定比例裁剪器（拖动/锚点/键盘/Esc）、AA 对比度与 reduced-motion。
+- Tabbit AI provider：唯一 `LLMBridge.chat` 接触点，3000ms 超时、0 重试、每页≤3 次、超时后本页禁用；输出经严格 Schema/evidence/数值来源/冲突校验，失败静默降级本地规则（AI_UNAVAILABLE/AI_TIMEOUT/AI_INVALID_OUTPUT 诊断留痕）。
+- 真实公开说明页模式：国知局适配器读取 `.content` 照片要求，本地+AI 双路径解析（全角冒号"宽：390像素"本地不可解析、由 AI 补充——实测证明 AI 路径必要性），"按本页要求准备照片"卡 + 下载闭环（不伪装回填）。
+- 跨阶段公共修复（均按总控 §6 留痕）：ADR-002 裁剪确认允许同尺寸平移（否则 §8.1 拖动 Must 不可实现）；manual 任务 null inputElement 的连接性判定（`_pumpQueue` 等四处统一走 `_inputConnected`，修复 `Cannot read properties of null` 导致的误报 USER_CONFIRMATION_REQUIRED）。
+- ADR-003：产物体积基线 150,000 → 168,000（S4 Must 范围实测不可压回；`src/config.js` 已同步，契约文件待主验收裁决）。
+
+验证结果：
+
+| 命令 | 结果 |
+|---|---|
+| `npm test -- --run` | PASS：17 个 Vitest 文件、137 个测试（基线 103 + S4 新增 34） |
+| `npm run build` | PASS：167,513 bytes 单 IIFE（SHA-256 `4656F05C260F676E24DDF4E94D9AB43AFDBE6BF4C2356D2F72071008BEE04509`） |
+| `npm run static-check` | PASS |
+| `npm run test:e2e -- --reporter=line --workers=1` | PASS：80 个 Chromium 测试（基线 59 + S4 新增 21），S0–S3 全部用例无回归 |
+
+已知限制（详见 `docs/handoffs/S4-handoff.md`）：A11 真实 Tabbit 实机调用需验收方补录一次（本工作区无 Tabbit 浏览器；调用路径为生产代码、S0 已实证同路径可用）；体积基线 ADR-003 待主验收 Agent 裁决；裁剪拖动的逐帧可视化断言留给 S5。
+
+证据：`docs/evidence/S4/README.md`、`docs/evidence/S4/s4-result.json`。Git 仅本地留痕，未推送远程。

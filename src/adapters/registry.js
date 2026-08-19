@@ -1,3 +1,4 @@
+import { cnipaPublicGuideAdapter } from './cnipa-public-guide.js';
 import { genericAdapter } from './generic.js';
 
 const REQUIRED_METHODS = [
@@ -38,6 +39,7 @@ export function createAdapterRegistry({ adapters = [] } = {}) {
   };
 
   for (const adapter of adapters) add(adapter);
+  add(cnipaPublicGuideAdapter);
   add(genericAdapter);
 
   return {

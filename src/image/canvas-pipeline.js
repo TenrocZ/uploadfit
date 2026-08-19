@@ -92,6 +92,15 @@ function normalizeCropPayload(payload) {
   return Object.fromEntries(keys.map((key) => [key, Math.round(candidate[key])]));
 }
 
+// ADR-002：确认的裁剪矩形必须保持建议尺寸，仅允许在图像内平移（边界由 safeCrop 强制）。
+function cropTranslationAllowed(crop, proposal) {
+  if (!crop || !proposal) return false;
+  return crop.width === proposal.width
+    && crop.height === proposal.height
+    && Number.isFinite(crop.x) && crop.x >= 0
+    && Number.isFinite(crop.y) && crop.y >= 0;
+}
+
 function confirmationFailure(message, details = {}) {
   throw new ImageProcessingError('USER_CONFIRMATION_REQUIRED', message, details);
 }
@@ -149,7 +158,7 @@ function validateResolvedPlan(metadata, plan) {
     }
     if (expected.type === 'CROP') {
       const crop = normalizeCropPayload(actual.payload);
-      if (!crop || !stableEqual(crop, authoritative.proposedCrop)
+      if (!crop || !cropTranslationAllowed(crop, authoritative.proposedCrop)
         || !stableEqual(plan.crop, crop)) {
         confirmationFailure('Crop confirmation payload is invalid or tampered.');
       }

@@ -16,7 +16,9 @@ test('injects a File, dispatches events, and keeps one session host', async ({ p
     const events = globalThis.uploadFitS0Probe.getEvents();
     return {
       sameSession: firstSession === secondSession,
-      hostCount: document.querySelectorAll('[data-uploadfit-host]').length,
+      hostCount: document.querySelectorAll(
+        '[data-uploadfit-host], [data-uploadfit-ui-host]'
+      ).length,
       injection,
       currentFile: globalThis.uploadFitS0Probe.getCurrentFile(),
       eventPhases: events.map((event) => `${event.type}:${event.phase}:${event.isTrusted}`)
@@ -44,7 +46,7 @@ test('injects a File, dispatches events, and keeps one session host', async ({ p
   ]);
 
   await page.evaluate(() => globalThis.__uploadfit_debug_bundle__.cleanupSession());
-  await expect(page.locator('[data-uploadfit-host]')).toHaveCount(0);
+  await expect(page.locator('[data-uploadfit-host], [data-uploadfit-ui-host]')).toHaveCount(0);
 });
 
 test('restores the saved original File through the product API', async ({ page }) => {

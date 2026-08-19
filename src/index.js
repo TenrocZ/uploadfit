@@ -5,6 +5,15 @@ import {
   selectAiRelevantText
 } from './dom/context-extractor.js';
 import { genericAdapter } from './adapters/generic.js';
+import { cnipaPublicGuideAdapter } from './adapters/cnipa-public-guide.js';
+import {
+  RuleUnderstandingProvider,
+  containsSensitiveAiInput,
+  validateAiRuleOutput
+} from './providers/rule-understanding-provider.js';
+import { TabbitAiProvider, buildAiPrompt, createTabbitAiProvider } from './providers/tabbit-ai.js';
+import { createUploadFitUi } from './ui/host.js';
+import { STATUS_TEXTS, statusText } from './ui/status-pill.js';
 import { parseRulesDeterministically } from './rules/deterministic-parser.js';
 import { normalizeRuleText } from './rules/normalizer.js';
 import { resolveRules } from './rules/resolver.js';
@@ -66,6 +75,16 @@ export {
   extractRelevantContext,
   findFileInputFromEvent,
   genericAdapter,
+  cnipaPublicGuideAdapter,
+  RuleUnderstandingProvider,
+  TabbitAiProvider,
+  createTabbitAiProvider,
+  buildAiPrompt,
+  containsSensitiveAiInput,
+  validateAiRuleOutput,
+  createUploadFitUi,
+  STATUS_TEXTS,
+  statusText,
   injectFile,
   inspectImage,
   isImageMime,
