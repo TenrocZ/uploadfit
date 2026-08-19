@@ -8,8 +8,8 @@
 - 需求事实来源：`C:\Users\蔡天乐\Desktop\黑客松\UploadFit-PRD-v1.0.md`
 - 执行任务书：`C:\Users\蔡天乐\Desktop\黑客松\UploadFit-开发任务书-v1.0`
 - 当前阶段：S3：任务编排与上传闭环
-- 当前状态：S0、S1、S2 已验收并放行；S3-D1～D9 已完成自动化门禁，当前为 `READY_FOR_ACCEPTANCE`，等待用户确认。
-- 记录日期：2026-08-18
+- 当前状态：S0、S1、S2 已验收并放行；S3 既有自动门禁通过，但独立验收发现 R1～R4，当前为 `REWORK_REQUIRED`；S4 暂不放行。
+- 记录日期：2026-08-19
 
 ## 2026-08-17：S0 / 平台连接确认
 
@@ -651,3 +651,17 @@ S2 范围：
 - `docs/handoffs/S3-handoff.md`
 
 范围边界：仅修改 S3 任务编排、拒收观察、资源/会话安全边界、对应测试和证据文档；未进入 S4 UI、真实 Tabbit AI、网络请求检查、业务按钮点击、CDN/WASM/provider 或远程推送。Git 仅本地留痕。
+
+## 2026-08-19：S3 / 独立验收不通过与返工施工单
+
+状态：`REWORK_REQUIRED`。既有 103 个 Vitest 用例、49 个 Chromium 用例、119062-byte IIFE 构建和静态检查均通过，但不足以证明 S3 满足任务书。
+
+独立对抗性复现确认：异步尺寸违规在确认前已触达页面业务监听器；0.75～0.89 规则确认接受后因 `RULE_CONFIDENCE` 与 S2 权威计划不一致而停止；两个 uploader 依 FIFO 成功处理时产生 `SUCCESS→PROCESSING/INJECTING` 非法 session 迁移。另缺任务书要求的 S3 测试页截图或录屏。
+
+已创建：
+
+- `docs/handoffs/S3-acceptance-review.md`
+- `docs/handoffs/S3-acceptance-rework-order.md`
+- `docs/evidence/S3/acceptance-review-result.json`
+
+外部 Agent 需关闭 R1～R4、增加 Q-S3-001～008、刷新结构化与视觉证据并提交本地 Git 留痕后，再申请独立复验。当前不得启动 S4。

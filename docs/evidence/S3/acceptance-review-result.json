@@ -1,0 +1,95 @@
+{
+  "stage": "S3 task orchestration and upload loop",
+  "reviewDate": "2026-08-19",
+  "baselineCommit": "1e2d0d9",
+  "reviewedCommit": "ce0cb3f",
+  "status": "REWORK_REQUIRED",
+  "automation": {
+    "vitestFiles": 15,
+    "vitestTests": 103,
+    "chromiumTests": 49,
+    "check": "PASS",
+    "e2e": "PASS",
+    "staticCheck": "PASS",
+    "artifactBytes": 119062,
+    "artifactLimitBytes": 150000,
+    "sha256": "7F0DEDA9CE989911A5D24D1BFA0A73B55D0B8ACDEF8B9B272B8A79E2BBBAC514",
+    "testPortClosed": true
+  },
+  "acceptanceProbes": {
+    "temporaryProbeRemovedAfterReview": true,
+    "reproductions": 3,
+    "asyncPropagation": {
+      "rule": "JPEG 390x567, 10KB-600KB",
+      "input": "synthetic 1000x1000 JPEG",
+      "businessChangeBeforeDecision": 1,
+      "defaultPrevented": false,
+      "taskStatusAfterInspection": "NEEDS_CONFIRMATION",
+      "pendingConfirmations": ["CROP"],
+      "result": "FAIL"
+    },
+    "ruleConfidenceAccept": {
+      "confidence": 0.8,
+      "accepted": true,
+      "status": "STOPPED",
+      "errorCode": "USER_CONFIRMATION_REQUIRED",
+      "hasResult": false,
+      "result": "FAIL"
+    },
+    "multiUploaderQueue": {
+      "taskResults": ["SUCCESS", "SUCCESS"],
+      "maxExpectedConcurrency": 1,
+      "diagnostics": [
+        {
+          "code": "INVALID_STATE_TRANSITION",
+          "from": "SUCCESS",
+          "to": "PROCESSING"
+        },
+        {
+          "code": "INVALID_STATE_TRANSITION",
+          "from": "SUCCESS",
+          "to": "INJECTING"
+        }
+      ],
+      "result": "FAIL"
+    }
+  },
+  "findings": [
+    {
+      "id": "R1",
+      "severity": "P0",
+      "title": "Async-only violations reach page listeners before the controller decision",
+      "status": "OPEN"
+    },
+    {
+      "id": "R2",
+      "severity": "P0",
+      "title": "Accepted RULE_CONFIDENCE is incompatible with the authoritative S2 plan",
+      "status": "OPEN"
+    },
+    {
+      "id": "R3",
+      "severity": "P1",
+      "title": "A valid multi-uploader FIFO flow produces invalid session transitions",
+      "status": "OPEN"
+    },
+    {
+      "id": "R4",
+      "severity": "P1",
+      "title": "Required regression and visual handoff evidence is incomplete",
+      "status": "OPEN"
+    }
+  ],
+  "requiredRegressionCases": [
+    "Q-S3-001",
+    "Q-S3-002",
+    "Q-S3-003",
+    "Q-S3-004",
+    "Q-S3-005",
+    "Q-S3-006",
+    "Q-S3-007",
+    "Q-S3-008"
+  ],
+  "nextStageAllowed": false,
+  "reworkOrder": "docs/handoffs/S3-acceptance-rework-order.md"
+}

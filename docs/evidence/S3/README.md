@@ -1,6 +1,8 @@
 # S3 任务编排与拒收观察证据
 
-状态：READY_FOR_ACCEPTANCE。自动化门禁已通过，等待用户验收；本文不表示用户已签字通过。
+> 2026-08-19 独立验收结论为 `REWORK_REQUIRED`。本文件原 PASS 映射只代表提交 `ce0cb3f` 的既有自动化结果，已由 `acceptance-review-result.json` 与 `docs/handoffs/S3-acceptance-review.md` 覆盖；返工入口为 `docs/handoffs/S3-acceptance-rework-order.md`。
+
+状态：`REWORK_REQUIRED`。提交 `ce0cb3f` 的自动化门禁通过，但独立验收失败；以下原始映射保留作历史基线，不表示当前可验收。
 
 任务书：C:\Users\蔡天乐\Desktop\黑客松\UploadFit-开发任务书-v1.0\40-S3-任务编排与上传闭环.md
 共享契约：C:\Users\蔡天乐\Desktop\黑客松\UploadFit-开发任务书-v1.0\01-共享契约与接口基线.md
@@ -59,4 +61,3 @@ SHA-256：7F0DEDA9CE989911A5D24D1BFA0A73B55D0B8ACDEF8B9B272B8A79E2BBBAC514
 - 不 monkey-patch 网络请求，不读取请求/响应，不点击最终业务按钮，不替换原 input 节点。
 - 合成事件仍为 isTrusted=false；网站不响应时只保留 manual-submit/download fallback 语义。
 - 证据只记录结构化状态、稳定错误码、MIME、字节、宽高和事件计数，不记录用户文件内容或敏感文本。
-

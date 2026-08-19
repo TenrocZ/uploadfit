@@ -4,8 +4,8 @@
 - 工程目录：C:\Users\蔡天乐\Desktop\黑客松\main
 - 对应任务书：40-S3-任务编排与上传闭环.md
 - 共享契约：01-共享契约与接口基线.md
-- Status：READY_FOR_ACCEPTANCE
-- 核心门禁：AUTOMATION_PASS / ACCEPTANCE_PENDING
+- Status：REWORK_REQUIRED
+- 核心门禁：AUTOMATION_PASS / INDEPENDENT_ACCEPTANCE_FAIL
 - 基线提交：1e2d0d9
 - 结束留痕：本次 S3 变更已纳入本地 Git 提交，最终提交号见当前 HEAD
 - Agent：Codex / UploadFit S3 Agent
@@ -14,7 +14,9 @@
 - 产物 bytes：119062
 - SHA-256：7F0DEDA9CE989911A5D24D1BFA0A73B55D0B8ACDEF8B9B272B8A79E2BBBAC514
 
-本文表示 S3 开发和自动化复验已完成，等待用户验收；不表示用户已经验收通过。
+> 2026-08-19 独立验收已覆盖本文原结论。正式结论见 `docs/handoffs/S3-acceptance-review.md`，外部 Agent 施工入口见 `docs/handoffs/S3-acceptance-rework-order.md`。R1～R4 关闭前不得启动 S4。
+
+本文以下内容保留为提交 `ce0cb3f` 的开发方历史交接，不再表示当前已具备验收条件。
 
 ## 1. 阶段结论
 
@@ -80,4 +82,4 @@ TaskController 是跨模块副作用唯一入口；view/测试只通过 start、
 
 ## 6. 验收入口
 
-请以基线提交 1e2d0d9、当前本地 Git 差异、docs/evidence/S3/s3-result.json、本文和上述命令复验。当前 S3 状态为 READY_FOR_ACCEPTANCE，收到用户验收通过后才可放行下一阶段。
+请先按 `docs/handoffs/S3-acceptance-rework-order.md` 完成返工，再以新提交、新 evidence 和全量门禁申请独立复验。当前 S3 状态为 `REWORK_REQUIRED`，S4 暂不放行。

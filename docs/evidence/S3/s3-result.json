@@ -1,6 +1,8 @@
 {
   "stage": "S3 task orchestration and rejection observation",
-  "status": "READY_FOR_ACCEPTANCE",
+  "status": "REWORK_REQUIRED",
+  "automationStatus": "PASS_HISTORICAL",
+  "acceptanceReview": "docs/evidence/S3/acceptance-review-result.json",
   "baselineCommit": "1e2d0d9",
   "scope": [
     "session and state machine",
@@ -107,4 +109,3 @@
     "remotePush": false
   }
 }
-
