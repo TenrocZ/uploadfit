@@ -8,6 +8,7 @@
 - 核心门禁：AUTOMATION_PASS / REWORK_VERIFIED / ACCEPTANCE_PENDING
 - 基线提交：1e2d0d9
 - 返工基线：ce0cb3f
+- 返工实现提交：5cec842
 - 结束留痕：本次返工纳入本地 Git 提交，最终提交号见当前 HEAD
 - Agent：Codex / UploadFit S3 Agent
 - 环境：Windows；Node v22.20.0；npm 10.9.3；Playwright Chromium 1.62.1
