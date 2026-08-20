@@ -1,0 +1,63 @@
+{
+  "stage": "S5",
+  "baselineCommit": "8d9d9ad",
+  "status": "BLOCKED_BY_ENVIRONMENT",
+  "local": {
+    "npmCi": "PASS",
+    "check": {
+      "status": "PASS",
+      "testFiles": 18,
+      "tests": 159,
+      "productionBytes": 175868,
+      "productionSha256": "29C5613CD5F9C71EBBD9E88754097B18435A4FA8508D0E2612D160233D79FD8F"
+    },
+    "e2e": {
+      "status": "PASS",
+      "totalTests": 116,
+      "s5Tests": 17,
+      "workers": 1,
+      "browser": "Playwright Chromium 1.62.1"
+    },
+    "staticCheck": {
+      "status": "PASS",
+      "sizeGate": "INFORMATIONAL_ONLY",
+      "reviewedOwnUiClicks": [
+        "src/ui/host.js",
+        "src/ui/task-card.js"
+      ]
+    }
+  },
+  "performance": {
+    "status": "PASS",
+    "sampleCount": 6,
+    "maxTotalMs": 971.5,
+    "maxHeartbeatGapMs": 353.1,
+    "outputBytes": 440409,
+    "outputWidth": 1647,
+    "outputHeight": 1235
+  },
+  "security": {
+    "status": "PASS",
+    "p0": 0,
+    "p1": 0,
+    "p2": 0,
+    "externalRequestsInLocalFlow": 0,
+    "sensitiveAiBridgeCalls": 0
+  },
+  "tabbit": {
+    "status": "MANUAL_REQUIRED",
+    "reason": "Browser is not available: iab; agent.browsers.list() returned an empty list",
+    "rows": [
+      "installation-and-refresh",
+      "scenario-A",
+      "scenario-B",
+      "scenario-C-confirm-cancel",
+      "scenario-D",
+      "scenario-E",
+      "scenario-F",
+      "ai-close-datatransfer-pagehide"
+    ],
+    "substitutesUsed": []
+  },
+  "nextAction": "恢复可用 Tabbit/in-app Browser 实例后，按 tabbit-matrix.json 补录真实矩阵，再进行独立 S5 验收。"
+}

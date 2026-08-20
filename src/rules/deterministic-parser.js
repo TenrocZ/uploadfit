@@ -14,6 +14,7 @@ import {
 } from './safety-semantics.js';
 
 const BYTE_PATTERN = /(\d+(?:[.,]\d+)?)\s*(mb|m\b|kb|k\b|b)\b/gi;
+const BYTE_RANGE_PATTERN = /(\d+(?:[.,]\d+)?)\s*(?:(mb|m\b|kb|k\b|b)\s*)?(?:-|至|到)\s*(\d+(?:[.,]\d+)?)\s*(mb|m\b|kb|k\b|b)\b/i;
 const DIMENSION_PAIR_PATTERN = /(\d+(?:[.,]\d+)?)\s*x\s*(\d+(?:[.,]\d+)?)(?:\s*(像素|px|厘米|公分|毫米|英寸|寸|cm|mm|inch|in))?/gi;
 const AXIS_PATTERN = /(宽(?:度)?|高(?:度)?)\s*(?:[:：]\s*)?(?:(不低于|至少|不超过|最多|最低|最高|>=|<=|≥|≤)\s*)?(\d+(?:[.,]\d+)?)(?:\s*(?:至|到|-)\s*(\d+(?:[.,]\d+)?))?(?:\s*(?:像素|px))?/gi;
 const FORMAT_PATTERN = /(?:image\/(?:jpeg|png|webp)|\.?\b(?:jpg|jpeg|png|webp)\b)/gi;
@@ -104,6 +105,15 @@ function parseFormats(text, rules) {
 }
 
 function parseBytes(text, rules) {
+  const shorthandRange = text.match(BYTE_RANGE_PATTERN);
+  if (shorthandRange) {
+    const firstUnit = shorthandRange[2] ?? shorthandRange[4];
+    const secondUnit = shorthandRange[4] ?? shorthandRange[2];
+    rules.minBytes = toBytes(shorthandRange[1], firstUnit, 'min');
+    rules.maxBytes = toBytes(shorthandRange[3], secondUnit, 'max');
+    return;
+  }
+
   const matches = [...text.matchAll(BYTE_PATTERN)];
   if (matches.length >= 2 && /(?:-|至|到)/.test(text.slice(matches[0].index + matches[0][0].length, matches[1].index))) {
     rules.minBytes = toBytes(matches[0][1], matches[0][2], 'min');
@@ -114,7 +124,7 @@ function parseBytes(text, rules) {
   for (const match of matches) {
     const prefix = text.slice(Math.max(0, match.index - 18), match.index);
     const isMin = /至少|不低于|大于|最低|最小|>=|≥/.test(prefix);
-    const isMax = /最多|不超过|不得|小于|低于|最高|最大|max|<=|≤/.test(prefix);
+    const isMax = /最多|不超过|不能超过|不得|小于|低于|最高|最大|max|<=|≤/.test(prefix);
     if (isMin) rules.minBytes = toBytes(match[1], match[2], 'min');
     if (isMax) rules.maxBytes = toBytes(match[1], match[2], 'max');
   }

@@ -1,0 +1,43 @@
+{
+  "stage": "S5",
+  "status": "MANUAL_REQUIRED",
+  "environment": {
+    "required": "Tabbit in-app Browser",
+    "observed": "Browser is not available: iab",
+    "browserList": [],
+    "date": "2026-08-20"
+  },
+  "matrix": [
+    {
+      "id": "D3-A",
+      "item": "安装/更新/指定网址/刷新自动执行",
+      "result": "MANUAL_REQUIRED"
+    },
+    {
+      "id": "D3-B",
+      "item": "场景 A 预检适配，真实 File/input/change/回填",
+      "result": "MANUAL_REQUIRED"
+    },
+    {
+      "id": "D3-C",
+      "item": "场景 B/C/D，拒收重试、裁剪确认/取消、模糊失败",
+      "result": "MANUAL_REQUIRED"
+    },
+    {
+      "id": "D3-D",
+      "item": "场景 E/F，表单不代提交流程和官方工具安全停止",
+      "result": "MANUAL_REQUIRED"
+    },
+    {
+      "id": "D3-E",
+      "item": "真实 AI provider、无敏感输入、超时/错误回退",
+      "result": "MANUAL_REQUIRED"
+    },
+    {
+      "id": "D3-F",
+      "item": "关闭、pagehide、DataTransfer、对象 URL/Worker 清理",
+      "result": "MANUAL_REQUIRED"
+    }
+  ],
+  "rule": "不得用 mock、Playwright Chromium 或历史 S4 Tabbit 证据替代当前实例的真实矩阵。"
+}

@@ -7,8 +7,8 @@
 - 工程目录：`C:\Users\蔡天乐\Desktop\黑客松\main`
 - 需求事实来源：`C:\Users\蔡天乐\Desktop\黑客松\UploadFit-PRD-v1.0.md`
 - 执行任务书：`C:\Users\蔡天乐\Desktop\黑客松\UploadFit-开发任务书-v1.0`
-- 当前阶段：S4 已验收并完成验收后回归修复；待启动 S5
-- 当前状态：S0、S1、S2、S3、S4 已验收并放行；Zent v7 现场回归与外部评审有效问题均已修复并通过全量回归，允许以当前终点提交为基线启动 S5。
+- 当前阶段：S5 本地全量测试、安全与兼容性实现
+- 当前状态：以 `8d9d9ad` 作为 S5 正式起始基线；本地自动化、静态安全、性能和稳定测试已完成，真实 Tabbit 矩阵因当前 in-app Browser 无可用实例而记为 `BLOCKED_BY_ENVIRONMENT`，未宣称 S5 验收通过。
 - 记录日期：2026-08-20
 
 ## 2026-08-17：S0 / 平台连接确认
@@ -801,3 +801,22 @@ S2 范围：
 最终验证：`npm run check` 18 文件 / 157 项通过；`npm run test:e2e` 99/99 Chromium 通过；`git diff --check` 通过。生产 IIFE 175,631 bytes，SHA-256 `AA7584629AA4A596AC829A5986CFDB6D3E04581A88EB68268DEF90065700FE3E`，`check` 与 E2E 前置构建一致。
 
 详细留痕：`docs/handoffs/S4-external-review-self-audit-and-remediation.md`、`docs/evidence/S4/external-review-remediation-result.json`、`docs/testing-sites.md`。
+
+## 2026-08-20：S5 / 本地全量测试、安全与兼容性实现
+
+状态：`BLOCKED_BY_ENVIRONMENT`。S5 本地交付与自动化证据完成；真实 Tabbit 安装、A–F 矩阵、AI、关闭和 DataTransfer 实机复验待环境恢复后执行，未把 Chromium 或既有 S4 实机证据替代为 Tabbit 通过。
+
+起始基线：`8d9d9ad`（用户指定的 S5 正式起点）。本轮所有修改均在该基线上产生，尚未推送远程。
+
+已完成事项：
+
+- 新增 `test-pages/index.html`、`test-pages/scenarios.js`、`test-pages/styles.css`，提供本地稳定测试页和 A–F 六个可一键进入场景；页面记录事件顺序、`isTrusted`、MIME、字节、业务 change 和提交 click，不记录图片内容。
+- 新增 `test-pages/ui-harness.html`，仅为 Chromium 自动化显式开放 Shadow DOM；生产稳定页继续加载 production IIFE 并保持 closed Shadow DOM。
+- 新增 `tests/e2e/s5-stable-scenarios.spec.js`、`s5-security.spec.js`、`s5-performance.spec.js`，覆盖 E01–E15 映射、X01–X12 关键路径、恶意证据/外联/敏感 AI 输入/清理和 Worker/main 性能。
+- 修复跨阶段规则解析缺口：支持任务书中的 `不能超过` 和 `30–120KB` 简写区间，并加入 R31 回归单测；没有扩大产品范围。
+- 加固 `scripts/static-check.js`：扫描源码和生产 IIFE 的执行、外联、注入、存储、凭据等禁用模式，并输出 artifact bytes/SHA；保留用户已裁决的“不设固定体积门禁”。
+- 补齐 S5 测试、安全、性能和证据文档；E15 编号经自检改为真实“用户关闭脚本”，场景 F 单列，不冒充 E15。
+
+本地验证：`npm ci`、`npm run check`、完整 `npm run test:e2e -- --reporter=line --workers=1` 均通过；最终全量数字和 SHA 见 `docs/handoffs/S5-handoff.md`、`docs/evidence/S5/s5-result.json`。
+
+真实平台边界：本会话调用 in-app Browser 时返回 `Browser is not available: iab`，`agent.browsers.list()` 为空。根据流程保留 `MANUAL_REQUIRED` 矩阵，不创建 mock 通过、不使用其他浏览器冒充 Tabbit；S6 尚未启动。

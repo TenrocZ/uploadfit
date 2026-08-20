@@ -40,7 +40,8 @@ describe('deterministic Chinese rule baseline R01-R30', () => {
     ['R27 advisory format forced max', '建议JPG，必须小于1MB', (rules) => expect(rules).toMatchObject({ formats: [], maxBytes: 1000000, actionable: true })],
     ['R28 same priority conflict', '最大100KB；最大200KB', (rules) => expect(rules).toMatchObject({ maxBytes: null, actionable: false })],
     ['R29 min max dimensions', '不低于800×600且不超过1920×1080', (rules) => expect(rules).toMatchObject({ width: { min: 800, max: 1920 }, height: { min: 600, max: 1080 } })],
-    ['R30 naming semantic', '文件名须含姓名和身份证号', (rules) => expect(rules).toMatchObject({ actionable: false })]
+    ['R30 naming semantic', '文件名须含姓名和身份证号', (rules) => expect(rules).toMatchObject({ actionable: false })],
+    ['R31 shorthand byte range', '30–120KB', (rules) => expect(rules).toMatchObject({ minBytes: 30720, maxBytes: 120000 })]
   ];
 
   for (const [name, text, assertion] of cases) {
@@ -181,6 +182,15 @@ it('retains full-width source evidence while normalizing its numeric rule', () =
   const [candidate] = parseRulesDeterministically({ normalizedText: '不超过100ＫＢ（全角）' });
   expect(candidate.evidence).toEqual(['不超过100ＫＢ（全角）']);
   expect(candidate.rules.maxBytes).toBe(100000);
+});
+
+it('parses the S5 rejection wording 不能超过 as a maximum byte rule', () => {
+  const [candidate] = parseRulesDeterministically({
+    alertTexts: ['仅支持JPG且不能超过100KB'],
+    normalizedText: '仅支持JPG且不能超过100KB'
+  });
+  expect(candidate.rules.maxBytes).toBe(100000);
+  expect(candidate.rules.formats).toEqual(['image/jpeg']);
 });
 
 it('sanitizes evidence before parsing and before retaining a candidate', () => {
