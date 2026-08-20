@@ -2,16 +2,16 @@
 
 ## 状态
 
-- Status: `BLOCKED_BY_ENVIRONMENT`
+- Status: `READY_FOR_REACCEPTANCE`
 - Start commit: `8d9d9ad`（用户指定的 S5 正式起始基线）
-- End commit: `dcd5c1a`（本地提交，未推送远程）
+- End commit: `dcd5c1a`（S5 实现提交）；本次 reacceptance 证据和文档另有后续本地提交，未推送远程
 - Lightweight reacceptance baseline: `9ed5839`（返工单验收基线）
 - Agent: Codex
 - Environment: Windows；Node `v22.20.0`；npm `10.9.3`；Playwright Chromium `1.62.1`
 - Task book: `C:\Users\蔡天乐\Desktop\黑客松\UploadFit-开发任务书-v1.0\60-S5-全量测试安全与兼容.md`
 - Artifact: `dist/uploadfit.js`，175,868 bytes；SHA-256 `29C5613CD5F9C71EBBD9E88754097B18435A4FA8508D0E2612D160233D79FD8F`
 
-`BLOCKED_BY_ENVIRONMENT` 只表示真实 Tabbit 矩阵尚未具备执行条件；本地工程、自动化、静态安全和性能交付已完成。不得把本状态改写成 S5 `ACCEPTED`。
+此前的 `BLOCKED_BY_ENVIRONMENT` 只表示真实 Tabbit 矩阵尚未具备执行条件；本轮已通过远程 CDP 补齐 LR1–LR5。当前 handoff 申请 `READY_FOR_REACCEPTANCE`，仍不得在独立验收前把 S5 写成 `ACCEPTED`。
 
 ## 基线和范围
 
@@ -31,8 +31,8 @@
 |---|---|---|
 | D1 稳定测试页 A–F | PASS | [`test-results.md`](../test-results.md)、[`s5-stable-scenarios.spec.js`](../../tests/e2e/s5-stable-scenarios.spec.js) |
 | D2 全量自动化 | PASS：18 个 Vitest 文件/159 测试；116 个 Chromium E2E | [`s5-result.json`](../evidence/S5/s5-result.json) |
-| D3 Tabbit 轻量补验 | `BLOCKED_BY_ENVIRONMENT`；LR1–LR5 未能执行 | [`tabbit-matrix.json`](../evidence/S5/tabbit-matrix.json) |
-| D4 静态/动态安全 | PASS（Chromium/源码静态）；Tabbit 实机待补 | [`security-review.md`](../security-review.md) |
+| D3 Tabbit 轻量补验 | PASS：LR1–LR5 均有当前 bundle 的 Tabbit 远程端口证据 | [`tabbit-matrix.json`](../evidence/S5/tabbit-matrix.json) |
+| D4 静态/动态安全 | PASS（Chromium/源码静态 + LR2/LR4 Tabbit 边界）；未重复项按轻量范围记录 | [`security-review.md`](../security-review.md) |
 | D5 性能 | PASS：6 样本均 ≤5s，最大 heartbeat 间隔 353.1ms | [`performance.md`](../performance.md) |
 | D6 报告和证据 | PASS | [`docs/evidence/S5/README.md`](../evidence/S5/README.md) |
 | D7 P0/P1/P2 | 本地未决缺陷 0/0/0；平台项未测不计为缺陷通过 | [`s5-result.json`](../evidence/S5/s5-result.json) |
@@ -51,20 +51,20 @@ npm run test:e2e -- --reporter=line --workers=1
 
 E01–E15 和 X01–X12 的映射、既有阶段回归引用、稳定页入口见 [`docs/test-results.md`](../test-results.md)。本轮自检修正了一个编号错误：场景 F 的官方工具安全停止是独立场景；E15 已由真实关闭按钮用例覆盖。C/D/E/F 和 X01–X12 按轻量范围记为 `NOT_REPEATED_BY_APPROVED_LIGHTWEIGHT_SCOPE`，证据仍为 S5 专属 Chromium 17/17，不写成 Tabbit 实测 PASS。
 
-## Tabbit 阻塞
+## Tabbit 轻量补验
 
-本会话调用 in-app Browser 返回 `Browser is not available: iab`，`agent.browsers.list()` 返回空列表。因而返工单要求的 LR1–LR5 全部保持 `BLOCKED_BY_ENVIRONMENT`：
+in-app Browser 别名仍返回 `Browser is not available: iab`，`agent.browsers.list()` 为空；用户随后授权切回 Tabbit 远程 CDP `9222`，已连接 Tabbit Browser 1.10.16.0。当前 `dist/uploadfit.js` 通过官方私有脚本完成：
 
-- Tabbit 安装/更新/指定网址/刷新自动执行；
-- A–F 真实页面矩阵；
-- 官方 AI provider 实调和敏感输入边界；
-- 关闭、pagehide、DataTransfer、对象 URL/Worker 清理的 Tabbit 实机组合；
-- Tabbit 界面截图和真实执行顺序。
+- LR1：脚本保存、部分网址匹配、probe 页首次运行与刷新均为一个 host/active session；
+- LR2：场景 A 输出 JPEG 390×567、106,855 bytes，外部请求 0；
+- LR3：场景 B 明确拒收后 `retryCount=1`，最终页面接受；
+- LR4：当前 bundle 真实调用 `LLMBridge.chat` 一次并通过本地 validator；另有一次真实 `AI_TIMEOUT` 降级观察，未被隐藏；
+- LR5：关闭后 host/session 消失，同页保持停止，新 Tabbit 标签页重新运行得到一个全新 session。
 
-没有使用 mock、Playwright Chromium 或历史 S4 Tabbit 证据冒充当前 S5 实机结果。LR6 文档一致性修正已完成；恢复可用实例后，应按 [`tabbit-matrix.json`](../evidence/S5/tabbit-matrix.json) 逐项补录 LR1–LR5，再由独立验收判定是否放行；S6 尚未启动。
+没有使用 mock、Playwright Chromium 或历史 S4 产物冒充当前 S5 实机结果。临时脚本最终关闭自动运行并保存为 false，临时页签关闭。LR1–LR6 现均为 PASS，但本 handoff 仅申请 `READY_FOR_REACCEPTANCE`，仍等待独立验收方裁决；S6 尚未启动。
 
 ## 下一步
 
-1. 在可用 Tabbit/in-app Browser 中执行并留档 LR1–LR5。
-2. 复核轻量补验结果和 `NOT_REPEATED_BY_APPROVED_LIGHTWEIGHT_SCOPE` 范围后，由独立验收方决定 S5 `ACCEPTED` 或继续返工。
+1. 复核当前 Tabbit 轻量补验结果和 `NOT_REPEATED_BY_APPROVED_LIGHTWEIGHT_SCOPE` 范围。
+2. 由独立验收方决定 S5 `ACCEPTED` 或继续返工。
 3. 未经该复核不启动 S6。

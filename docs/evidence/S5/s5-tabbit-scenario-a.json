@@ -1,0 +1,56 @@
+{
+  "date": "2026-08-20",
+  "stage": "S5",
+  "check": "S5-LR2",
+  "status": "PASS",
+  "runtime": {
+    "browser": "Tabbit Browser 1.10.16.0",
+    "connection": "remote CDP port 9222",
+    "execution": "official private script, auto-run on matching page",
+    "page": "http://127.0.0.1:8765/test-pages/index.html?scenario=A"
+  },
+  "finalBundle": {
+    "path": "dist/uploadfit.js",
+    "bytes": 175868,
+    "sha256": "29C5613CD5F9C71EBBD9E88754097B18435A4FA8508D0E2612D160233D79FD8F"
+  },
+  "result": {
+    "hostCount": 1,
+    "sessionPresent": true,
+    "task": {
+      "status": "SUCCESS",
+      "source": "preflight",
+      "retryCount": 0,
+      "result": {
+        "mime": "image/jpeg",
+        "bytes": 106855,
+        "width": 390,
+        "height": 567
+      },
+      "errorCode": null
+    },
+    "page": {
+      "businessChangeCount": 1,
+      "rejectionCount": 0,
+      "submitClickCount": 0,
+      "originalFile": { "mime": "image/png", "bytes": 2062531 },
+      "finalFile": { "mime": "image/jpeg", "bytes": 106855 },
+      "eventCounts": {
+        "total": 7,
+        "input": 4,
+        "change": 3,
+        "trusted": 3,
+        "synthetic": 4
+      }
+    },
+    "aiCallCount": 0,
+    "diagnostics": []
+  },
+  "network": {
+    "externalRequests": 0,
+    "allowedObservedRequestKinds": ["local-origin blob worker"],
+    "rawRequestUrlsRetained": false
+  },
+  "screenshot": "docs/evidence/S5/s5-tabbit-scenario-a.png",
+  "privacy": "No filename, image content, Base64, cookie, token, form value, or full page text retained."
+}

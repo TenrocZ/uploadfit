@@ -2,7 +2,7 @@
 
 ## 结论
 
-本地自动化结果为 `PASS`；轻量补验 LR1–LR5 为 `BLOCKED_BY_ENVIRONMENT`，原因是本会话没有可用的 in-app Browser 实例。因此本文不把 S5 记为最终验收通过。
+本地自动化结果为 `PASS`；用户授权切回 Tabbit remote CDP `9222` 后，轻量补验 LR1–LR5 均有当前 bundle 的 Tabbit 证据。S5 当前为 `READY_FOR_REACCEPTANCE`，等待独立验收方裁决，不在本文自行写成最终 `ACCEPTED`。
 
 - S5 正式起始基线：`8d9d9ad`
 - 工程：Windows，Node `v22.20.0`，npm `10.9.3`
@@ -73,4 +73,4 @@ C 的确认/取消按钮自动化使用 [`ui-harness.html`](../test-pages/ui-har
 
 ## 未完成的真实平台项
 
-本次轻量补验按批准范围不重复场景 C/D/E/F 和 X01–X12，统一记录为 `NOT_REPEATED_BY_APPROVED_LIGHTWEIGHT_SCOPE`；场景 A/B、安装/刷新、真实 AI、关闭/再次运行仍属于 LR1–LR5，因 in-app Browser 返回 `Browser is not available: iab` 且实例列表为空而保持阻塞。详见 [`S5-lightweight-reacceptance-report.md`](handoffs/S5-lightweight-reacceptance-report.md) 与 [`tabbit-matrix.json`](evidence/S5/tabbit-matrix.json)。
+本次轻量补验已在用户授权的 Tabbit remote CDP `9222` 中完成 LR1–LR5：当前 bundle 安装/刷新、场景 A、场景 B、真实 `LLMBridge.chat`、关闭和新 Tabbit 标签页重跑均有脱敏证据。场景 C/D/E/F 和 X01–X12 按批准范围不重复实机执行，统一记录为 `NOT_REPEATED_BY_APPROVED_LIGHTWEIGHT_SCOPE`。详见 [`S5-lightweight-reacceptance-report.md`](handoffs/S5-lightweight-reacceptance-report.md) 与 [`tabbit-matrix.json`](evidence/S5/tabbit-matrix.json)。

@@ -1,7 +1,7 @@
 {
   "stage": "S5",
   "baselineCommit": "8d9d9ad",
-  "status": "BLOCKED_BY_ENVIRONMENT",
+  "status": "READY_FOR_REACCEPTANCE",
   "local": {
     "npmCi": "PASS",
     "check": {
@@ -45,20 +45,22 @@
     "sensitiveAiBridgeCalls": 0
   },
   "tabbit": {
-    "status": "BLOCKED_BY_ENVIRONMENT",
+    "status": "READY_FOR_REACCEPTANCE",
     "scope": "LIGHTWEIGHT_REACCEPTANCE",
     "acceptanceBaseline": "9ed5839",
-    "reason": "Browser is not available: iab; agent.browsers.list() returned an empty list",
+    "browser": "Tabbit Browser 1.10.16.0",
+    "connection": "remote CDP port 9222",
     "rows": [
-      { "id": "S5-LR1", "result": "BLOCKED_BY_ENVIRONMENT" },
-      { "id": "S5-LR2", "result": "BLOCKED_BY_ENVIRONMENT" },
-      { "id": "S5-LR3", "result": "BLOCKED_BY_ENVIRONMENT" },
-      { "id": "S5-LR4", "result": "BLOCKED_BY_ENVIRONMENT" },
-      { "id": "S5-LR5", "result": "BLOCKED_BY_ENVIRONMENT" },
+      { "id": "S5-LR1", "result": "PASS", "evidence": "docs/evidence/S5/s5-tabbit-install-refresh.json" },
+      { "id": "S5-LR2", "result": "PASS", "evidence": "docs/evidence/S5/s5-tabbit-scenario-a.json" },
+      { "id": "S5-LR3", "result": "PASS", "evidence": "docs/evidence/S5/s5-tabbit-scenario-b.json" },
+      { "id": "S5-LR4", "result": "PASS", "evidence": "docs/evidence/S5/s5-tabbit-ai-redacted.json" },
+      { "id": "S5-LR5", "result": "PASS", "evidence": "docs/evidence/S5/s5-tabbit-close-rerun.json" },
       { "id": "S5-LR6", "result": "PASS" }
     ],
     "notRepeatedResult": "NOT_REPEATED_BY_APPROVED_LIGHTWEIGHT_SCOPE",
-    "substitutesUsed": []
+    "substitutesUsed": [],
+    "temporaryScriptAutoRunFinal": false
   },
-  "nextAction": "恢复可用 Tabbit/in-app Browser 实例后，按 tabbit-matrix.json 补录 LR1-LR5，再进行独立 S5 验收。"
+  "nextAction": "提交本地 reacceptance 留痕，等待独立验收方裁决 S5 ACCEPTED；S6 在此之前继续 HOLD。"
 }

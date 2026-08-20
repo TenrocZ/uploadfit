@@ -2,7 +2,7 @@
 
 ## 结论
 
-本地静态和动态安全检查通过；未发现 P0/P1/P2 未决缺陷。真实 Tabbit 环境安全矩阵尚未执行，原因记录为 `BLOCKED_BY_ENVIRONMENT`，不以 Chromium 结果替代。
+本地静态和动态安全检查通过；S5 LR2/LR4 的真实 Tabbit 边界也已完成，未发现 P0/P1/P2 未决缺陷。C/D/E/F 和 X01–X12 按批准轻量范围不重复 Tabbit 实机，保留 `NOT_REPEATED_BY_APPROVED_LIGHTWEIGHT_SCOPE`，不以 Chromium 结果替代这些未重复项。
 
 ## 静态检查
 
@@ -35,4 +35,4 @@
 
 ## 平台实机限制
 
-当前 in-app Browser 不可用：调用返回 `Browser is not available: iab`，浏览器实例列表为空。因此返工单 LR1–LR5 保持 `BLOCKED_BY_ENVIRONMENT`：Tabbit 安装/刷新/关闭生命周期、A/B 真实页面事件、AI provider、DataTransfer 和 close/pagehide 组合路径。轻量范围未重复的 C/D/E/F 与 X01–X12 记录为 `NOT_REPEATED_BY_APPROVED_LIGHTWEIGHT_SCOPE`，不写成 Tabbit 实测 PASS。证据见 [`tabbit-matrix.json`](evidence/S5/tabbit-matrix.json)。
+当前 in-app Browser 别名仍不可用：调用返回 `Browser is not available: iab`，浏览器实例列表为空；用户授权后已使用 Tabbit remote CDP `9222` 完成 LR1–LR5。当前 Tabbit 证据覆盖安装/刷新、A/B 真实页面事件、一次真实 AI provider 调用、超时降级观察、关闭和新页面重跑；没有使用 mock、Playwright 或旧 S4 产物替代。轻量范围未重复的 C/D/E/F 与 X01–X12 记录为 `NOT_REPEATED_BY_APPROVED_LIGHTWEIGHT_SCOPE`，不写成 Tabbit 实测 PASS。证据见 [`tabbit-matrix.json`](evidence/S5/tabbit-matrix.json) 和 [`S5-lightweight-reacceptance-report.md`](handoffs/S5-lightweight-reacceptance-report.md)。

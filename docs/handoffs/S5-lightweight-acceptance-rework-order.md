@@ -3,7 +3,7 @@
 - 日期：2026-08-20
 - 验收基线：`9ed5839`
 - S5 实现提交：`dcd5c1a`
-- 当前状态：`BLOCKED_BY_ENVIRONMENT`
+- 当前状态：`READY_FOR_REACCEPTANCE`
 - S6 状态：`HOLD`
 - 当前生产包：`dist/uploadfit.js`，175,868 bytes
 - 当前 SHA-256：`29C5613CD5F9C71EBBD9E88754097B18435A4FA8508D0E2612D160233D79FD8F`
@@ -19,7 +19,7 @@ S5 本地实现不需要代码返工。独立轻量验收已确认：
 - 场景 A–F、一次重试、裁剪确认/取消、不代点提交、官方工具安全停止均已由 Chromium 自动化覆盖；
 - 工作区在验收后保持干净。
 
-唯一阻断是当前生产包没有 S5 阶段的 Tabbit 实机冒烟证据。验收时再次连接 in-app Browser，结果仍为 `Browser is not available: iab`，可用浏览器列表为空。不得使用 mock、Playwright Chromium 或 S4 旧 SHA 的实机截图冒充当前 S5 产物。
+本单开工时唯一阻断是当前生产包没有 S5 阶段的 Tabbit 实机冒烟证据。验收时再次连接 in-app Browser，结果仍为 `Browser is not available: iab`，可用浏览器列表为空。不得使用 mock、Playwright Chromium 或 S4 旧 SHA 的实机截图冒充当前 S5 产物。
 
 本返工单按用户批准的“轻量验收重要环节”口径，将原任务书的完整 Tabbit A–F 矩阵收敛为四组平台关键冒烟。未重跑的项目必须如实标记为“由自动化覆盖，按轻量验收不重复实机执行”，不得伪造为已实测。
 
@@ -242,3 +242,14 @@ git diff --check
 - 工作区有可复查提交，未擅自推送远程。
 
 若仍无可用 Tabbit 实例，应保持 `BLOCKED_BY_ENVIRONMENT`，列明时间、版本/环境、错误形态和已尝试范围后停止；不得将 S5 改为 `ACCEPTED`，也不得启动 S6。
+
+## 8.1 本单执行结果（2026-08-20）
+
+用户授权切回 Tabbit remote CDP `9222` 后，已连接 Tabbit Browser 1.10.16.0，使用本单顶部当前 production bundle 完成 LR1–LR5：
+
+- LR1–LR5：`PASS`；对应脱敏 JSON/截图见 `docs/evidence/S5/`；
+- LR6：`PASS`，heartbeat 已统一为 353.1ms；
+- 轻量范围未重复项：C/D/E/F、X01–X12 保持 `NOT_REPEATED_BY_APPROVED_LIGHTWEIGHT_SCOPE`；
+- 真实 AI：成功调用一次并通过本地 validator；另记录一次真实 `AI_TIMEOUT`，没有隐去降级观察；
+- 临时私有脚本：验收后关闭自动运行并保存为 false，临时页签关闭，未公开分享；
+- 当前申请状态：`READY_FOR_REACCEPTANCE`；独立验收前不写为 `ACCEPTED`，S6 继续 `HOLD`。

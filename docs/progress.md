@@ -843,3 +843,19 @@ S2 范围：
 已再次尝试连接当前真实 Tabbit。只读环境检查显示本机存在 Tabbit Browser 进程，但 in-app Browser 返回 `Browser is not available: iab`，实例列表为空；已知的 `9222/9223` 调试端口没有监听。进程存在不能证明当前会话有可控页面，因此没有启动临时脚本、没有使用替代浏览器，也没有伪造 LR1–LR5 证据。
 
 返工报告和矩阵已补记本次尝试；待可控 Tabbit 页面连接恢复后继续执行。
+
+## 2026-08-20：S5 / Tabbit 远程端口轻量补验完成
+
+状态：`READY_FOR_REACCEPTANCE`。用户授权切回 Tabbit remote CDP `9222` 后，LR1–LR5 已按返工单完成；S6 继续 `HOLD`，等待独立验收方裁决，不把本轮结果直接写成 `ACCEPTED`。
+
+运行与证据：
+
+- Tabbit Browser 1.10.16.0；当前 `dist/uploadfit.js` 为 175,868 bytes，SHA-256 `29C5613CD5F9C71EBBD9E88754097B18435A4FA8508D0E2612D160233D79FD8F`。
+- 官方私有脚本保存为部分网址匹配，probe 页自身不加载产品 bundle；首次运行和刷新均保持一个 host、一个 active session。
+- 场景 A 输出 JPEG、390×567、106,855 bytes，业务 change=1、提交 click=0，外部请求=0（仅本地 blob worker）。
+- 场景 B 明确拒收后 `source=rejection`、`retryCount=1`，第二次页面接受，提交 click=0。
+- 真实 `LLMBridge.chat` 调用 `callCount=0→1`，生产本地 validator=PASS；另有一次独立 `AI_TIMEOUT`，未被隐藏，证明 3 秒超时降级边界。
+- 关闭后 host/session 为 0/false；同页刷新不复活已关闭会话；新 Tabbit 标签页得到一个新 active session。
+- 临时脚本最终关闭自动运行并保存为 false，临时匹配页签关闭；未公开分享、未保存完整 prompt/响应或用户数据。
+
+证据索引：`docs/evidence/S5/s5-tabbit-install-refresh.json`、`s5-tabbit-scenario-a.json`、`s5-tabbit-scenario-b.json`、`s5-tabbit-ai-redacted.json`、`s5-tabbit-close-rerun.json` 及对应截图；总矩阵见 `docs/evidence/S5/tabbit-matrix.json`，交接见 `docs/handoffs/S5-lightweight-reacceptance-report.md`。

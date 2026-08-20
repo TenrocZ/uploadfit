@@ -1,47 +1,66 @@
 {
   "stage": "S5",
-  "status": "BLOCKED_BY_ENVIRONMENT",
+  "status": "READY_FOR_REACCEPTANCE",
   "scope": "LIGHTWEIGHT_REACCEPTANCE",
   "acceptanceBaseline": "9ed5839",
   "environment": {
-    "required": "Tabbit in-app Browser",
-    "observed": "Browser is not available: iab",
+    "required": "Tabbit official script runtime",
+    "observed": "Tabbit remote CDP debugging authorized and connected",
     "browserList": [],
     "localProcessObserved": true,
     "knownDebugPortsChecked": [9222, 9223],
-    "knownDebugPortsListening": [],
+    "knownDebugPortsListening": [9222],
+    "browser": "Tabbit Browser 1.10.16.0",
+    "connection": "remote CDP port 9222",
+    "temporaryScriptAutoRunFinal": false,
     "date": "2026-08-20"
   },
   "matrix": [
     {
       "id": "S5-LR1",
       "item": "当前 bundle 安装、保存、指定网址、刷新运行和单实例",
-      "result": "BLOCKED_BY_ENVIRONMENT",
-      "reason": "无可用 in-app Browser 实例"
+      "result": "PASS",
+      "evidence": [
+        "docs/evidence/S5/s5-tabbit-install-refresh.json",
+        "docs/evidence/S5/s5-tabbit-install-refresh.png"
+      ]
     },
     {
       "id": "S5-LR2",
       "item": "场景 A 预检适配、真实 File/input/change/回填",
-      "result": "BLOCKED_BY_ENVIRONMENT",
-      "reason": "无可用 in-app Browser 实例"
+      "result": "PASS",
+      "evidence": [
+        "docs/evidence/S5/s5-tabbit-scenario-a.json",
+        "docs/evidence/S5/s5-tabbit-scenario-a.png"
+      ]
     },
     {
       "id": "S5-LR3",
       "item": "场景 B 明确拒收后只重试一次",
-      "result": "BLOCKED_BY_ENVIRONMENT",
-      "reason": "无可用 in-app Browser 实例"
+      "result": "PASS",
+      "evidence": [
+        "docs/evidence/S5/s5-tabbit-scenario-b.json",
+        "docs/evidence/S5/s5-tabbit-scenario-b.png"
+      ]
     },
     {
       "id": "S5-LR4",
       "item": "真实 AI Bridge 调用与敏感输入边界",
-      "result": "BLOCKED_BY_ENVIRONMENT",
-      "reason": "无可用 in-app Browser 实例"
+      "result": "PASS",
+      "evidence": [
+        "docs/evidence/S5/s5-tabbit-ai-redacted.json",
+        "docs/evidence/S5/s5-tabbit-ai-redacted.png"
+      ]
     },
     {
       "id": "S5-LR5",
       "item": "关闭、刷新、再次运行和旧会话清理",
-      "result": "BLOCKED_BY_ENVIRONMENT",
-      "reason": "无可用 in-app Browser 实例"
+      "result": "PASS",
+      "evidence": [
+        "docs/evidence/S5/s5-tabbit-close-rerun.json",
+        "docs/evidence/S5/s5-tabbit-close-rerun.png",
+        "docs/evidence/S5/s5-tabbit-rerun.png"
+      ]
     },
     {
       "id": "S5-LR6",
@@ -58,6 +77,6 @@
     "X01-X12"
   ],
   "notRepeatedResult": "NOT_REPEATED_BY_APPROVED_LIGHTWEIGHT_SCOPE",
-  "automationEvidence": "S5 专属 Chromium 17/17；不等同于 Tabbit 实测",
+  "automationEvidence": "S5 专属 Chromium 17/17；仅作为未重复项证据，不替代 LR1-LR5 的 Tabbit 记录",
   "rule": "不得用 mock、Playwright Chromium 或历史 S4 Tabbit 证据替代当前实例的真实矩阵。"
 }
