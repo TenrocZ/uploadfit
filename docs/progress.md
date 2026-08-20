@@ -7,9 +7,9 @@
 - 工程目录：`C:\Users\蔡天乐\Desktop\黑客松\main`
 - 需求事实来源：`C:\Users\蔡天乐\Desktop\黑客松\UploadFit-PRD-v1.0.md`
 - 执行任务书：`C:\Users\蔡天乐\Desktop\黑客松\UploadFit-开发任务书-v1.0`
-- 当前阶段：S3 已验收；待启动 S4
-- 当前状态：S0、S1、S2、S3 已验收并放行；S3 返工和独立复验残留均已关闭，当前为 `ACCEPTED`；允许启动 S4。
-- 记录日期：2026-08-19
+- 当前阶段：S4 已验收并完成验收后回归修复；待启动 S5
+- 当前状态：S0、S1、S2、S3、S4 已验收并放行；Zent v7 现场回归与外部评审有效问题均已修复并通过全量回归，允许以当前终点提交为基线启动 S5。
+- 记录日期：2026-08-20
 
 ## 2026-08-17：S0 / 平台连接确认
 
@@ -775,3 +775,29 @@ S2 范围：
 最终 `dist/uploadfit.js` 为 169,536 bytes，SHA-256 `67879C73748432DEAF7526ED645842575EAE36AD710313082BCF38B2003AE840`。`npm run check` 18 文件/148 测试通过，Chromium 90/90 通过。真实 CNIPA 页面得到 ready/actionable、JPG、30–120KB、390×567 且无诊断；Tabbit 官方私有脚本真实调用 `LLMBridge.chat` 一次并通过本地校验。临时妙招、页面和 8766 服务均已清理。
 
 最终报告：`docs/handoffs/S4-final-acceptance.md`。结构化证据：`docs/evidence/S4/rework-result.json`、`docs/evidence/S4/tabbit-ai-result.json`。
+
+## 2026-08-20：S4 / Zent v7 现场误判回归修复
+
+状态：`FIXED_AND_VERIFIED`，不改变 S4 已验收状态。
+
+用户在 Zent v7 Upload 示例现场发现“网络图片”被 `/网络|超时/` 误判为 `NETWORK_OR_TIMEOUT`；controller 又将任意 safety flag 统一误报为 `OFFICIAL_TOOL_REQUIRED`，失败卡还重复渲染同一文案。
+
+已收紧网络、登录/权限和官方工具的停机语义，保留真实 safety 错误码，并将失败文案合并为单一 `role=alert` 元素。新增 Zent 原文、controller 错误码和 UI 不重复三类回归。
+
+验证：`npm run check` 18 文件 / 149 测试通过；`npm run test:e2e` 91/91 通过；生产 IIFE 170,651 bytes，SHA-256 `8126F37A6EF212A6BB7B3A24565DB5A7493CB6B3DF779699C8EBB552B394D45D`。
+
+留痕：`docs/handoffs/S4-post-acceptance-zent-regression-fix.md`、`docs/evidence/S4/zent-v7-regression-result.json`。
+
+## 2026-08-20：外部评审自检与有效问题修复
+
+状态：`FIXED_AND_VERIFIED`，S4 验收状态保持不变。
+
+已逐项复现 `修复建议.md`。完成任务/上传器有界回收、物理尺寸防误判、AI 宽高角色溯源、事务式 File 注入回滚、拒收超时收口、格式否定尾缀、统一 STOP 语义、规则底色贯通、DOM 节点身份去重和可行体积区间修复。Zent v7 原网址已写入自动化用例，并增加不依赖公网的本地 DOM 夹具及人工测试清单。
+
+保留两项反驳：KB minimum 1024 / maximum 1000 是在网站进制未知时的保守安全交集，不统一为单一进制；worker/main 的门禁是约束等价和最终复检，不要求压缩字节完全相同。大规模 controller/worker 重构留待独立阶段。
+
+工程加固：新增根 `README.md`，`.learnings/` 明确忽略，static-check 增加 WebSocket、EventSource 和 sendBeacon 外泄通道检查。
+
+最终验证：`npm run check` 18 文件 / 157 项通过；`npm run test:e2e` 99/99 Chromium 通过；`git diff --check` 通过。生产 IIFE 175,631 bytes，SHA-256 `AA7584629AA4A596AC829A5986CFDB6D3E04581A88EB68268DEF90065700FE3E`，`check` 与 E2E 前置构建一致。
+
+详细留痕：`docs/handoffs/S4-external-review-self-audit-and-remediation.md`、`docs/evidence/S4/external-review-remediation-result.json`、`docs/testing-sites.md`。

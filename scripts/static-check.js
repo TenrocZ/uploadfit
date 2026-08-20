@@ -10,6 +10,9 @@ const forbiddenPatterns = [
   { name: 'new Function', pattern: /\bnew\s+Function\s*\(/ },
   { name: 'fetch', pattern: /\bfetch\s*\(/ },
   { name: 'XMLHttpRequest', pattern: /\bXMLHttpRequest\b/ },
+  { name: 'WebSocket', pattern: /\bWebSocket\b/ },
+  { name: 'EventSource', pattern: /\bEventSource\b/ },
+  { name: 'sendBeacon', pattern: /\bsendBeacon\s*\(/ },
   { name: 'innerHTML', pattern: /\binnerHTML\b/ }
 ];
 

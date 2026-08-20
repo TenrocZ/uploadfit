@@ -236,11 +236,12 @@ export function findFileInputFromEvent(event) {
 
 /**
  * Create a subscription-based uploader discovery lifecycle.
- * @param {{root?: Document|Element|ShadowRoot, onDiscover?: (context: object) => void, onProtectedFrame?: (detail: object) => void, debounceMs?: number}} options
+ * @param {{root?: Document|Element|ShadowRoot, onDiscover?: (context: object) => void, onRemove?: (context: object, detail: object) => void, onProtectedFrame?: (detail: object) => void, debounceMs?: number}} options
  */
 export function createUploaderDiscovery({
   root = globalThis.document,
   onDiscover = () => {},
+  onRemove = () => {},
   onProtectedFrame = () => {},
   debounceMs = DOM_DEBOUNCE_MS
 } = {}) {
@@ -289,6 +290,21 @@ export function createUploaderDiscovery({
     return context;
   };
 
+  const unregisterInput = (input, reason = 'INPUT_REMOVED') => {
+    const context = contexts.get(input);
+    if (!context) return false;
+    contexts.delete(input);
+    registeredInputs.delete(input);
+    onRemove(context, { reason });
+    return true;
+  };
+
+  const pruneDisconnectedInputs = () => {
+    for (const [input] of contexts) {
+      if (!isInputInRoot(input)) unregisterInput(input);
+    }
+  };
+
   const observeRoot = (mutationRoot) => {
     if (!active || observedRoots.has(mutationRoot)) return;
     const documentRef = getOwnerDocument(mutationRoot) ?? rootDocument;
@@ -300,6 +316,9 @@ export function createUploaderDiscovery({
       for (const record of records) {
         for (const node of record.addedNodes) scanAddedNode(node);
       }
+      // Run after the complete mutation batch so moving a still-connected input
+      // does not look like a removal.
+      pruneDisconnectedInputs();
     });
     observer.observe(mutationRoot, { childList: true, subtree: true });
     observedRoots.set(mutationRoot, observer);
@@ -316,7 +335,9 @@ export function createUploaderDiscovery({
 
   const removeContextsFromDocument = (documentRef) => {
     for (const [input] of contexts) {
-      if (input.ownerDocument === documentRef) contexts.delete(input);
+      if (input.ownerDocument === documentRef) {
+        unregisterInput(input, 'FRAME_DOCUMENT_REPLACED');
+      }
     }
   };
 
@@ -362,6 +383,7 @@ export function createUploaderDiscovery({
 
   const scan = () => {
     if (!active || !root) return [];
+    pruneDisconnectedInputs();
     const before = contexts.size;
     scanTree(root, handlers);
     return [...contexts.values()].slice(before);

@@ -350,3 +350,39 @@ test('tracks dynamic same-origin iframe loads without stale observers or duplica
     afterCleanupCallbacks: 2
   });
 });
+
+test('unregisters a detached uploader after a complete mutation batch', async ({ page }) => {
+  await page.goto('/test-pages/probe.html');
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
+
+  const result = await page.evaluate(async () => {
+    const api = globalThis.__uploadfit_debug_bundle__;
+    document.querySelector('#probe-file')?.remove();
+    const removed = [];
+    const wrapper = document.createElement('section');
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/png';
+    wrapper.append(input);
+    document.body.append(wrapper);
+    const discovery = api.createUploaderDiscovery({
+      onRemove: (context, detail) => removed.push({
+        sameInput: context.input === input,
+        reason: detail.reason
+      })
+    });
+    discovery.start();
+    const before = discovery.getUploaders().length;
+    wrapper.remove();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const after = discovery.getUploaders().length;
+    discovery.cleanup();
+    return { before, after, removed };
+  });
+
+  expect(result).toEqual({
+    before: 1,
+    after: 0,
+    removed: [{ sameInput: true, reason: 'INPUT_REMOVED' }]
+  });
+});

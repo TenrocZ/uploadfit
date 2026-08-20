@@ -129,7 +129,7 @@ export function observeRejection(task, uploaderContext, options = {}) {
   const described = describedNodes(input);
   const activeTasks = () => collectActiveTasks(task, options.getActiveTasks);
   const startedAt = Date.now();
-  const seen = new Set();
+  const seen = new WeakMap();
   const observers = [];
   let timeoutId = null;
   let debounceId = null;
@@ -152,9 +152,10 @@ export function observeRejection(task, uploaderContext, options = {}) {
     for (const candidateNode of currentCandidates(node)) {
       const text = textOf(candidateNode);
       if (!text) continue;
-      const key = String(candidateNode) + '::' + text;
-      if (seen.has(key)) continue;
-      seen.add(key);
+      const seenTexts = seen.get(candidateNode) ?? new Set();
+      if (seenTexts.has(text)) continue;
+      seenTexts.add(text);
+      seen.set(candidateNode, seenTexts);
 
       const classification = classifyRejectionText(text);
       if (classification.kind === 'irrelevant') continue;

@@ -224,6 +224,68 @@ test('I06/I07/I08/I15: blocks lossy confirmations until explicit resolution', as
   expect(result.upscale).toEqual({ executableBefore: false, width: 390, height: 390 });
 });
 
+test('transparent PNG uses the blue background required by the resolved rule', async ({ page }) => {
+  await openApi(page);
+  const result = await page.evaluate(async () => {
+    const api = globalThis.__uploadfit_debug_bundle__;
+    const canvas = document.createElement('canvas');
+    canvas.width = 32;
+    canvas.height = 32;
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+    const file = new File([blob], 'transparent-blue.png', { type: 'image/png' });
+    const rules = {
+      formats: ['image/jpeg'],
+      extensions: ['jpg', 'jpeg'],
+      minBytes: 1,
+      maxBytes: 200_000,
+      width: { exact: 32, min: null, max: null },
+      height: { exact: 32, min: null, max: null },
+      aspectRatio: { value: 1, tolerance: 0.015 },
+      dpi: null,
+      count: { max: 1 },
+      background: 'blue',
+      semanticRequirements: ['蓝色背景'],
+      confidence: 0.96,
+      sources: [],
+      conflicts: [],
+      advisories: [],
+      safetyFlags: [],
+      actionable: true
+    };
+    const metadata = await api.inspectImage(file);
+    const plan = api.createProcessingPlan(metadata, rules);
+    const pending = plan.confirmations.find((item) => item.type === 'FLATTEN_BACKGROUND');
+    const resolved = api.resolveProcessingConfirmation(plan, {
+      id: pending.id,
+      type: pending.type,
+      accepted: true,
+      payload: pending.suggestedPayload
+    });
+    const output = await api.processImage(file, resolved, undefined, { useWorker: false });
+    const bitmap = await createImageBitmap(output.file);
+    const sample = document.createElement('canvas');
+    sample.width = 1;
+    sample.height = 1;
+    const context = sample.getContext('2d');
+    context.drawImage(bitmap, 0, 0, 1, 1);
+    const pixel = Array.from(context.getImageData(0, 0, 1, 1).data);
+    bitmap.close();
+    return {
+      suggested: pending.suggestedPayload,
+      applied: resolved.flattenBackground,
+      pixel,
+      valid: output.validation.valid
+    };
+  });
+
+  expect(result.suggested).toEqual({ color: 'blue' });
+  expect(result.applied).toEqual({ color: 'blue' });
+  expect(result.valid).toBe(true);
+  expect(result.pixel[0]).toBeLessThan(60);
+  expect(result.pixel[1]).toBeGreaterThan(90);
+  expect(result.pixel[2]).toBeGreaterThan(220);
+});
+
 test('I11/I12/I13/I14/I17: rejects unsafe inputs, handles EXIF orientation and keeps output checks strict', async ({ page }) => {
   await openApi(page);
   const result = await page.evaluate(async () => {

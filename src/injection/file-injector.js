@@ -30,6 +30,26 @@ function metadataMatches(actual, expected) {
   );
 }
 
+function filesOf(input) {
+  try {
+    return Array.from(input?.files ?? []);
+  } catch {
+    return [];
+  }
+}
+
+function fileListsMatch(actual, expected) {
+  return actual.length === expected.length
+    && actual.every((file, index) => metadataMatches(file, expected[index]));
+}
+
+function assignFiles(input, files, DataTransferConstructor) {
+  const dataTransfer = new DataTransferConstructor();
+  for (const file of files) dataTransfer.items.add(file);
+  input.files = dataTransfer.files;
+  return fileListsMatch(filesOf(input), files);
+}
+
 /**
  * Replace a file input's FileList and optionally dispatch the normal events.
  * @param {HTMLInputElement} input
@@ -51,25 +71,26 @@ export function injectFile(input, file, options = {}) {
 
   const dispatchEvents = options.dispatchEvents !== false;
   const EventConstructor = input.ownerDocument?.defaultView?.Event ?? globalThis.Event;
+  const previousFiles = filesOf(input);
+  let phase = 'prepare';
 
   try {
-    const dataTransfer = new DataTransferConstructor();
-    dataTransfer.items.add(file);
-    armInjectionGuard(input, 'change');
-    input.files = dataTransfer.files;
-
-    const actual = input.files?.[0];
-    if (!metadataMatches(actual, file)) {
-      clearInjectionGuard(input);
+    phase = 'assign';
+    if (!assignFiles(input, [file], DataTransferConstructor)) {
+      if (!fileListsMatch(filesOf(input), previousFiles)
+        && !assignFiles(input, previousFiles, DataTransferConstructor)) {
+        return failure('RESTORE_FAILED');
+      }
       return failure('INJECTION_FAILED');
     }
 
     const eventsDispatched = [];
     if (dispatchEvents) {
       if (typeof EventConstructor !== 'function') {
-        clearInjectionGuard(input);
-        return failure('INJECTION_FAILED');
+        throw new Error('Event API unavailable.');
       }
+      phase = 'dispatch';
+      armInjectionGuard(input, 'change');
       try {
         input.dispatchEvent(new EventConstructor('input', { bubbles: true, composed: true }));
         eventsDispatched.push('input');
@@ -92,7 +113,18 @@ export function injectFile(input, file, options = {}) {
     };
   } catch (error) {
     clearInjectionGuard(input);
-    if (error?.name === 'NotSupportedError' || error?.name === 'TypeError') {
+    const changed = !fileListsMatch(filesOf(input), previousFiles);
+    if (changed) {
+      try {
+        if (!assignFiles(input, previousFiles, DataTransferConstructor)) {
+          return failure('RESTORE_FAILED');
+        }
+      } catch {
+        return failure('RESTORE_FAILED');
+      }
+    }
+    if (phase === 'prepare'
+      || (phase === 'assign' && (error?.name === 'NotSupportedError' || error?.name === 'TypeError'))) {
       return failure('DATATRANSFER_UNAVAILABLE');
     }
     return failure('INJECTION_FAILED');

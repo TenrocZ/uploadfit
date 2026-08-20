@@ -135,6 +135,148 @@ test('L09: multiple-file selection is left untouched and does not create a task'
   expect(result).toEqual({ fileCount: 2, changes: 1, activeTask: null });
 });
 
+test('safety stop keeps the network error code instead of claiming an official tool is required', async ({ page }) => {
+  await openController(page);
+  await page.evaluate(async () => {
+    const api = globalThis.__uploadfit_debug_bundle__;
+    const controller = api.createTaskController({ documentRef: document, globalRef: window });
+    globalThis.__s3Controller = controller;
+    const label = document.createElement('label');
+    label.textContent = '网络超时，请稍后重试，图片最大100KB';
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/jpeg';
+    label.append(input);
+    document.body.append(label);
+    controller.start();
+    const response = await window.fetch('/tests/fixtures/generated/jpeg-390x567-small.jpg');
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([await response.arrayBuffer()], 'network-test.jpg', {
+      type: 'image/jpeg'
+    }));
+    input.files = transfer.files;
+    input.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+  });
+  await waitForTask(page, 'snapshot => snapshot.activeTask?.status === "STOPPED"');
+  const snapshot = await page.evaluate(() => globalThis.__s3Controller.getSnapshot());
+  expect(snapshot.activeTask.errorCode).toBe('NETWORK_OR_TIMEOUT');
+  await page.evaluate(() => globalThis.__s3Controller.dispose());
+});
+
+test('WAITING_REJECTION timeout settles as passthrough instead of remaining active forever', async ({ page }) => {
+  await openController(page);
+  const result = await page.evaluate(async () => {
+    const api = globalThis.__uploadfit_debug_bundle__;
+    const discovery = { start() {}, cleanup() {} };
+    const controller = api.createTaskController({
+      documentRef: document,
+      globalRef: window,
+      discovery,
+      observeRejectionFn: (_task, _context, options) => {
+        const id = setTimeout(() => options.onTimeout(), 0);
+        return () => clearTimeout(id);
+      }
+    });
+    const input = document.createElement('input');
+    input.type = 'file';
+    document.body.append(input);
+    const context = controller.registerUploader({
+      input,
+      uploaderId: 'timeout-uploader',
+      label: '上传图片',
+      nearbyTexts: [],
+      alertTexts: []
+    });
+    controller.start();
+    const transfer = new DataTransfer();
+    transfer.items.add(new File(['a'], 'a.jpg', { type: 'image/jpeg' }));
+    input.files = transfer.files;
+    await controller.handleFileChange({ type: 'change', target: input }, context);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const snapshot = controller.getSnapshot();
+    controller.dispose();
+    return {
+      taskStatus: snapshot.activeTask?.status,
+      sessionState: snapshot.sessionState
+    };
+  });
+  expect(result).toEqual({ taskStatus: 'PASSTHROUGH', sessionState: 'ARMED' });
+});
+
+test('repeated selections keep a bounded two-task history with the current task intact', async ({ page }) => {
+  await openController(page);
+  const result = await page.evaluate(async () => {
+    const api = globalThis.__uploadfit_debug_bundle__;
+    const discovery = { start() {}, cleanup() {} };
+    const controller = api.createTaskController({
+      documentRef: document,
+      globalRef: window,
+      discovery,
+      observeRejectionFn: () => () => {}
+    });
+    const input = document.createElement('input');
+    input.type = 'file';
+    document.body.append(input);
+    const context = controller.registerUploader({
+      input,
+      uploaderId: 'retained-uploader',
+      label: '上传图片',
+      nearbyTexts: [],
+      alertTexts: []
+    });
+    controller.start();
+    for (let index = 0; index < 25; index += 1) {
+      const transfer = new DataTransfer();
+      transfer.items.add(new File([String(index)], `image-${index}.jpg`, {
+        type: 'image/jpeg'
+      }));
+      input.files = transfer.files;
+      await controller.handleFileChange({ type: 'change', target: input }, context);
+    }
+    const retained = [...controller.tasks.values()];
+    const snapshot = controller.getSnapshot();
+    controller.dispose();
+    return {
+      taskCount: retained.length,
+      retainedName: retained.at(-1)?.originalFile?.name,
+      status: snapshot.activeTask?.status
+    };
+  });
+  expect(result).toEqual({
+    taskCount: 2,
+    retainedName: 'image-24.jpg',
+    status: 'WAITING_REJECTION'
+  });
+});
+
+test('controller releases a detached uploader and its change listener', async ({ page }) => {
+  await openController(page);
+  const result = await page.evaluate(async () => {
+    const api = globalThis.__uploadfit_debug_bundle__;
+    document.querySelector('#probe-file')?.remove();
+    const controller = api.createTaskController({ documentRef: document, globalRef: window });
+    const wrapper = document.createElement('section');
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/png';
+    wrapper.append(input);
+    document.body.append(wrapper);
+    controller.start();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const before = controller.getSnapshot().uploaderCount;
+    const resourcesBefore = controller.resources.size;
+    wrapper.remove();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const after = controller.getSnapshot().uploaderCount;
+    const resourcesAfter = controller.resources.size;
+    controller.dispose();
+    return { before, after, resourcesBefore, resourcesAfter };
+  });
+  expect(result.before).toBe(1);
+  expect(result.after).toBe(0);
+  expect(result.resourcesAfter).toBe(result.resourcesBefore);
+});
+
 test('C05/C06: crop waits for an explicit confirmation and cancellation does not process', async ({ page }) => {
   await openController(page);
   await page.evaluate(() => {

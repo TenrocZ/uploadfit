@@ -7,6 +7,8 @@ function resolve(text) {
   return resolveRules(parseRulesDeterministically({ normalizedText: text }));
 }
 
+const ZENT_V7_UPLOAD_URL = 'https://youzan.github.io/zent-v7/zh/component/upload';
+
 describe('deterministic Chinese rule baseline R01-R30', () => {
   const cases = [
     ['R01 max bytes', '不超过100KB', (rules) => expect(rules.maxBytes).toBe(100000)],
@@ -70,6 +72,51 @@ it('preserves a stop semantic even when it has no executable number', () => {
     field: 'safety',
     reason: 'STOP_SEMANTIC'
   }));
+});
+
+it('does not mistake a network-image source option for a network failure', () => {
+  const result = resolve('上传至分组：请选择 网络图片：本地图片：仅支持 gif、jpeg、png、bmp 4种格式，大小不超过1.0 MB');
+  expect(result).toMatchObject({
+    formats: ['image/jpeg', 'image/png'],
+    maxBytes: 1000000,
+    safetyFlags: [],
+    actionable: true
+  });
+});
+
+it(`keeps the copied upload rules actionable for ${ZENT_V7_UPLOAD_URL}`, () => {
+  const result = resolve('上传至分组：请选择 网络图片：本地图片：仅支持 gif、jpeg、png、bmp 4种格式，大小不超过1.0 MB');
+  expect(result).toMatchObject({
+    formats: ['image/jpeg', 'image/png'],
+    maxBytes: 1_000_000,
+    safetyFlags: [],
+    actionable: true
+  });
+});
+
+it('rejects physical and display-context dimension pairs without losing pixel rules', () => {
+  for (const text of [
+    '证件照尺寸3.5x4.9厘米',
+    '照片尺寸35x49毫米',
+    '分辨率1920x1080下显示最佳'
+  ]) {
+    expect(resolve(text).width).toEqual({ exact: null, min: null, max: null });
+    expect(resolve(text).height).toEqual({ exact: null, min: null, max: null });
+  }
+  expect(resolve('照片尺寸390x567像素')).toMatchObject({
+    width: { exact: 390 },
+    height: { exact: 567 }
+  });
+});
+
+it('keeps format lists with an 等-format denial out of the allow list', () => {
+  expect(resolve('支持jpg，gif、png等格式不支持').formats).toEqual(['image/jpeg']);
+});
+
+it('stops on review and connection-failure equivalents without matching 网络图片', () => {
+  expect(resolve('审核未通过：图片模糊').safetyFlags).toEqual(['REVIEW_REJECTED']);
+  expect(resolve('网络连接失败，请重试').safetyFlags).toEqual(['NETWORK_OR_TIMEOUT']);
+  expect(resolve('网络图片：请选择').safetyFlags).toEqual([]);
 });
 
 it('does not infer a format from examples, filenames, paths, or URLs', () => {

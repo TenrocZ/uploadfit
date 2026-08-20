@@ -381,7 +381,7 @@ test('U11: status live text changes once per state and errors use one alert', as
         .shadowRoot.querySelector('.uf-status-live').textContent);
     }
     const errorTask = {
-      taskId: 'u11-error', status: 'STOPPED', errorCode: 'PROCESSING_FAILED', source: 'preflight',
+      taskId: 'u11-error', status: 'STOPPED', errorCode: 'NETWORK_OR_TIMEOUT', source: 'preflight',
       current: null, rules: null, plan: null, result: null, retryCount: 0, warnings: []
     };
     controller.getSnapshot = () => ({
@@ -390,10 +390,13 @@ test('U11: status live text changes once per state and errors use one alert', as
     ui.collapse();
     ui.expand();
     const host = document.querySelector('[data-uploadfit-ui-host]');
+    const cardText = host.shadowRoot.querySelector('.uf-card').innerText;
     return {
       liveTexts,
       errorLive: host.shadowRoot.querySelector('.uf-status-live').textContent,
-      alerts: host.shadowRoot.querySelectorAll('[role="alert"]').length
+      alerts: host.shadowRoot.querySelectorAll('[role="alert"]').length,
+      errorMessageOccurrences: cardText.match(/网页提示网络异常或超时/g)?.length ?? 0,
+      mentionsOfficialTool: cardText.includes('官方指定工具')
     };
   });
   expect(result.liveTexts).toEqual([
@@ -401,6 +404,8 @@ test('U11: status live text changes once per state and errors use one alert', as
   ]);
   expect(result.errorLive).toBe('');
   expect(result.alerts).toBe(1);
+  expect(result.errorMessageOccurrences).toBe(1);
+  expect(result.mentionsOfficialTool).toBe(false);
   await cleanup();
 });
 

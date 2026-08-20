@@ -104,6 +104,30 @@ test('A03: byte evidence cannot borrow an equal pixel count', () => {
   expect(result.errors).toContain('NUMERIC_MINBYTES_UNSOURCED');
 });
 
+test('A03: width and height cannot borrow equal values from byte evidence', () => {
+  const result = validateAiRuleOutput({
+    ...VALID_OUTPUT,
+    minSize: null,
+    maxSize: null,
+    width: { exact: 120, min: null, max: null },
+    height: { exact: 30, min: null, max: null },
+    evidence: ['JPG格式', '30KB到120KB']
+  }, 'JPG格式，30KB到120KB。');
+  expect(result.ok).toBe(false);
+  expect(result.errors).toContain('NUMERIC_WIDTH.EXACT_UNSOURCED');
+  expect(result.errors).toContain('NUMERIC_HEIGHT.EXACT_UNSOURCED');
+});
+
+test('A03: a dimension pair sources width and height by their positions', () => {
+  const result = validateAiRuleOutput({
+    ...VALID_OUTPUT,
+    minSize: null,
+    maxSize: null,
+    evidence: ['JPG格式', '尺寸390x567像素']
+  }, 'JPG格式，尺寸390x567像素。');
+  expect(result.ok).toBe(true);
+});
+
 test('A03: an aspect ratio must be sourced by a numeric ratio or value', () => {
   const missing = validateAiRuleOutput({
     ...VALID_OUTPUT,

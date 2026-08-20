@@ -2,12 +2,17 @@ import { createCropper } from './cropper.js';
 
 const ERROR_TEXTS = {
   USER_CANCELLED: '已取消，原文件保持不变。',
-  OFFICIAL_TOOL_REQUIRED: '网页要求使用官方照片审核工具，UploadFit 不能替代，因此没有修改文件。',
+  SYSTEM_BUSY: '网页提示系统繁忙，无法可靠判断上传结果，因此没有修改文件。',
+  NETWORK_OR_TIMEOUT: '网页提示网络异常或超时，无法可靠判断上传结果，因此没有修改文件。',
+  PERMISSION_OR_LOGIN: '网页提示需要登录或权限不足，UploadFit 不会绕过访问控制，因此没有修改文件。',
+  REVIEW_REJECTED: '网页提示审核不通过，该结果不能仅通过图片参数适配解决，因此没有修改文件。',
+  OFFICIAL_TOOL_REQUIRED: '网页明确要求使用官方指定工具，UploadFit 不能替代，因此没有修改文件。',
   RULE_CONFLICT: '网页规则互相冲突，无法自动适配，因此没有修改文件。',
   AMBIGUOUS_RULES: '网页规则不完整或存在矛盾，无法自动适配，因此没有修改文件。',
   AMBIGUOUS_REJECTION_ASSOCIATION: '无法确定网页报错与本次上传的关系，因此没有修改文件。',
   INPUT_DETACHED: '上传框已从页面移除，无法写回，可下载处理后的文件手动上传。',
   INJECTION_FAILED: '处理完成但写回上传框失败，可下载处理后的文件手动上传。',
+  RESTORE_FAILED: '写回失败且浏览器未能恢复原文件，请重新选择原文件或下载处理结果后手动上传。',
   DATATRANSFER_UNAVAILABLE: '浏览器不允许把文件写回上传框，可下载处理后的文件手动上传。',
   UNTRUSTED_EVENT_BLOCKED: '浏览器拦截了模拟事件，可下载处理后的文件手动上传。',
   OUTPUT_VALIDATION_FAILED: '处理结果未通过最终复检，已放弃，没有修改原文件。',
@@ -25,7 +30,7 @@ const OPERATION_TEXTS = {
   CONVERT: '转换图片格式',
   RESIZE: '调整宽高尺寸',
   CROP: '裁剪照片',
-  FLATTEN_BACKGROUND: '透明背景转白底',
+  FLATTEN_BACKGROUND: '填充透明背景',
   UPSCALE: '放大像素尺寸',
   ENCODE: '重新编码',
   COMPRESS: '压缩文件大小'
@@ -221,14 +226,25 @@ export function createTaskCardView({ documentRef, callbacks }) {
   };
 
   const renderFlattenConfirm = (card, task, pending) => {
-    card.append(el('div', 'uf-card-title', '透明背景将转为白底'));
-    card.append(hint('网页要求 JPG 格式；转换后透明像素会全部变成白色。'));
+    const color = pending.suggestedPayload?.color
+      ?? task.plan?.proposedFlattenBackground?.color
+      ?? 'white';
+    const colors = {
+      white: { label: '白色', css: '#ffffff' },
+      blue: { label: '蓝色', css: '#1677ff' },
+      red: { label: '红色', css: '#d9363e' },
+      green: { label: '绿色', css: '#2f9e44' },
+      black: { label: '黑色', css: '#000000' }
+    };
+    const background = colors[color] ?? colors.white;
+    card.append(el('div', 'uf-card-title', `透明背景将转为${background.label}背景`));
+    card.append(hint(`网页要求 JPG 格式；转换后透明像素会全部变成${background.label}。`));
     const imageUrl = callbacks.createPreviewUrl(task.taskId);
     if (imageUrl) {
       const row = el('div', 'uf-preview-row');
-      for (const [checker, caption] of [['uf-preview-checker', '当前（透明）'], ['', '转换后（白底）']]) {
+      for (const [checker, caption] of [['uf-preview-checker', '当前（透明）'], ['', `转换后（${background.label}背景）`]]) {
         const box = el('div', 'uf-preview-box' + (checker ? ' ' + checker : ''));
-        if (!checker) box.style.background = '#ffffff';
+        if (!checker) box.style.background = background.css;
         const image = el('img');
         image.src = imageUrl;
         image.alt = caption;
@@ -237,9 +253,9 @@ export function createTaskCardView({ documentRef, callbacks }) {
       }
       card.append(row);
     }
-    const accept = btn('确认转白底并继续', 'confirm-flatten', true);
+    const accept = btn(`确认转为${background.label}背景并继续`, 'confirm-flatten', true);
     accept.addEventListener('click', () => confirm(task.taskId, {
-      id: pending.id, type: 'FLATTEN_BACKGROUND', accepted: true, payload: { color: 'white' }
+      id: pending.id, type: 'FLATTEN_BACKGROUND', accepted: true, payload: { color }
     }));
     const cancel = btn('取消', 'decline-flatten');
     cancel.addEventListener('click', () => decline(task, pending));
@@ -384,12 +400,9 @@ export function createTaskCardView({ documentRef, callbacks }) {
     const cancelled = task.errorCode === 'USER_CANCELLED';
     card.append(el('div', 'uf-card-title', cancelled ? '已停止处理' : '未能完成适配'));
     const message = errorText(task.errorCode);
-    card.append(el('div', cancelled ? 'uf-status-warn' : 'uf-status-error', message));
-    if (!cancelled) {
-      const alertBox = el('div', 'uf-alert', message);
-      alertBox.setAttribute('role', 'alert');
-      card.append(alertBox);
-    }
+    const status = el('div', cancelled ? 'uf-status-warn' : 'uf-status-error', message);
+    if (!cancelled) status.setAttribute('role', 'alert');
+    card.append(status);
     rulesSection(card, task.rules);
     const buttons = [];
     if (viewModel.hasOutput) {

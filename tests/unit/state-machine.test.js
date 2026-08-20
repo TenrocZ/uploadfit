@@ -21,6 +21,7 @@ describe('S3 state machine', () => {
       to: 'PROCESSING'
     });
     expect(canTransition('INSPECTING', 'NEEDS_CONFIRMATION')).toBe(true);
+    expect(canTransition('WAITING_REJECTION', 'PASSTHROUGH')).toBe(true);
     expect(canTransition('DISPOSED', 'ARMED')).toBe(false);
   });
 
@@ -31,4 +32,3 @@ describe('S3 state machine', () => {
     expect(machine.state).toBe('DISPOSED');
   });
 });
-

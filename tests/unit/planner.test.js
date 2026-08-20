@@ -162,4 +162,36 @@ describe('S2 processing planner', () => {
     expect(plan.targetHeight).toBe(1500);
     expect(plan.confirmations).toEqual([]);
   });
+
+  it('uses the rule background for transparent JPEG conversion', () => {
+    const plan = createProcessingPlan(
+      metadata({
+        mime: 'image/png',
+        extension: 'png',
+        declaredMime: 'image/png',
+        declaredExtension: 'png',
+        signatureMime: 'image/png',
+        hasAlpha: true
+      }),
+      rules({ background: 'blue' })
+    );
+    expect(plan.proposedFlattenBackground).toEqual({ color: 'blue' });
+    expect(plan.confirmations).toContainEqual(expect.objectContaining({
+      type: 'FLATTEN_BACKGROUND',
+      suggestedPayload: { color: 'blue' }
+    }));
+  });
+
+  it('keeps a feasible interval when the minimum exceeds the safety margin', () => {
+    const plan = createProcessingPlan(
+      metadata({ size: 110_000 }),
+      rules({ minBytes: 95_000, maxBytes: 100_000 })
+    );
+    expect(plan.targetMinBytes).toBe(95_000);
+    expect(plan.targetMaxBytes).toBe(100_000);
+    expect(plan.targetMaxBytes).toBeGreaterThan(plan.targetMinBytes);
+    expect(plan.warnings).toContainEqual(expect.objectContaining({
+      code: 'MAX_SAFETY_MARGIN_RELAXED_FOR_MINIMUM'
+    }));
+  });
 });

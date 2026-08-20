@@ -1,5 +1,6 @@
 import { MAX_DIMENSION, MAX_INPUT_BYTES } from '../config.js';
 import { RULE_SOURCE_TYPES, getSourcePriority } from './schema.js';
+import { ALLOWED_SAFETY_FLAGS } from './safety-semantics.js';
 
 export const ALLOWED_FORMATS = Object.freeze([
   'image/jpeg',
@@ -18,13 +19,7 @@ export const ALLOWED_SEMANTICS = Object.freeze([
   '文件名需包含姓名和身份证号',
   '必须使用官方工具'
 ]);
-export const ALLOWED_SAFETY_FLAGS = Object.freeze([
-  'SYSTEM_BUSY',
-  'NETWORK_OR_TIMEOUT',
-  'PERMISSION_OR_LOGIN',
-  'REVIEW_REJECTED',
-  'OFFICIAL_TOOL_REQUIRED'
-]);
+export { ALLOWED_SAFETY_FLAGS } from './safety-semantics.js';
 
 const MAX_DPI = 2400;
 const MAX_ASPECT_RATIO = 100;

@@ -254,7 +254,9 @@ function numericClaims(rules) {
   for (const field of ['width', 'height']) {
     for (const key of ['exact', 'min', 'max']) {
       const value = rules[field]?.[key];
-      if (Number.isFinite(value)) claims.push({ field: `${field}.${key}`, value });
+      if (Number.isFinite(value)) {
+        claims.push({ field: `${field}.${key}`, value, kind: 'dimension' });
+      }
     }
   }
   for (const field of ['minBytes', 'maxBytes']) {
@@ -273,6 +275,30 @@ function byteClaimHasSource(value, evidenceTexts, field) {
   ));
 }
 
+const DIMENSION_PAIR_SOURCE_PATTERN = /(\d+(?:[.,]\d+)?)\s*x\s*(\d+(?:[.,]\d+)?)(?:\s*(?:像素|px))?/gi;
+
+function dimensionValuesFromText(text, field) {
+  const normalized = normalizeRuleText(text);
+  const values = [];
+  const axis = field === 'width' ? '(?:宽(?:度)?|width|w)' : '(?:高(?:度)?|height|h)';
+  const axisPattern = new RegExp(`${axis}\\s*(?:(?:为|是|[:=]|不低于|至少|最低|不超过|最多|最高|>=|<=|≥|≤)\\s*)?(\\d+(?:[.,]\\d+)?)`, 'gi');
+  for (const match of normalized.matchAll(axisPattern)) {
+    const value = normalizedNumber(match[1]);
+    if (Number.isFinite(value)) values.push(value);
+  }
+  for (const match of normalized.matchAll(DIMENSION_PAIR_SOURCE_PATTERN)) {
+    const value = normalizedNumber(field === 'width' ? match[1] : match[2]);
+    if (Number.isFinite(value)) values.push(value);
+  }
+  return values;
+}
+
+function dimensionClaimHasSource(claim, evidenceTexts) {
+  const field = claim.field.split('.')[0];
+  return evidenceTexts.some((text) => dimensionValuesFromText(text, field)
+    .some((candidate) => numberMatches(candidate, claim.value)));
+}
+
 function claimHasSource(claim, evidenceTexts) {
   if (claim.kind === 'ratio') {
     return evidenceTexts.some((text) => (
@@ -280,6 +306,7 @@ function claimHasSource(claim, evidenceTexts) {
         || contextualRatioValuesFromText(text).some((candidate) => numberMatches(candidate, claim.value))
     ));
   }
+  if (claim.kind === 'dimension') return dimensionClaimHasSource(claim, evidenceTexts);
   return evidenceTexts.some((text) => numericTokens(text).some((candidate) => (
     numberMatches(candidate, claim.value)
   )));

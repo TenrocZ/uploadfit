@@ -631,7 +631,11 @@ export function validateFile(metadata, rules, options = {}) {
     && allowedFormats.every((format) => format === 'image/jpeg');
   if (metadata.hasAlpha && jpegOnly) {
     addViolation(result, 'TRANSPARENCY_WILL_BE_LOST');
-    addConfirmation(result, 'FLATTEN_BACKGROUND', { color: 'white' });
+    addConfirmation(result, 'FLATTEN_BACKGROUND', {
+      color: rules.background && rules.background !== 'transparent'
+        ? rules.background
+        : 'white'
+    });
   }
   if (Array.isArray(rules.semanticRequirements)
     && rules.semanticRequirements.includes('必须使用官方工具')) {

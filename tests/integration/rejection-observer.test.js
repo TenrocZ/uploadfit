@@ -63,6 +63,54 @@ test('L05: ambiguous upload failure stops safely without processing or retry', a
   await page.evaluate(() => globalThis.__s3Controller.dispose());
 });
 
+test('same-text error nodes keep distinct identity during uploader association', async ({ page }) => {
+  await page.goto('/test-pages/probe.html');
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
+  const result = await page.evaluate(async () => {
+    const api = globalThis.__uploadfit_debug_bundle__;
+    document.querySelector('#probe-file')?.remove();
+    const makeUploader = () => {
+      const section = document.createElement('section');
+      const input = document.createElement('input');
+      input.type = 'file';
+      const error = document.createElement('div');
+      error.className = 'error';
+      section.append(input, error);
+      document.body.append(section);
+      return { input, error };
+    };
+    const first = makeUploader();
+    const second = makeUploader();
+    const firstTask = { taskId: 'first', inputElement: first.input };
+    const secondTask = { taskId: 'second', inputElement: second.input };
+    const detections = [];
+    const stop = api.observeRejection(firstTask, { input: first.input }, {
+      debounceMs: 0,
+      windowMs: 2_000,
+      getActiveTasks: () => [firstTask, secondTask],
+      onRejection: (detail) => detections.push({
+        taskId: detail.task?.taskId ?? null,
+        related: detail.related,
+        text: detail.text
+      })
+    });
+    second.error.textContent = '图片尺寸必须为390×567像素';
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const afterOtherUploader = detections.length;
+    first.error.textContent = '图片尺寸必须为390×567像素';
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    stop();
+    return { afterOtherUploader, detections };
+  });
+
+  expect(result.afterOtherUploader).toBe(0);
+  expect(result.detections).toEqual([{
+    taskId: 'first',
+    related: true,
+    text: '图片尺寸必须为390×567像素'
+  }]);
+});
+
 test('C10/C11: detached input and dispose abort stale processing before injection', async ({ page }) => {
   await page.goto('/test-pages/probe.html');
   await page.addScriptTag({ url: '/dist/uploadfit.test.js' });

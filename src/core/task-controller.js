@@ -16,6 +16,7 @@ import {
 } from '../dom/rejection-observer.js';
 import { parseRulesDeterministically } from '../rules/deterministic-parser.js';
 import { resolveRules } from '../rules/resolver.js';
+import { safetyErrorCode } from '../rules/safety-semantics.js';
 import {
   createProcessingPlan,
   resolveProcessingConfirmation
@@ -40,6 +41,7 @@ import { createCleanupRegistry } from './cleanup.js';
 import { createStateMachine } from './state-machine.js';
 
 const TERMINAL_TASK_STATES = new Set(['STOPPED', 'DISPOSED', 'PASSTHROUGH']);
+const MAX_RETAINED_TASKS = 2;
 const ACTIVE_TASK_STATES = new Set([
   'ARMED',
   'INSPECTING',
@@ -218,6 +220,14 @@ function isFileForInput(input, file) {
   return typeof Constructor === 'function' && file instanceof Constructor;
 }
 
+function inputContainsFile(input, expected) {
+  const actual = input?.files?.[0];
+  return Boolean(actual && expected
+    && actual.name === expected.name
+    && actual.type === expected.type
+    && actual.size === expected.size);
+}
+
 function quickViolations(file, rules) {
   const violations = [];
   if (rules?.formats?.length && typeof file?.type === 'string'
@@ -381,7 +391,8 @@ export class TaskController {
     if (!this.discovery) {
       this.discovery = createUploaderDiscovery({
         root: this.documentRef,
-        onDiscover: (context) => this.registerUploader(context)
+        onDiscover: (context) => this.registerUploader(context),
+        onRemove: (context) => this.unregisterUploader(context)
       });
     }
 
@@ -488,11 +499,69 @@ export class TaskController {
       input.removeEventListener?.('change', record.listener, true);
       clearInjectionGuard(input);
     };
-    this.resources.add(record.cleanupListener);
     this.uploaders.set(input, record);
     this.logger.emit('UPLOADER_DISCOVERED');
     this._publish();
     return context;
+  }
+
+  unregisterUploader(uploaderContext) {
+    const input = uploaderContext?.input ?? uploaderContext;
+    const record = this.uploaders.get(input);
+    if (!record) return false;
+    const task = record.currentTask;
+    if (task && !TERMINAL_TASK_STATES.has(task.status)) {
+      this._stopTask(task, 'INPUT_DETACHED');
+    }
+    record.currentTask = null;
+    record.cleanupListener?.();
+    this.uploaders.delete(input);
+    this._pruneTasks();
+    this._publish();
+    return true;
+  }
+
+  _releaseTaskResources(task) {
+    if (!task) return;
+    task.abortController?.abort?.();
+    this._stopRejectionObserver(task);
+    const urlApi = task.inputElement?.ownerDocument?.defaultView?.URL
+      ?? this.globalRef?.URL
+      ?? globalThis.URL;
+    task.objectUrls?.splice?.(0).forEach((url) => urlApi?.revokeObjectURL?.(url));
+    task.originalFile = null;
+    task.processedFile = null;
+    task.result = null;
+    task.metadata = null;
+    task.validation = null;
+    task.plan = null;
+    task.contextBundle = null;
+    task.ruleCandidates = [];
+    task.event = null;
+  }
+
+  _forgetTask(task) {
+    if (!task || !this.tasks.has(task.taskId)) return false;
+    this.queue = this.queue.filter((candidate) => candidate !== task);
+    const record = this._recordForTask(task);
+    if (record?.currentTask === task) record.currentTask = null;
+    this.manualRecords.delete(task.taskId);
+    this._releaseTaskResources(task);
+    this.tasks.delete(task.taskId);
+    return true;
+  }
+
+  _pruneTasks() {
+    if (this.tasks.size <= MAX_RETAINED_TASKS) return;
+    const disposable = [...this.tasks.values()]
+      .filter((task) => task !== this.processingTask && (
+        TERMINAL_TASK_STATES.has(task.status)
+        || (task.status === 'SUCCESS' && !task.rejectionStopper?.active?.())
+      ))
+      .sort((left, right) => left.createdAt - right.createdAt);
+    while (this.tasks.size > MAX_RETAINED_TASKS && disposable.length) {
+      this._forgetTask(disposable.shift());
+    }
   }
 
   _recordForTask(task) {
@@ -619,8 +688,11 @@ export class TaskController {
       return { ignored: 'FILE_UNAVAILABLE' };
     }
 
-    if (record.currentTask && taskCanBeObserved(record.currentTask)) {
-      this._cancelTaskInternal(record.currentTask, 'USER_CANCELLED', false);
+    if (record.currentTask) {
+      const previous = record.currentTask;
+      if (taskCanBeObserved(previous)) {
+        this._cancelTaskInternal(previous, 'USER_CANCELLED', false);
+      }
     }
     const resolved = this._resolveRules(record);
     const task = this._makeTask(
@@ -633,6 +705,7 @@ export class TaskController {
     );
     record.currentTask = task;
     this.tasks.set(task.taskId, task);
+    this._pruneTasks();
     this.logger.emit('FILE_SELECTED', {
       taskId: task.taskId,
       mime: file.type,
@@ -679,7 +752,9 @@ export class TaskController {
       if (task.rules.safetyFlags?.length || task.rules.conflicts?.some((item) => item.unresolvable)) {
         this._stopTask(
           task,
-          task.rules.safetyFlags?.length ? 'OFFICIAL_TOOL_REQUIRED' : 'RULE_CONFLICT'
+          task.rules.safetyFlags?.length
+            ? safetyErrorCode(task.rules.safetyFlags)
+            : 'RULE_CONFLICT'
         );
       } else if (task.source === 'manual-card') {
         this._stopTask(task, 'AMBIGUOUS_RULES');
@@ -848,12 +923,14 @@ export class TaskController {
   }
 
   _completePassthrough(task) {
+    this._stopRejectionObserver(task);
     this._transitionTask(task, 'PASSTHROUGH');
     this._transitionSession('PASSTHROUGH', { taskId: task.taskId });
     if (this.sessionMachine.state === 'PASSTHROUGH') {
       this._transitionSession('ARMED', { reason: 'PASSTHROUGH_COMPLETE' });
     }
     this.logger.emit('TASK_SUCCEEDED', { taskId: task.taskId });
+    this._pruneTasks();
     this._publish();
   }
 
@@ -1031,13 +1108,21 @@ export class TaskController {
         this._stopTask(task, 'INPUT_DETACHED');
         return;
       }
-      const code = stableErrorCode(error);
+      let code = stableErrorCode(error);
       if (task.status === 'INJECTING'
-        && ['INJECTION_FAILED', 'DATATRANSFER_UNAVAILABLE'].includes(code)) {
-        this.injectFile(task.inputElement, task.originalFile, {
+        && ['INJECTION_FAILED', 'DATATRANSFER_UNAVAILABLE', 'RESTORE_FAILED'].includes(code)) {
+        const rollback = this.injectFile(task.inputElement, task.originalFile, {
           dispatchEvents: false,
           reason: 'restore'
         });
+        if (!rollback?.ok && !inputContainsFile(task.inputElement, task.originalFile)) {
+          code = 'RESTORE_FAILED';
+          this.diagnostics.push({
+            code,
+            reason: rollback?.errorCode ?? 'INJECTION_ROLLBACK_FAILED',
+            taskId: task.taskId
+          });
+        }
       }
       this._stopTask(task, code, error);
     }
@@ -1123,12 +1208,28 @@ export class TaskController {
         void this._handleRejection(task, record, detail);
       },
       onTimeout: () => {
-        if (isTaskCurrent(task, record)) this._publish();
+        if (!isTaskCurrent(task, record)) return;
+        this._stopRejectionObserver(task);
+        if (task.status === 'WAITING_REJECTION') {
+          if (task.eventBlocked && !this._releaseOriginalEvent(task)) {
+            this._stopTask(task, 'INJECTION_FAILED');
+          } else {
+            this._completePassthrough(task);
+          }
+          return;
+        }
+        this._pruneTasks();
+        this._publish();
       },
       getActiveTasks: () => [...this.tasks.values()]
         .filter((candidate) => taskCanBeObserved(candidate))
     });
-    task.rejectionStopper = typeof stopper === 'function' ? stopper : null;
+    if (taskCanBeObserved(task) && typeof stopper === 'function') {
+      task.rejectionStopper = stopper;
+    } else {
+      stopper?.();
+      task.rejectionStopper = null;
+    }
   }
 
   _stopRejectionObserver(task) {
@@ -1170,7 +1271,7 @@ export class TaskController {
     if (!task.rules.actionable || task.rules.safetyFlags?.length
       || task.rules.conflicts?.some((item) => item.unresolvable)) {
       this._stopTask(task, task.rules.safetyFlags?.length
-        ? 'OFFICIAL_TOOL_REQUIRED'
+        ? safetyErrorCode(task.rules.safetyFlags)
         : 'RULE_CONFLICT');
       return;
     }
@@ -1271,10 +1372,19 @@ export class TaskController {
       }
       if (!accepted) {
         if (task.eventBlocked) {
-          this.injectFile(task.inputElement, task.originalFile, {
+          const rollback = this.injectFile(task.inputElement, task.originalFile, {
             dispatchEvents: false,
             reason: 'restore'
           });
+          if (!rollback?.ok && !inputContainsFile(task.inputElement, task.originalFile)) {
+            this.diagnostics.push({
+              code: 'RESTORE_FAILED',
+              reason: rollback?.errorCode ?? 'CONFIRMATION_ROLLBACK_FAILED',
+              taskId: task.taskId
+            });
+            this._stopTask(task, 'RESTORE_FAILED');
+            return { ok: false, errorCode: 'RESTORE_FAILED' };
+          }
         }
         this._stopTask(task, 'USER_CANCELLED');
         return { ok: true, status: task.status };
@@ -1388,6 +1498,13 @@ export class TaskController {
       task.processedFile = null;
       task.warnings.push({ code: 'ORIGINAL_RESTORED' });
       this._stopTask(task, 'USER_CANCELLED');
+    } else {
+      this.diagnostics.push({
+        code: 'RESTORE_FAILED',
+        reason: result?.errorCode ?? 'RESTORE_API_FAILED',
+        taskId: task.taskId
+      });
+      this._stopTask(task, 'RESTORE_FAILED');
     }
     return result;
   }
@@ -1534,6 +1651,7 @@ export class TaskController {
     record.currentTask = task;
     this.manualRecords.set(task.taskId, record);
     this.tasks.set(task.taskId, task);
+    this._pruneTasks();
     this.logger.emit('FILE_SELECTED', {
       taskId: task.taskId,
       mime: file.type,
@@ -1587,6 +1705,7 @@ export class TaskController {
         errorCode
       });
       this._transitionSession('STOPPED', { taskId: task.taskId });
+      this._pruneTasks();
       this._publish();
     }
     return changed;

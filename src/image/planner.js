@@ -278,9 +278,13 @@ export function createProcessingPlan(metadata, rules, options = {}) {
   if (dimensionsChanged) addOperation(operations, 'RESIZE');
 
   const flattenRequired = targetMime === 'image/jpeg' && metadata.hasAlpha;
+  const flattenColor = ALLOWED_BACKGROUND_COLORS.has(rules.background)
+    && rules.background !== 'transparent'
+    ? rules.background
+    : 'white';
   if (flattenRequired) {
     addOperation(operations, 'FLATTEN_BACKGROUND');
-    addConfirmation(confirmations, 'FLATTEN_BACKGROUND', { color: 'white' });
+    addConfirmation(confirmations, 'FLATTEN_BACKGROUND', { color: flattenColor });
   }
 
   const targetMinBytes = Number.isFinite(rules.minBytes) ? rules.minBytes : null;
@@ -290,7 +294,9 @@ export function createProcessingPlan(metadata, rules, options = {}) {
     : Math.floor(hardMaxBytes * TARGET_MAX_RATIO);
   const targetMaxBytes = safeMaxBytes === null
     ? null
-    : Math.max(targetMinBytes ?? 0, safeMaxBytes);
+    : targetMinBytes !== null && safeMaxBytes < targetMinBytes
+      ? hardMaxBytes
+      : safeMaxBytes;
   if (safeMaxBytes !== null && targetMinBytes !== null && safeMaxBytes < targetMinBytes) {
     warnings.push({ code: 'MAX_SAFETY_MARGIN_RELAXED_FOR_MINIMUM', safeMaxBytes, targetMinBytes });
   }
@@ -330,7 +336,7 @@ export function createProcessingPlan(metadata, rules, options = {}) {
     crop: null,
     proposedCrop: dimensions.crop,
     flattenBackground: null,
-    proposedFlattenBackground: flattenRequired ? { color: 'white' } : null,
+    proposedFlattenBackground: flattenRequired ? { color: flattenColor } : null,
     qualityRange: [
       clamp(options.qualityMin ?? ENCODE_QUALITY_MIN, ENCODE_QUALITY_MIN, ENCODE_QUALITY_MAX),
       clamp(options.qualityMax ?? ENCODE_QUALITY_MAX, ENCODE_QUALITY_MIN, ENCODE_QUALITY_MAX)

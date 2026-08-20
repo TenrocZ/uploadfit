@@ -123,3 +123,48 @@ test('restores the saved original File through the product API', async ({ page }
 
   await page.evaluate(() => globalThis.__uploadfit_debug_bundle__.cleanupSession());
 });
+
+test('rolls back the original File when synthetic event dispatch fails after assignment', async ({ page }) => {
+  await page.goto('/test-pages/probe.html');
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
+
+  const result = await page.evaluate(async () => {
+    const api = globalThis.__uploadfit_debug_bundle__;
+    const input = document.querySelector('#probe-file');
+    const original = new File(['original'], 'original.png', { type: 'image/png' });
+    const processed = new File(['processed'], 'processed.jpg', { type: 'image/jpeg' });
+    api.injectFile(input, original, { dispatchEvents: false, reason: 'probe' });
+    const ownDescriptor = Object.getOwnPropertyDescriptor(input, 'dispatchEvent');
+    Object.defineProperty(input, 'dispatchEvent', {
+      configurable: true,
+      value: () => { throw new Error('synthetic dispatch blocked'); }
+    });
+    const injection = api.injectFile(input, processed, {
+      dispatchEvents: true,
+      reason: 'processed'
+    });
+    if (ownDescriptor) Object.defineProperty(input, 'dispatchEvent', ownDescriptor);
+    else delete input.dispatchEvent;
+    return {
+      injection,
+      current: {
+        name: input.files[0]?.name,
+        type: input.files[0]?.type,
+        text: await input.files[0]?.text()
+      }
+    };
+  });
+
+  expect(result.injection).toEqual({
+    ok: false,
+    inputFilesVerified: false,
+    eventsDispatched: [],
+    fallback: 'download',
+    errorCode: 'INJECTION_FAILED'
+  });
+  expect(result.current).toEqual({
+    name: 'original.png',
+    type: 'image/png',
+    text: 'original'
+  });
+});

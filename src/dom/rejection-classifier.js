@@ -1,4 +1,5 @@
 import { parseRulesDeterministically } from '../rules/deterministic-parser.js';
+import { extractSafetyFlags } from '../rules/safety-semantics.js';
 import { sanitizeEvidenceText } from '../utils/text.js';
 
 const MAX_REJECTION_TEXT = 600;
@@ -6,7 +7,6 @@ const MAX_REJECTION_TEXT = 600;
 const REJECTION_SIGNAL = /(?:拒绝|支持|不符合|不支持|不允许|无法上传|上传失败|上传不成功|提交失败|验证失败|格式错误|尺寸错误|大小错误|必须|要求|限制|超过|低于|少于|不低于|不超过|需为|应为|请上传|请选择)/i;
 const FILE_SEMANTIC = /(?:文件|图片|图像|照片|证件照|头像|封面|扫描件|格式|类型|大小|容量|像素|尺寸|宽|高|比例|分辨率|dpi|jpg|jpeg|png|webp|image|photo)/i;
 const AMBIGUOUS_FAILURE = /(?:上传失败|上传不成功|文件不合法|未知错误|服务异常|系统繁忙|操作失败|网络|超时|权限|登录|审核|内容不符合|图片不清晰|清晰度|身份不一致|官方工具)/i;
-const SAFETY_STOP = /(?:网络|超时|系统繁忙|服务异常|权限|登录|审核|内容审核|不清晰|清晰度|身份不一致|官方工具|官方系统|权限不足)/i;
 
 function structuredRule(candidate) {
   if (!candidate || candidate.advisoryOnly) return false;
@@ -56,7 +56,7 @@ export function classifyRejectionText(value, { parseRules = parseRulesDeterminis
     : [];
   const hasFileSemantics = FILE_SEMANTIC.test(text);
   const hasRejectionSignal = REJECTION_SIGNAL.test(text);
-  const hasSafetyStop = SAFETY_STOP.test(text);
+  const hasSafetyStop = extractSafetyFlags(text).length > 0;
   const isAmbiguousFailure = AMBIGUOUS_FAILURE.test(text);
 
   if (hasSafetyStop) {

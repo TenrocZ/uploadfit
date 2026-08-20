@@ -5,3 +5,4 @@ test-results/
 coverage/
 *.log
 tests/fixtures/generated/
+.learnings/
