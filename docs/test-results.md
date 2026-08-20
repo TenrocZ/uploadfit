@@ -2,7 +2,7 @@
 
 ## 结论
 
-本地自动化结果为 `PASS`；真实 Tabbit 实机矩阵为 `MANUAL_REQUIRED`，原因是本会话没有可用的 in-app Browser 实例。因此本文不把 S5 记为最终验收通过。
+本地自动化结果为 `PASS`；轻量补验 LR1–LR5 为 `BLOCKED_BY_ENVIRONMENT`，原因是本会话没有可用的 in-app Browser 实例。因此本文不把 S5 记为最终验收通过。
 
 - S5 正式起始基线：`8d9d9ad`
 - 工程：Windows，Node `v22.20.0`，npm `10.9.3`
@@ -41,7 +41,7 @@
 | E14 | [`ui-controller.test.js`](../tests/integration/ui-controller.test.js) U04：规则冲突不自动执行，展示冲突 | PASS |
 | E15 | 稳定页 UI harness：真实点击“关闭 UploadFit”，移除 UI、监听和 controller 会话 | PASS |
 
-此外，场景 F 独立验证 `OFFICIAL_TOOL_REQUIRED` 安全停止；它不是任务书 E15，避免编号混淆。
+此外，场景 F 独立验证 `OFFICIAL_TOOL_REQUIRED` 安全停止；它不是任务书 E15，避免编号混淆。E/X 的 PASS 均指 Chromium/自动化覆盖，不指当前 Tabbit 实机 PASS。
 
 ## X01–X12 映射
 
@@ -73,4 +73,4 @@ C 的确认/取消按钮自动化使用 [`ui-harness.html`](../test-pages/ui-har
 
 ## 未完成的真实平台项
 
-本会话的 in-app Browser 返回 `Browser is not available: iab`，`agent.browsers.list()` 返回空。Tabbit 安装/更新/指定网址/刷新执行、A–F 实机矩阵、AI 调用、关闭、DataTransfer 和 close/pagehide 仍需在真实实例中逐项补录，详见 [`S5-handoff.md`](handoffs/S5-handoff.md) 与 [`tabbit-matrix.json`](evidence/S5/tabbit-matrix.json)。
+本次轻量补验按批准范围不重复场景 C/D/E/F 和 X01–X12，统一记录为 `NOT_REPEATED_BY_APPROVED_LIGHTWEIGHT_SCOPE`；场景 A/B、安装/刷新、真实 AI、关闭/再次运行仍属于 LR1–LR5，因 in-app Browser 返回 `Browser is not available: iab` 且实例列表为空而保持阻塞。详见 [`S5-lightweight-reacceptance-report.md`](handoffs/S5-lightweight-reacceptance-report.md) 与 [`tabbit-matrix.json`](evidence/S5/tabbit-matrix.json)。

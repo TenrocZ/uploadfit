@@ -35,4 +35,4 @@
 
 ## 平台实机限制
 
-当前 in-app Browser 不可用：调用返回 `Browser is not available: iab`，浏览器实例列表为空。因此以下项目保持 `MANUAL_REQUIRED`：Tabbit 安装/刷新/关闭生命周期、A–F 真实页面事件、AI provider、DataTransfer 和 close/pagehide 组合路径。证据见 [`tabbit-matrix.json`](evidence/S5/tabbit-matrix.json)。
+当前 in-app Browser 不可用：调用返回 `Browser is not available: iab`，浏览器实例列表为空。因此返工单 LR1–LR5 保持 `BLOCKED_BY_ENVIRONMENT`：Tabbit 安装/刷新/关闭生命周期、A/B 真实页面事件、AI provider、DataTransfer 和 close/pagehide 组合路径。轻量范围未重复的 C/D/E/F 与 X01–X12 记录为 `NOT_REPEATED_BY_APPROVED_LIGHTWEIGHT_SCOPE`，不写成 Tabbit 实测 PASS。证据见 [`tabbit-matrix.json`](evidence/S5/tabbit-matrix.json)。

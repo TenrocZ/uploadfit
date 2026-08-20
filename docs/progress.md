@@ -819,4 +819,19 @@ S2 范围：
 
 本地验证：`npm ci`、`npm run check`、完整 `npm run test:e2e -- --reporter=line --workers=1` 均通过；最终全量数字和 SHA 见 `docs/handoffs/S5-handoff.md`、`docs/evidence/S5/s5-result.json`。
 
-真实平台边界：本会话调用 in-app Browser 时返回 `Browser is not available: iab`，`agent.browsers.list()` 为空。根据流程保留 `MANUAL_REQUIRED` 矩阵，不创建 mock 通过、不使用其他浏览器冒充 Tabbit；S6 尚未启动。
+真实平台边界：本会话调用 in-app Browser 时返回 `Browser is not available: iab`，`agent.browsers.list()` 为空。根据轻量返工单保留 `BLOCKED_BY_ENVIRONMENT` 的 LR1–LR5 矩阵；不创建 mock 通过、不使用其他浏览器冒充 Tabbit；S6 尚未启动。
+
+## 2026-08-20：S5 / 轻量验收补验返工
+
+状态：`BLOCKED_BY_ENVIRONMENT`。返工基线为 `9ed5839`，实现提交为 `dcd5c1a`；不修改产品源码、不修改自动化断言。
+
+返工单要求的真实 Tabbit 连接已重新尝试：in-app Browser 返回 `Browser is not available: iab`，可用浏览器列表为空。按返工单停止 LR1–LR5，不使用 mock、Playwright Chromium 或 S4 旧证据冒充实机通过。
+
+已完成的本地返工：
+
+- LR6 文档一致性修正：`S5-handoff.md` 的最大 heartbeat 间隔已从 357.2ms 改为 353.1ms；bytes、SHA、159 个单测、116 个 E2E、状态和性能文档保持一致。
+- `docs/evidence/S5/tabbit-matrix.json` 改为轻量 LR1–LR6 矩阵：LR1–LR5 为 `BLOCKED_BY_ENVIRONMENT`，LR6 为 `PASS`。
+- 场景 C/D/E/F 和 X01–X12 按批准轻量范围记录为 `NOT_REPEATED_BY_APPROVED_LIGHTWEIGHT_SCOPE`，证据仍为 S5 专属 Chromium 17/17，不宣称 Tabbit 实测 PASS。
+- 新增 `docs/handoffs/S5-lightweight-reacceptance-report.md`，记录阻塞尝试、未重跑边界和重新申请验收条件。
+
+下一步：只有恢复真实 Tabbit/in-app Browser 后，才继续 LR1–LR5；在此之前保持 S5 阻塞，S6 继续 HOLD。

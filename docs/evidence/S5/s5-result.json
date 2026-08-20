@@ -45,19 +45,20 @@
     "sensitiveAiBridgeCalls": 0
   },
   "tabbit": {
-    "status": "MANUAL_REQUIRED",
+    "status": "BLOCKED_BY_ENVIRONMENT",
+    "scope": "LIGHTWEIGHT_REACCEPTANCE",
+    "acceptanceBaseline": "9ed5839",
     "reason": "Browser is not available: iab; agent.browsers.list() returned an empty list",
     "rows": [
-      "installation-and-refresh",
-      "scenario-A",
-      "scenario-B",
-      "scenario-C-confirm-cancel",
-      "scenario-D",
-      "scenario-E",
-      "scenario-F",
-      "ai-close-datatransfer-pagehide"
+      { "id": "S5-LR1", "result": "BLOCKED_BY_ENVIRONMENT" },
+      { "id": "S5-LR2", "result": "BLOCKED_BY_ENVIRONMENT" },
+      { "id": "S5-LR3", "result": "BLOCKED_BY_ENVIRONMENT" },
+      { "id": "S5-LR4", "result": "BLOCKED_BY_ENVIRONMENT" },
+      { "id": "S5-LR5", "result": "BLOCKED_BY_ENVIRONMENT" },
+      { "id": "S5-LR6", "result": "PASS" }
     ],
+    "notRepeatedResult": "NOT_REPEATED_BY_APPROVED_LIGHTWEIGHT_SCOPE",
     "substitutesUsed": []
   },
-  "nextAction": "恢复可用 Tabbit/in-app Browser 实例后，按 tabbit-matrix.json 补录真实矩阵，再进行独立 S5 验收。"
+  "nextAction": "恢复可用 Tabbit/in-app Browser 实例后，按 tabbit-matrix.json 补录 LR1-LR5，再进行独立 S5 验收。"
 }

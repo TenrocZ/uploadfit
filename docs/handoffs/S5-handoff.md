@@ -5,6 +5,7 @@
 - Status: `BLOCKED_BY_ENVIRONMENT`
 - Start commit: `8d9d9ad`（用户指定的 S5 正式起始基线）
 - End commit: `dcd5c1a`（本地提交，未推送远程）
+- Lightweight reacceptance baseline: `9ed5839`（返工单验收基线）
 - Agent: Codex
 - Environment: Windows；Node `v22.20.0`；npm `10.9.3`；Playwright Chromium `1.62.1`
 - Task book: `C:\Users\蔡天乐\Desktop\黑客松\UploadFit-开发任务书-v1.0\60-S5-全量测试安全与兼容.md`
@@ -30,9 +31,9 @@
 |---|---|---|
 | D1 稳定测试页 A–F | PASS | [`test-results.md`](../test-results.md)、[`s5-stable-scenarios.spec.js`](../../tests/e2e/s5-stable-scenarios.spec.js) |
 | D2 全量自动化 | PASS：18 个 Vitest 文件/159 测试；116 个 Chromium E2E | [`s5-result.json`](../evidence/S5/s5-result.json) |
-| D3 Tabbit 矩阵 | `MANUAL_REQUIRED` | [`tabbit-matrix.json`](../evidence/S5/tabbit-matrix.json) |
+| D3 Tabbit 轻量补验 | `BLOCKED_BY_ENVIRONMENT`；LR1–LR5 未能执行 | [`tabbit-matrix.json`](../evidence/S5/tabbit-matrix.json) |
 | D4 静态/动态安全 | PASS（Chromium/源码静态）；Tabbit 实机待补 | [`security-review.md`](../security-review.md) |
-| D5 性能 | PASS：6 样本均 ≤5s，最大 heartbeat 间隔 357.2ms | [`performance.md`](../performance.md) |
+| D5 性能 | PASS：6 样本均 ≤5s，最大 heartbeat 间隔 353.1ms | [`performance.md`](../performance.md) |
 | D6 报告和证据 | PASS | [`docs/evidence/S5/README.md`](../evidence/S5/README.md) |
 | D7 P0/P1/P2 | 本地未决缺陷 0/0/0；平台项未测不计为缺陷通过 | [`s5-result.json`](../evidence/S5/s5-result.json) |
 
@@ -48,11 +49,11 @@ npm run test:e2e -- --reporter=line --workers=1
 
 ## E/X 覆盖
 
-E01–E15 和 X01–X12 的映射、既有阶段回归引用、稳定页入口见 [`docs/test-results.md`](../test-results.md)。本轮自检修正了一个编号错误：场景 F 的官方工具安全停止是独立场景；E15 已由真实关闭按钮用例覆盖。
+E01–E15 和 X01–X12 的映射、既有阶段回归引用、稳定页入口见 [`docs/test-results.md`](../test-results.md)。本轮自检修正了一个编号错误：场景 F 的官方工具安全停止是独立场景；E15 已由真实关闭按钮用例覆盖。C/D/E/F 和 X01–X12 按轻量范围记为 `NOT_REPEATED_BY_APPROVED_LIGHTWEIGHT_SCOPE`，证据仍为 S5 专属 Chromium 17/17，不写成 Tabbit 实测 PASS。
 
 ## Tabbit 阻塞
 
-本会话调用 in-app Browser 返回 `Browser is not available: iab`，`agent.browsers.list()` 返回空列表。因而以下项目全部保持 `MANUAL_REQUIRED`：
+本会话调用 in-app Browser 返回 `Browser is not available: iab`，`agent.browsers.list()` 返回空列表。因而返工单要求的 LR1–LR5 全部保持 `BLOCKED_BY_ENVIRONMENT`：
 
 - Tabbit 安装/更新/指定网址/刷新自动执行；
 - A–F 真实页面矩阵；
@@ -60,10 +61,10 @@ E01–E15 和 X01–X12 的映射、既有阶段回归引用、稳定页入口�
 - 关闭、pagehide、DataTransfer、对象 URL/Worker 清理的 Tabbit 实机组合；
 - Tabbit 界面截图和真实执行顺序。
 
-没有使用 mock、Playwright Chromium 或历史 S4 Tabbit 证据冒充当前 S5 实机结果。恢复可用实例后，应按 [`tabbit-matrix.json`](../evidence/S5/tabbit-matrix.json) 逐项补录，再由独立验收判定是否放行；S6 尚未启动。
+没有使用 mock、Playwright Chromium 或历史 S4 Tabbit 证据冒充当前 S5 实机结果。LR6 文档一致性修正已完成；恢复可用实例后，应按 [`tabbit-matrix.json`](../evidence/S5/tabbit-matrix.json) 逐项补录 LR1–LR5，再由独立验收判定是否放行；S6 尚未启动。
 
 ## 下一步
 
-1. 在可用 Tabbit/in-app Browser 中执行并留档 D3 矩阵。
-2. 复核 D3 结果后，由独立验收方决定 S5 `ACCEPTED` 或返工。
+1. 在可用 Tabbit/in-app Browser 中执行并留档 LR1–LR5。
+2. 复核轻量补验结果和 `NOT_REPEATED_BY_APPROVED_LIGHTWEIGHT_SCOPE` 范围后，由独立验收方决定 S5 `ACCEPTED` 或继续返工。
 3. 未经该复核不启动 S6。
