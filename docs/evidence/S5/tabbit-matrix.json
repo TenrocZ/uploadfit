@@ -7,6 +7,9 @@
     "required": "Tabbit in-app Browser",
     "observed": "Browser is not available: iab",
     "browserList": [],
+    "localProcessObserved": true,
+    "knownDebugPortsChecked": [9222, 9223],
+    "knownDebugPortsListening": [],
     "date": "2026-08-20"
   },
   "matrix": [

@@ -835,3 +835,11 @@ S2 范围：
 - 新增 `docs/handoffs/S5-lightweight-reacceptance-report.md`，记录阻塞尝试、未重跑边界和重新申请验收条件。
 
 下一步：只有恢复真实 Tabbit/in-app Browser 后，才继续 LR1–LR5；在此之前保持 S5 阻塞，S6 继续 HOLD。
+
+## 2026-08-20：S5 / 用户委托再次尝试 LR1–LR5
+
+状态仍为：`BLOCKED_BY_ENVIRONMENT`。
+
+已再次尝试连接当前真实 Tabbit。只读环境检查显示本机存在 Tabbit Browser 进程，但 in-app Browser 返回 `Browser is not available: iab`，实例列表为空；已知的 `9222/9223` 调试端口没有监听。进程存在不能证明当前会话有可控页面，因此没有启动临时脚本、没有使用替代浏览器，也没有伪造 LR1–LR5 证据。
+
+返工报告和矩阵已补记本次尝试；待可控 Tabbit 页面连接恢复后继续执行。
