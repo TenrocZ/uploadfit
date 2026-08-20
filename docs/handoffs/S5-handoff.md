@@ -4,7 +4,7 @@
 
 - Status: `BLOCKED_BY_ENVIRONMENT`
 - Start commit: `8d9d9ad`（用户指定的 S5 正式起始基线）
-- End commit: 本轮 S5 本地提交（提交后以 `git log` 为准）
+- End commit: `dcd5c1a`（本地提交，未推送远程）
 - Agent: Codex
 - Environment: Windows；Node `v22.20.0`；npm `10.9.3`；Playwright Chromium `1.62.1`
 - Task book: `C:\Users\蔡天乐\Desktop\黑客松\UploadFit-开发任务书-v1.0\60-S5-全量测试安全与兼容.md`
