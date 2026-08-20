@@ -8,7 +8,7 @@
 - Lightweight reacceptance baseline: `9ed5839`（返工单验收基线）
 - Agent: Codex
 - Environment: Windows；Node `v22.20.0`；npm `10.9.3`；Playwright Chromium `1.62.1`
-- Task book: `C:\Users\蔡天乐\Desktop\黑客松\UploadFit-开发任务书-v1.0\60-S5-全量测试安全与兼容.md`
+- Task book: `docs/archive/v1/work-orders/60-S5-全量测试安全与兼容.md`
 - Artifact: `dist/uploadfit.js`，175,868 bytes；SHA-256 `29C5613CD5F9C71EBBD9E88754097B18435A4FA8508D0E2612D160233D79FD8F`
 
 此前的 `BLOCKED_BY_ENVIRONMENT` 只表示真实 Tabbit 矩阵尚未具备执行条件；本轮已通过远程 CDP 补齐 LR1–LR5。当前 handoff 申请 `READY_FOR_REACCEPTANCE`，仍不得在独立验收前把 S5 写成 `ACCEPTED`。

@@ -1,6 +1,8 @@
 # UploadFit
 
-UploadFit 是一个在浏览器本地识别图片上传规则、处理图片并安全回填文件框的 Tabbit 纯 JavaScript 插件。图片字节不会发送到远端；AI 只在本地规则不完整时通过 Tabbit 提供的 `LLMBridge.chat()` 理解经过筛选的规则文本。
+UploadFit 是一个在浏览器本地识别文件上传规则、执行最小必要适配并安全回填文件框的 Tabbit 纯 JavaScript 插件。当前生产包是已验收的 V1 图片版；V2 长语音转写上传适配已经完成 PRD 和施工拆分，尚未进入生产实现。
+
+当前图片字节不会发送到远端；AI 只在本地规则不完整时通过 Tabbit 提供的 `LLMBridge.chat()` 理解经过筛选的规则文本。V2 同样要求音频内容不离开浏览器本地，AI 不接触音频文件或元数据。
 
 ## 构建与验证
 
@@ -25,9 +27,13 @@ npm run test:e2e
 
 不要把源码目录、多文件 import 或 Markdown 代码围栏粘贴到 Tabbit。发布时保留生产包的实际字节数与 SHA-256；项目不设置固定体积上限。
 
+当前 `dist/uploadfit.js` **不包含音频功能**。音频 V2 只能从 `V2-S0` 可行性探针开始，不能直接按 PRD 对当前包进行功能宣传。
+
 ## 文档导航
 
 - `docs/progress.md`：阶段进度与验收记录。
+- `docs/v2/README.md`：V2 音频 MVP 的 PRD、施工入口和当前放行状态。
+- `docs/archive/v1/README.md`：V1 PRD/任务书归档及阶段状态。
 - `docs/handoffs/`：各阶段交接、返工和复验报告。
 - `docs/evidence/`：结构化与视觉证据。
 - `docs/testing-sites.md`：公开站点与本地回归夹具清单。

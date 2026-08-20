@@ -9,7 +9,7 @@
 - End commit: 本次 S4 提交（见当前 HEAD，本地 Git 留痕）
 - Agent: Claude / UploadFit S4 Agent
 - Environment: Windows；Node v22.20.0；npm 10.9.3；Playwright Chromium 1.62.1（命令经 WSL interop 调用工程 node_modules；Node 侧 vitest/e2e 全部通过 Windows node 执行）
-- 任务书：`C:\Users\蔡天乐\Desktop\黑客松\UploadFit-开发任务书-v1.0\50-S4-UI确认与Tabbit-AI.md`
+- 任务书：`docs/archive/v1/work-orders/50-S4-UI确认与Tabbit-AI.md`
 - 生产产物：`dist/uploadfit.js`，167,513 bytes
 - SHA-256：`4656F05C260F676E24DDF4E94D9AB43AFDBE6BF4C2356D2F72071008BEE04509`
 

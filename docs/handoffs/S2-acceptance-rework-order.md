@@ -2,7 +2,7 @@
 
 - 施工单日期：2026-08-18
 - 工程目录：`C:\Users\蔡天乐\Desktop\黑客松\main`
-- 对应任务书：`C:\Users\蔡天乐\Desktop\黑客松\UploadFit-开发任务书-v1.0\30-S2-图像处理引擎.md`
+- 对应任务书：`docs/archive/v1/work-orders/30-S2-图像处理引擎.md`
 - 独立验收基线：`8e502f9`（`docs: mark S2 ready for acceptance`）
 - S2 实质实现基线：`463bab7`
 - 当前状态：`BLOCKED_REWORK`

@@ -4,8 +4,8 @@
 
 状态：`ACCEPTED`。返工基线：`ce0cb3f`；独立复验修复提交：`09e7d3d`；S4 已放行。
 
-任务书：C:\Users\蔡天乐\Desktop\黑客松\UploadFit-开发任务书-v1.0\40-S3-任务编排与上传闭环.md
-共享契约：C:\Users\蔡天乐\Desktop\黑客松\UploadFit-开发任务书-v1.0\01-共享契约与接口基线.md
+任务书：`docs/archive/v1/work-orders/40-S3-任务编排与上传闭环.md`
+共享契约：`docs/archive/v1/work-orders/01-共享契约与接口基线.md`
 基线提交：1e2d0d9
 工程目录：C:\Users\蔡天乐\Desktop\黑客松\main
 

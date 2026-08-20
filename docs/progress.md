@@ -1,14 +1,15 @@
 # UploadFit 开发进度记录
 
-本文件记录按《UploadFit-开发任务书-v1.0》执行的逐步进度。每完成一个可独立验收的步骤就暂停并向用户汇报；遇到需要决策、授权或平台能力不确定时立即暂停，不把推测写成通过结论。
+本文件记录 UploadFit V1 实施历史和 V2 后续进度。每完成一个可独立验收的步骤就暂停并向用户汇报；遇到需要决策、授权或平台能力不确定时立即暂停，不把推测写成通过结论。
 
 ## 工程基线
 
 - 工程目录：`C:\Users\蔡天乐\Desktop\黑客松\main`
-- 需求事实来源：`C:\Users\蔡天乐\Desktop\黑客松\UploadFit-PRD-v1.0.md`
-- 执行任务书：`C:\Users\蔡天乐\Desktop\黑客松\UploadFit-开发任务书-v1.0`
-- 当前阶段：S5 本地全量测试、安全与兼容性实现
-- 当前状态：以 `8d9d9ad` 作为 S5 正式起始基线；本地自动化、静态安全、性能和稳定测试已完成，真实 Tabbit 矩阵因当前 in-app Browser 无可用实例而记为 `BLOCKED_BY_ENVIRONMENT`，未宣称 S5 验收通过。
+- V1 归档事实源：`docs/archive/v1/UploadFit-PRD-v1.0.md` 与 `docs/archive/v1/work-orders/`
+- V2 需求事实源：`docs/v2/UploadFit-PRD-v2.0.md`
+- V2 执行任务书：`docs/v2/work-orders/`
+- 当前阶段：V2-S0 编解码与 Tabbit 可行性探针
+- 当前状态：`READY_TO_START`。V1 S0–S5 已验收；原 V1-S6 未启动并由 V2-S5 承接。当前 production bundle 仍只包含图片能力，音频代码尚未施工。
 - 记录日期：2026-08-20
 
 ## 2026-08-17：S0 / 平台连接确认
@@ -859,3 +860,13 @@ S2 范围：
 - 临时脚本最终关闭自动运行并保存为 false，临时匹配页签关闭；未公开分享、未保存完整 prompt/响应或用户数据。
 
 证据索引：`docs/evidence/S5/s5-tabbit-install-refresh.json`、`s5-tabbit-scenario-a.json`、`s5-tabbit-scenario-b.json`、`s5-tabbit-ai-redacted.json`、`s5-tabbit-close-rerun.json` 及对应截图；总矩阵见 `docs/evidence/S5/tabbit-matrix.json`，交接见 `docs/handoffs/S5-lightweight-reacceptance-report.md`。
+
+## 2026-08-20：V1 归档与 V2 音频 MVP 立项
+
+状态：`V2-S0 READY_TO_START`。
+
+S5 依据真实 Tabbit LR1–LR6 与本地全量证据正式记录为 `ACCEPTED`，结论见 `docs/handoffs/S5-final-acceptance.md`。V1 PRD 与整套任务书迁入 `docs/archive/v1/`，代码 handoff/evidence 保留原路径作为审计链；原 V1-S6 未启动，由 V2-S5 承接发布工作。
+
+V2 产品范围已收缩为唯一音频场景：长语音录音上传转写时，页面明确允许 MP3、明确给出单文件最大字节数，且当前文件因格式或体积不符无法继续。合规文件原样放行；处理为本地有损 MP3、必须确认、不自动提交。音乐、视频抽音轨、批量、裁剪/分段、降噪和时长墙均不在范围。
+
+新增 `docs/v2/UploadFit-PRD-v2.0.md` 和 `docs/v2/work-orders/`，包含总控、共享契约、V2-S0 至 S5 逐阶段施工单、需求追踪矩阵和最终验收手册。只有 V2-S0 被放行；该阶段必须在真实 Tabbit 单 IIFE 中用实际大于 200,000,000 bytes 的可解码非敏感合成录音完成到不超过 100,000,000 bytes MP3 的流式、可取消、零外联实证，失败则停止 V2。
