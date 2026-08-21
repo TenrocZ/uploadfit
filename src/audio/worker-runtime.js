@@ -241,6 +241,12 @@ export function createAudioWorkerRuntime(options = {}) {
         if (settled) return;
         settled = true;
         cleanup();
+        if (value instanceof AudioProcessingError) {
+          value.details = {
+            ...(value.details ?? {}),
+            cleanup: { ...cleanupState }
+          };
+        }
         if (active?.taskId === taskId) active = null;
         callback(value);
       };

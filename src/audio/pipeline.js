@@ -239,11 +239,19 @@ async function processPass(file, passPlan, runtime, progress, options) {
         AUDIO_PCM_BUFFER_BUDGET
       )
     });
-    throwIfAborted(options.signal);
-    return normalizeRuntimeResult(result);
+    const normalized = normalizeRuntimeResult(result);
+    if (options.signal?.aborted) {
+      throw new AudioProcessingError('AUDIO_PROCESSING_CANCELLED', undefined, {
+        cleanup: normalized.cleanup ?? null
+      });
+    }
+    return normalized;
   } catch (error) {
-    if (options.signal?.aborted) throwIfAborted(options.signal);
-    throw asAudioProcessingError(error);
+    const normalized = asAudioProcessingError(error);
+    if (options.signal?.aborted && normalized.code !== 'AUDIO_PROCESSING_CANCELLED') {
+      throwIfAborted(options.signal);
+    }
+    throw normalized;
   }
 }
 
@@ -394,8 +402,11 @@ export async function processAudio(file, plan, options = {}) {
       cleanup: lastRuntime?.cleanup ?? null
     };
   } catch (error) {
-    if (signal?.aborted) throwIfAborted(signal);
-    throw asAudioProcessingError(error);
+    const normalized = asAudioProcessingError(error);
+    if (signal?.aborted && normalized.code !== 'AUDIO_PROCESSING_CANCELLED') {
+      throwIfAborted(signal);
+    }
+    throw normalized;
   } finally {
     if (ownsRuntime) {
       try { runtime?.dispose?.(); } catch {}

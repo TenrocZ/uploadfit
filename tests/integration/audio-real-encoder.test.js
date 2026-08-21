@@ -94,8 +94,9 @@ async function installRunner(page, source) {
           workerRuntime: window.__s2Runtime,
           inputChunkBytes: opts.inputChunkBytes,
           onProgress: (event) => {
-            progress.push({ ratio: event.ratio, at: performance.now() - startedAt });
-            if (opts.abortOnFirstProgress && progress.length === 1) {
+            progress.push({ phase: event.phase, ratio: event.ratio, at: performance.now() - startedAt });
+            const encodeProgressCount = progress.filter((item) => item.phase === 'encode').length;
+            if (opts.abortOnFirstProgress && event.phase === 'encode' && encodeProgressCount === 1) {
               abortedAt = performance.now();
               controller.abort();
             }

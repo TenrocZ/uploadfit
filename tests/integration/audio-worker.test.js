@@ -70,6 +70,9 @@ test.describe('S2 audio worker protocol', () => {
     const pending = runtime.run({ size: 1 }, { targetMaxBytes: 100, safeTargetBytes: 90 }, { signal: controller.signal });
     controller.abort();
     await expect(pending).rejects.toMatchObject({ code: 'AUDIO_PROCESSING_CANCELLED' });
+    await expect(pending).rejects.toMatchObject({
+      details: { cleanup: { workerTerminated: true, objectUrlRevoked: true, queueCleared: true } }
+    });
     expect(CancelWorker.instances.at(-1).messages.map((item) => item.type)).toContain('CANCEL');
   });
 

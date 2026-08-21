@@ -136,7 +136,7 @@ async function installHarness(page, implementationSource) {
         maxHeartbeatGapMs = Math.max(maxHeartbeatGapMs, now - lastHeartbeat);
         lastHeartbeat = now;
       }, 100);
-      const progress = { events: 0, maxRatioGap: 0, lastRatio: 0, nonMonotonic: 0 };
+      const progress = { events: 0, encodeEvents: 0, maxRatioGap: 0, lastRatio: 0, nonMonotonic: 0 };
       const controller = new AbortController();
       let abortAt = null;
       const startedAt = performance.now();
@@ -149,10 +149,11 @@ async function installHarness(page, implementationSource) {
           timeoutMs: 900_000,
           onProgress: (event) => {
             progress.events += 1;
+            if (event.phase === 'encode') progress.encodeEvents += 1;
             progress.maxRatioGap = Math.max(progress.maxRatioGap, event.ratio - progress.lastRatio);
             if (event.ratio < progress.lastRatio) progress.nonMonotonic += 1;
             progress.lastRatio = event.ratio;
-            if (opts.abortOnFirstProgress && progress.events === 1) {
+            if (opts.abortOnFirstProgress && event.phase === 'encode' && progress.encodeEvents === 1) {
               abortAt = performance.now();
               controller.abort();
             }
@@ -190,6 +191,7 @@ async function installHarness(page, implementationSource) {
           progress,
           outputValidationValid: outputValidation.valid,
           outputValidationViolations: outputValidation.violations.map((item) => item.code),
+          frameValidation: outputValidation.frameValidation,
           warnings: result.warnings.map((item) => item.code),
           cleanup: result.cleanup ?? null
         };
@@ -198,7 +200,9 @@ async function installHarness(page, implementationSource) {
         return {
           ok: false,
           errorCode: error?.code ?? null,
-          errorDetails: error?.details ?? null,
+          errorDetails: error?.details?.forcedTerminate === true
+            ? { forcedTerminate: true }
+            : {},
           planSnapshot: {
             executable: plan.executable,
             passthrough: plan.passthrough,
@@ -218,7 +222,9 @@ async function installHarness(page, implementationSource) {
           },
           maxHeartbeatGapMs,
           progress,
-          cancelLatencyMs: abortAt === null ? null : performance.now() - abortAt
+          cancelLatencyMs: abortAt === null ? null : performance.now() - abortAt,
+          cleanup: error?.details?.cleanup ?? null,
+          partialOutputPersisted: false
         };
       }
     };
@@ -301,11 +307,16 @@ async function main() {
     && summary.success.outputBytes > 0
     && summary.success.outputBytes <= maxBytes
     && summary.success.outputValidationValid === true
+    && summary.success.frameValidation?.valid === true
+    && Number(summary.success.frameValidation?.count) >= 2
     && summary.success.workerUsed === true
     && summary.cancel?.ok === false
     && summary.cancel?.errorCode === 'AUDIO_PROCESSING_CANCELLED'
     && Number.isFinite(summary.cancel?.cancelLatencyMs)
     && summary.cancel.cancelLatencyMs <= 1000
+    && summary.cancel.cleanup?.workerTerminated === true
+    && summary.cancel.cleanup?.objectUrlRevoked === true
+    && summary.cancel.cleanup?.queueCleared === true
     && summary.reuse?.ok === true
   );
   process.exitCode = passed ? 0 : 1;

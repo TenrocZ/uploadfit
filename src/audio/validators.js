@@ -254,7 +254,8 @@ function outputResult() {
     warnings: [],
     safeAutoFixes: [],
     requiredConfirmations: [],
-    unfixable: []
+    unfixable: [],
+    frameValidation: null
   };
 }
 
@@ -338,6 +339,9 @@ export function validateAudioOutput(metadata, rules, plan, sourceMetadata = null
   }
 
   const frameCount = outputFrameCount(metadata, options);
+  if (isRecord(metadata.frameValidation)) {
+    result.frameValidation = { ...metadata.frameValidation };
+  }
   if (frameCount !== null && frameCount < 2 && options.allowSingleFrame !== true) {
     outputViolation(result, 'AUDIO_NO_AUDIO_FRAMES', 2, frameCount);
   }
