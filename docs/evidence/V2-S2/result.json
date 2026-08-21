@@ -1,8 +1,8 @@
 {
   "stage": "V2-S2",
-  "status": "READY_FOR_ACCEPTANCE",
+  "status": "ACCEPTED",
   "startCommit": "31d3d2b669ab5bf390cdd6a84b153e802811fb1f",
-  "endCommit": "ab6a765",
+  "endCommit": "3967a45",
   "prerequisites": {
     "s0": { "handoff": "docs/handoffs/V2-S0-handoff.md", "status": "ACCEPTED" },
     "s1": { "handoff": "docs/handoffs/V2-S1-handoff.md", "status": "ACCEPTED" }
@@ -10,8 +10,9 @@
   "rework": {
     "order": "docs/handoffs/V2-S2-acceptance-rework-order.md",
     "reacceptanceOrder": "docs/handoffs/V2-S2-reacceptance-rework-order.md",
-    "report": "docs/handoffs/V2-S2-rework-report.md",
-    "round": 2
+    "thirdAcceptanceOrder": "docs/handoffs/V2-S2-third-acceptance-rework-order.md",
+    "report": "docs/handoffs/V2-S2-third-rework-report.md",
+    "round": 3
   },
   "encoder": {
     "package": "lamejs",
@@ -39,23 +40,25 @@
     "progressIntervalMs": 100,
     "inputChunkBytes": 4194304,
     "pcmBufferBudgetBytes": 33554432,
-    "mainThreadFallback": false
+    "mainThreadFallback": false,
+    "activeDispose": "immediate AUDIO_PROCESSING_CANCELLED + terminate + timers/listener cleanup + object URL revoke"
   },
   "tests": {
     "command": "npm test -- --run",
     "testFiles": 25,
-    "tests": 227,
+    "tests": 228,
     "planner": "PASS",
     "outputValidation": "PASS",
     "pipelineHarness": "PASS",
     "workerHarness": "PASS",
     "handlerHarness": "PASS (Playwright Node harness)",
-    "realEncoder": "PASS (tests/integration/audio-real-encoder.test.js: 6 cases, real lamejs Worker in Chromium)"
+    "realEncoder": "PASS (7 test cases; includes PCM16/24/32 x mono/stereo through the real lamejs Blob Worker)"
   },
   "e2e": {
     "command": "npm run test:e2e -- --reporter=line --workers=1",
     "passed": 141,
-    "failed": 0
+    "failed": 0,
+    "reuseNote": "Previously accepted full regression; not rerun in round 3 because production entry and V1 paths are unchanged."
   },
   "e2eHarness": {
     "runner": "scripts/run-e2e.js",
@@ -84,6 +87,34 @@
     "unhandledChildError": false,
     "codeCommit": "ab6a765"
   },
+  "round3Verification": {
+    "codeCommit": "3967a45",
+    "targetedCommand": "npm run test:e2e -- --grep \"S2 audio\" --reporter=line --workers=1",
+    "targetedPassed": 29,
+    "targetedFailed": 0,
+    "canonicalStopIntegrity": {
+      "status": "PASS",
+      "stops": ["OFFICIAL_TOOL_REQUIRED", "AUDIO_ORIGINAL_REQUIRED", "AUDIO_LOSSLESS_REQUIRED", "AUDIO_DURATION_LIMIT_UNFIXABLE", "AUDIO_TARGET_UNSAFE", "AUDIO_CODEC_UNSUPPORTED"],
+      "runtimeRuns": 0
+    },
+    "activeDispose": {
+      "status": "PASS",
+      "layers": ["runtime", "pipeline self-created runtime", "handler self-created runtime"],
+      "lateResultIgnored": true,
+      "repeatDisposeIdempotent": true,
+      "objectUrlsRemaining": 0
+    },
+    "realPcmVariants": {
+      "status": "PASS",
+      "bitDepths": [16, 24, 32],
+      "channels": [1, 2],
+      "combinations": 6,
+      "assertions": ["audio/mpeg", "size", "sampleRate", "channels", "workerUsed", "encodePasses=1", "independentValidation", "frameValidation", "cleanup"]
+    },
+    "check": "PASS (25 files, 228 tests, build, static-check)",
+    "adapter": "PASS (166929 bytes, lamejs@1.2.1, forbiddenMatches=[])",
+    "resourceReuse": "The accepted 141-case full E2E, 200MB production-equivalent gate and real Tabbit evidence were not rerun. Frozen encoder/adapter and output planning math are unchanged; normal runtime completion/cleanup was revalidated with six real PCM variants, while round-3 logic changes focus on pre-runtime plan guards and active-dispose settlement."
+  },
   "bundle": {
     "productionBytes": 185068,
     "productionSha256": "8BBBD1CB9564E2A6D01E53ABEC71B8B6D46AABB765FA90C16C3C7960E7EE404E",
@@ -93,6 +124,7 @@
   },
   "productionEquivalent200MBGate": {
     "status": "PASS",
+    "round3EvidencePolicy": "REUSED; not rerun by explicit resource-saving instruction. Frozen encoder/adapter and output planning math did not change; normal Worker completion/cleanup was revalidated with six real PCM variants.",
     "command": "npm run audio:s2:gate",
     "environment": "local Playwright Chromium, win32 x64, Node v22.20.0; S2 handler chain + frozen lamejs Worker",
     "input": { "bytes": 200000044, "container": "wav", "codec": "pcm", "bitDepth": 32, "sampleRate": 48000, "channels": 2, "durationMs": 520833.3333333334 },

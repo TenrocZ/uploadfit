@@ -870,3 +870,11 @@ S5 依据真实 Tabbit LR1–LR6 与本地全量证据正式记录为 `ACCEPTED`
 V2 产品范围已收缩为唯一音频场景：长语音录音上传转写时，页面明确允许 MP3、明确给出单文件最大字节数，且当前文件因格式或体积不符无法继续。合规文件原样放行；处理为本地有损 MP3、必须确认、不自动提交。音乐、视频抽音轨、批量、裁剪/分段、降噪和时长墙均不在范围。
 
 新增 `docs/v2/UploadFit-PRD-v2.0.md` 和 `docs/v2/work-orders/`，包含总控、共享契约、V2-S0 至 S5 逐阶段施工单、需求追踪矩阵和最终验收手册。只有 V2-S0 被放行；该阶段必须在真实 Tabbit 单 IIFE 中用实际大于 200,000,000 bytes 的可解码非敏感合成录音完成到不超过 100,000,000 bytes MP3 的流式、可取消、零外联实证，失败则停止 V2。
+
+## 2026-08-21：V2-S2 第三轮返修完成并验收
+
+状态：`V2-S2 ACCEPTED`，V2-S3 前置已满足、可以启动。
+
+最终代码提交 `3967a45` 修复三项：canonical safety stop 无法再被外部 plan 的 `executable/unfixable` 篡改绕过；runtime/pipeline/handler 的 active dispose 立即结算并完整清理；真实 `lamejs` Blob Worker 快速套件覆盖 PCM16/24/32 × mono/stereo 六组合。
+
+本轮实际执行 S2 定向 E2E 29/29、Node/Vitest 25 files / 228 tests、production build、static-check、adapter build 和 diff check，均通过。按用户节约资源要求，已通过且未受修复影响的 141 项全量 E2E、200MB 慢速门禁和真实 Tabbit 证据未重复执行；复用边界和依据见 `docs/handoffs/V2-S2-third-rework-report.md`。production 包仍不含音频接线，S3 之前不宣传音频功能。
