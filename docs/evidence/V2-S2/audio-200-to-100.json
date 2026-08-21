@@ -3,8 +3,8 @@
     "runner": "local Playwright Chromium (production-equivalent S2 handler + frozen lamejs Worker); real-Tabbit gate is owned by V2-S4",
     "node": "v22.20.0",
     "platform": "win32 x64",
-    "startedAt": "2026-08-21T09:21:04.242Z",
-    "wallClockMs": 47013
+    "startedAt": "2026-08-21T09:44:08.035Z",
+    "wallClockMs": 41561
   },
   "fixture": {
     "bytes": 200000044,
@@ -28,20 +28,25 @@
     "outputDurationMs": 520868.8,
     "outputSampleRate": 48000,
     "outputChannels": 2,
-    "processingElapsedMs": 40327,
+    "processingElapsedMs": 35204,
     "encodePasses": 1,
     "workerUsed": true,
     "passthrough": false,
     "peakBufferedBytes": 26825856,
-    "maxHeartbeatGapMs": 113.20000004768372,
+    "maxHeartbeatGapMs": 112.09999990463257,
     "progress": {
       "events": 51,
+      "encodeEvents": 48,
       "maxRatioGap": 0.02097152000000002,
       "lastRatio": 1,
       "nonMonotonic": 0
     },
     "outputValidationValid": true,
     "outputValidationViolations": [],
+    "frameValidation": {
+      "count": 203,
+      "valid": true
+    },
     "warnings": [],
     "cleanup": {
       "workerTerminated": true,
@@ -75,14 +80,22 @@
       "channels": 2,
       "errorCode": null
     },
-    "maxHeartbeatGapMs": 0,
+    "maxHeartbeatGapMs": 112.59999990463257,
     "progress": {
-      "events": 1,
-      "maxRatioGap": 0,
-      "lastRatio": 0,
+      "events": 2,
+      "encodeEvents": 1,
+      "maxRatioGap": 0.02097152,
+      "lastRatio": 0.02097152,
       "nonMonotonic": 0
     },
-    "cancelLatencyMs": 1
+    "cancelLatencyMs": 9.699999809265137,
+    "cleanup": {
+      "workerTerminated": true,
+      "objectUrlRevoked": true,
+      "queueCleared": true,
+      "disposed": true
+    },
+    "partialOutputPersisted": false
   },
   "reuse": {
     "ok": true,
@@ -102,20 +115,25 @@
     "outputDurationMs": 2037.5510204081634,
     "outputSampleRate": 44100,
     "outputChannels": 2,
-    "processingElapsedMs": 283,
+    "processingElapsedMs": 272,
     "encodePasses": 1,
     "workerUsed": true,
     "passthrough": false,
     "peakBufferedBytes": 705600,
-    "maxHeartbeatGapMs": 115,
+    "maxHeartbeatGapMs": 108.29999995231628,
     "progress": {
       "events": 4,
+      "encodeEvents": 1,
       "maxRatioGap": 1,
       "lastRatio": 1,
       "nonMonotonic": 0
     },
     "outputValidationValid": true,
     "outputValidationViolations": [],
+    "frameValidation": {
+      "count": 186,
+      "valid": true
+    },
     "warnings": [],
     "cleanup": {
       "workerTerminated": true,

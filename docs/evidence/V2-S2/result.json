@@ -2,7 +2,7 @@
   "stage": "V2-S2",
   "status": "READY_FOR_ACCEPTANCE",
   "startCommit": "31d3d2b669ab5bf390cdd6a84b153e802811fb1f",
-  "endCommit": "80f559c",
+  "endCommit": "c58805b",
   "prerequisites": {
     "s0": { "handoff": "docs/handoffs/V2-S0-handoff.md", "status": "ACCEPTED" },
     "s1": { "handoff": "docs/handoffs/V2-S1-handoff.md", "status": "ACCEPTED" }
@@ -78,13 +78,15 @@
       "channels": 2,
       "withinMaxBytes": true,
       "independentValidation": "PASS",
+      "frameValidation": { "count": 203, "valid": true },
       "crossCheck": "S2 production-equivalent result; no real-Tabbit claim (that gate is owned by S4)"
     },
     "runtime": {
       "workerUsed": true,
       "encodePasses": 1,
-      "processingElapsedMs": 40327,
-      "maxHeartbeatGapMs": 113.20000004768372,
+      "inputBytesRead": 201048576,
+      "processingElapsedMs": 35204,
+      "maxHeartbeatGapMs": 112.09999990463257,
       "peakBufferedBytes": 26825856,
       "peakBufferedBoundBytes": 137748736,
       "peakBufferedBoundComponents": {
@@ -93,13 +95,18 @@
         "outputHardMaxBytes": 100000000
       },
       "progressEvents": 51,
+      "encodeProgressEvents": 48,
       "progressMonotonic": true
     },
     "cancel": {
       "status": "CANCELLED",
-      "cancelLatencyMs": 1,
+      "cancelLatencyMs": 9.699999809265137,
+      "maxHeartbeatGapMs": 112.59999990463257,
+      "progressEvents": 2,
+      "encodeProgressEvents": 1,
       "forcedTerminateAvailable": true,
-      "partialOutputPersisted": false
+      "partialOutputPersisted": false,
+      "cleanup": { "workerTerminated": true, "objectUrlRevoked": true, "queueCleared": true, "disposed": true }
     },
     "reuseAfterCancel": "PASS (2s in-page WAV encoded with fresh progress/cleanup state)",
     "cleanup": { "workerTerminated": true, "objectUrlRevoked": true, "queueCleared": true },

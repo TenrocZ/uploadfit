@@ -33,10 +33,11 @@
 - 计划：320kbps、stereo、48kHz、safe target 95,000,000 bytes；1 个有损确认；
 - 输出：20,834,880-byte `audio/mpeg`，SHA-256 `9394F96A5CDBD87823BB3223F584BB844471A74C6AA73DAB2B0EB44C39F16FBC`；独立复检通过（首中尾帧、时长 520,868.8ms 未截短）；
 - 本条只证明 S2 production-equivalent handler，不宣称真实 Tabbit；真实 Tabbit 门禁归 S4；
-- 处理墙钟 40,327ms；单遍；主线程心跳最大间隔 113.2ms（目标 ≤500ms）；
+- 处理墙钟 35,204ms；单遍；主线程心跳最大间隔 112.1ms（目标 ≤500ms）；
 - 峰值缓冲实测 26,825,856 bytes；理论硬上界 137,748,736 bytes = 4MiB 输入块 + 32MiB PCM 预算 + 100,000,000-byte 输出聚合上限；
 - progress 51 个事件、单调、终值 1；
-- 取消用例：首个进度后 abort，`AUDIO_PROCESSING_CANCELLED`，延迟 1ms，无半成品；
+- 取消用例：首个 encode progress 后 abort，`AUDIO_PROCESSING_CANCELLED`，延迟 9.7ms，无半成品；Worker terminated、object URL revoked、队列清空、disposed 均为 true；
+- 首中尾 MP3 帧复检：203 个代表性帧，`valid=true`；
 - 取消后再跑 2s 小文件成功，无 Worker/内存残留；
 - Worker terminated、object URL revoked、队列清空；临时 fixture 已删除。
 

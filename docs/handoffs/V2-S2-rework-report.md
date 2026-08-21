@@ -16,7 +16,7 @@
 | R2-6 单元测试边界缺口 | MEDIUM | ✅ 已修复 | `audio-planner.test.js` 13 用例（+8）：精确阶梯档位、48 分界、MiB/decimal、reserve 交叉点、duration 异常、decline、过期重放、冻结门控、采样率承诺 |
 | R2-7 `skipPlanIdentity` 死口子 | LOW | ✅ 已删除 | `pipeline.js` 无该选项 |
 | R2-8 确认跨 plan 重放窗口 | LOW | ✅ 已收敛 | planner/validator 共用 `src/audio/confirmation.js`；confirmation id 绑定 `type + payload` 稳定 JSON 双轮 FNV-1a 哈希；参数变化即拒绝；参数全同的重放窗口移交 S3 controller（handoff 已记录） |
-| R2-9 记录性偏差 | LOW | ✅ 已留痕（历史聚合提交） | passthrough `workerUsed:false/encodePasses:0` 批准偏差；本轮 S2 代码/测试修复形成聚焦提交 `a289226`、`80f559c`。历史 S0/S1/S2 聚合基线 `07d25a4` 不做破坏性重写，S0/S1 的阶段拆分偏差保留审计记录 |
+| R2-9 记录性偏差 | LOW | ✅ 已留痕（历史聚合提交） | passthrough `workerUsed:false/encodePasses:0` 批准偏差；本轮 S2 代码/测试修复形成聚焦提交 `a289226`、`80f559c`、`c58805b`。历史 S0/S1/S2 聚合基线 `07d25a4` 不做破坏性重写，S0/S1 的阶段拆分偏差保留审计记录 |
 | R2-10（返工中新发现）Worker 模板作用域 bug | BLOCKER（已修复） | ✅ 已修复 | 见下节 |
 
 ## 2. 返工中新发现的缺陷（R2-10）
@@ -68,7 +68,7 @@ R2-1 的真实编码测试暴露第二个行为事实：冻结 lamejs 在低码�
 | `npm run build` | 185,068 bytes（与返工前逐字节一致；音频引擎未进生产包） |
 | `npm run static-check` | PASS；SHA-256 `8BBBD1CB9564E2A6D01E53ABEC71B8B6D46AABB765FA90C16C3C7960E7EE404E` 不变 |
 | `git diff --check` | 干净 |
-| `npm run audio:s2:gate` | PASS（200,000,044→20,834,880 bytes；40,327ms；心跳 113.2ms；取消 1ms；复用正常；输出 SHA `9394F96A5CDBD87823BB3223F584BB844471A74C6AA73DAB2B0EB44C39F16FBC`） |
+| `npm run audio:s2:gate` | PASS（200,000,044→20,834,880 bytes；35,204ms；心跳 112.1ms；首中尾帧 203/valid；processing 中取消 9.7ms 且清理完整；复用正常；输出 SHA `9394F96A5CDBD87823BB3223F584BB844471A74C6AA73DAB2B0EB44C39F16FBC`） |
 
 ## 6. 已知限制（移交）
 
