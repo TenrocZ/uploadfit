@@ -3,7 +3,7 @@
 - Status: `READY_FOR_ACCEPTANCE`（返工第 1 轮完成，申请复验）
 - Date: 2026-08-21
 - Start commit: `31d3d2b669ab5bf390cdd6a84b153e802811fb1f`
-- End commit: `WORKTREE`（返工完成后按总控第 13 节分阶段提交）
+- End commit: `07d25a4`（V2-S0..S2 单次聚焦提交；三阶段文件级耦合，拆分会产生不可构建中间态，已在提交说明中记录）
 - Rework order: `docs/handoffs/V2-S2-acceptance-rework-order.md`
 - Rework report: `docs/handoffs/V2-S2-rework-report.md`
 - Prerequisites: V2-S0 `ACCEPTED`、V2-S1 `ACCEPTED`（用户已确认）
