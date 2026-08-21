@@ -3,7 +3,7 @@
 - Status: `READY_FOR_ACCEPTANCE`（返工第 1 轮完成，申请复验）
 - Date: 2026-08-21
 - Start commit: `31d3d2b669ab5bf390cdd6a84b153e802811fb1f`
-- End commit: `07d25a4`（V2-S0..S2 单次聚焦提交；三阶段文件级耦合，拆分会产生不可构建中间态，已在提交说明中记录）
+- End commit: `a289226`（本轮 S2 复验修复的聚焦提交；历史 V2-S0..S2 聚合基线为 `07d25a4`，未对已验收历史做破坏性重写）
 - Rework order: `docs/handoffs/V2-S2-acceptance-rework-order.md`
 - Rework report: `docs/handoffs/V2-S2-rework-report.md`
 - Prerequisites: V2-S0 `ACCEPTED`、V2-S1 `ACCEPTED`（用户已确认）
@@ -13,6 +13,7 @@
 
 ```text
 src/audio/encoder-contract.js
+src/audio/confirmation.js
 src/audio/planner.js
 src/audio/worker-runtime.js
 src/audio/pipeline.js
@@ -122,7 +123,7 @@ git diff --check
 npm run audio:s2:gate
 ```
 
-语义：本地 Playwright Chromium 运行真实 S2 handler 链（planner → 确认 → processAudio → 独立复检）与冻结 lamejs Worker；生成 200,000,044-byte PCM32 WAV 至系统临时目录，取证后删除。本次执行结果：输出 20,834,880-byte `audio/mpeg`（SHA-256 `7490E27B43CA99B5563CB6FFF877556C866FAA29F74B54E6557A033071D045CD`），处理 36,165ms，主线程心跳最大 112ms，峰值缓冲 26,825,856 bytes，取消延迟 0.7ms，清理完整，取消后小文件复用正常。结构化结果：`docs/evidence/V2-S2/audio-200-to-100.json`。
+语义：本地 Playwright Chromium 运行真实 S2 handler 链（planner → 确认 → processAudio → 独立复检）与冻结 lamejs Worker；生成 200,000,044-byte PCM32 WAV 至系统临时目录，取证后删除。本次执行结果：输出 20,834,880-byte `audio/mpeg`（SHA-256 `9394F96A5CDBD87823BB3223F584BB844471A74C6AA73DAB2B0EB44C39F16FBC`），处理 40,327ms，主线程心跳最大 113.2ms，峰值缓冲 26,825,856 bytes，取消延迟 1ms，清理完整，取消后小文件复用正常。结构化结果：`docs/evidence/V2-S2/audio-200-to-100.json`。
 
 说明：`capture-tabbit.mjs` 是 S0 的真实 Tabbit CDP 探针（参数 `--cdp=http://127.0.0.1:<port>`），真实 Tabbit 200MB 门禁按总控第 5 节归 V2-S4 执行；S2 阶段以 production-equivalent 门禁为准。
 

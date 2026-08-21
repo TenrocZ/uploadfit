@@ -2,7 +2,7 @@
   "stage": "V2-S2",
   "status": "READY_FOR_ACCEPTANCE",
   "startCommit": "31d3d2b669ab5bf390cdd6a84b153e802811fb1f",
-  "endCommit": "07d25a4",
+  "endCommit": "a289226",
   "prerequisites": {
     "s0": { "handoff": "docs/handoffs/V2-S0-handoff.md", "status": "ACCEPTED" },
     "s1": { "handoff": "docs/handoffs/V2-S1-handoff.md", "status": "ACCEPTED" }
@@ -67,32 +67,37 @@
     "status": "PASS",
     "command": "npm run audio:s2:gate",
     "environment": "local Playwright Chromium, win32 x64, Node v22.20.0; S2 handler chain + frozen lamejs Worker",
-    "input": { "bytes": 200000044, "container": "wav", "codec": "pcm", "bitDepth": 32, "sampleRate": 48000, "channels": 2, "durationMs": 520833.44 },
+    "input": { "bytes": 200000044, "container": "wav", "codec": "pcm", "bitDepth": 32, "sampleRate": 48000, "channels": 2, "durationMs": 520833.3333333334 },
     "plan": { "targetBitrateKbps": 320, "targetSampleRate": 48000, "targetChannels": 2, "safeTargetBytes": 95000000 },
     "output": {
       "bytes": 20834880,
       "mime": "audio/mpeg",
-      "sha256": "7490E27B43CA99B5563CB6FFF877556C866FAA29F74B54E6557A033071D045CD",
+      "sha256": "9394F96A5CDBD87823BB3223F584BB844471A74C6AA73DAB2B0EB44C39F16FBC",
       "durationMs": 520868.8,
       "sampleRate": 48000,
       "channels": 2,
       "withinMaxBytes": true,
       "independentValidation": "PASS",
-      "crossCheck": "byte size identical to S0 real-Tabbit gate output (20,834,880) for the same fixture"
+      "crossCheck": "S2 production-equivalent result; no real-Tabbit claim (that gate is owned by S4)"
     },
     "runtime": {
       "workerUsed": true,
       "encodePasses": 1,
-      "processingElapsedMs": 36165,
-      "maxHeartbeatGapMs": 112,
+      "processingElapsedMs": 40327,
+      "maxHeartbeatGapMs": 113.20000004768372,
       "peakBufferedBytes": 26825856,
-      "peakBufferedBoundBytes": 4194304 + 33554432,
+      "peakBufferedBoundBytes": 137748736,
+      "peakBufferedBoundComponents": {
+        "inputChunkBytes": 4194304,
+        "pcmBufferBudgetBytes": 33554432,
+        "outputHardMaxBytes": 100000000
+      },
       "progressEvents": 51,
       "progressMonotonic": true
     },
     "cancel": {
       "status": "CANCELLED",
-      "cancelLatencyMs": 0.7,
+      "cancelLatencyMs": 1,
       "forcedTerminateAvailable": true,
       "partialOutputPersisted": false
     },

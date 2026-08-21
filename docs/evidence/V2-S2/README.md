@@ -5,6 +5,7 @@
 ## 已交付
 
 - `src/audio/planner.js`：95%/64KiB 安全目标、有限数学、48kbps 离散阶梯、passthrough、payload 绑定的不可变 confirmation、两遍上限；低码率下承诺冻结编码器实际输出采样率（`encoder-contract.js` 的 48 组合实证表）；非 WAV 编码源停止为 `AUDIO_CODEC_UNSUPPORTED`。
+- `src/audio/confirmation.js`：planner 与 validator 共用稳定 JSON + 双轮 FNV-1a confirmation 身份，参数变化即失配。
 - `src/audio/worker-runtime.js`：Blob Worker 的 `START/CANCEL/DISPOSE`、严格 `taskId`、单任务、进度节流、稳定错误码和统一清理；finalize 进度在 runTask 作用域内发送（修复模板 ReferenceError）。
 - `src/audio/pipeline.js`：有界运行参数、独立输出复检、硬上限内安全余量 warning、最多第二遍降一档、取消和并发保护；不 dispose 调用方 runtime；降档后按冻结表重预测输出采样率。
 - `src/audio/validators.js`：MP3 容器/MIME/帧、大小、时长、sample rate、channels 和代表性首中尾帧复检；非 WAV 编码源不给不可执行的自动修复。
@@ -28,14 +29,14 @@
 
 命令：`npm run audio:s2:gate`（本地 Playwright Chromium + S2 handler 链 + 冻结 lamejs Worker；真实 Tabbit 门禁归 V2-S4）。
 
-- 输入：200,000,044-byte PCM32 WAV（48kHz、stereo、520,833ms），合成生成、取证后删除；
+- 输入：200,000,044-byte PCM32 WAV（48kHz、stereo、520,833.333ms），合成生成、取证后删除；
 - 计划：320kbps、stereo、48kHz、safe target 95,000,000 bytes；1 个有损确认；
-- 输出：20,834,880-byte `audio/mpeg`，SHA-256 `7490E27B43CA99B5563CB6FFF877556C866FAA29F74B54E6557A033071D045CD`；独立复检通过（首中尾帧、时长 520,868.8ms 未截短）；
-- 与 S0 真实 Tabbit 门禁同一 fixture 的输出大小逐字节一致（20,834,880），跨环境复现；
-- 处理墙钟 36,165ms；单遍；主线程心跳最大间隔 112ms（目标 ≤500ms）；
-- 峰值缓冲实测 26,825,856 bytes，理论硬上界 = 4MiB 输入块 + 32MiB PCM 预算 + 输出聚合；
+- 输出：20,834,880-byte `audio/mpeg`，SHA-256 `9394F96A5CDBD87823BB3223F584BB844471A74C6AA73DAB2B0EB44C39F16FBC`；独立复检通过（首中尾帧、时长 520,868.8ms 未截短）；
+- 本条只证明 S2 production-equivalent handler，不宣称真实 Tabbit；真实 Tabbit 门禁归 S4；
+- 处理墙钟 40,327ms；单遍；主线程心跳最大间隔 113.2ms（目标 ≤500ms）；
+- 峰值缓冲实测 26,825,856 bytes；理论硬上界 137,748,736 bytes = 4MiB 输入块 + 32MiB PCM 预算 + 100,000,000-byte 输出聚合上限；
 - progress 51 个事件、单调、终值 1；
-- 取消用例：首个进度后 abort，`AUDIO_PROCESSING_CANCELLED`，延迟 0.7ms，无半成品；
+- 取消用例：首个进度后 abort，`AUDIO_PROCESSING_CANCELLED`，延迟 1ms，无半成品；
 - 取消后再跑 2s 小文件成功，无 Worker/内存残留；
 - Worker terminated、object URL revoked、队列清空；临时 fixture 已删除。
 

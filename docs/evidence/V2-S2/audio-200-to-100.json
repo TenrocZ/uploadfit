@@ -3,11 +3,11 @@
     "runner": "local Playwright Chromium (production-equivalent S2 handler + frozen lamejs Worker); real-Tabbit gate is owned by V2-S4",
     "node": "v22.20.0",
     "platform": "win32 x64",
-    "startedAt": "2026-08-21T08:46:49.964Z",
-    "wallClockMs": 41558
+    "startedAt": "2026-08-21T09:21:04.242Z",
+    "wallClockMs": 47013
   },
   "fixture": {
-    "bytes": 200000084,
+    "bytes": 200000044,
     "source": "scripts/audio-probe/generate-fixture.mjs --bytes=200000044 --bit-depth=32; synthetic-only; file removed after capture"
   },
   "success": {
@@ -21,22 +21,22 @@
         "AUDIO_LOSSY_TRANSCODE"
       ]
     },
-    "inputBytesRead": 201048616,
+    "inputBytesRead": 201048576,
     "outputBytes": 20834880,
     "outputType": "audio/mpeg",
-    "outputSha256": "7490E27B43CA99B5563CB6FFF877556C866FAA29F74B54E6557A033071D045CD",
+    "outputSha256": "9394F96A5CDBD87823BB3223F584BB844471A74C6AA73DAB2B0EB44C39F16FBC",
     "outputDurationMs": 520868.8,
     "outputSampleRate": 48000,
     "outputChannels": 2,
-    "processingElapsedMs": 36165,
+    "processingElapsedMs": 40327,
     "encodePasses": 1,
     "workerUsed": true,
     "passthrough": false,
     "peakBufferedBytes": 26825856,
-    "maxHeartbeatGapMs": 112,
+    "maxHeartbeatGapMs": 113.20000004768372,
     "progress": {
       "events": 51,
-      "maxRatioGap": 0.020971515805696894,
+      "maxRatioGap": 0.02097152000000002,
       "lastRatio": 1,
       "nonMonotonic": 0
     },
@@ -70,7 +70,7 @@
       "signatureMime": "audio/wav",
       "container": "wav",
       "codec": "pcm",
-      "durationMs": 520833.43749999994,
+      "durationMs": 520833.3333333334,
       "sampleRate": 48000,
       "channels": 2,
       "errorCode": null
@@ -82,7 +82,7 @@
       "lastRatio": 0,
       "nonMonotonic": 0
     },
-    "cancelLatencyMs": 0.7000000476837158
+    "cancelLatencyMs": 1
   },
   "reuse": {
     "ok": true,
@@ -102,12 +102,12 @@
     "outputDurationMs": 2037.5510204081634,
     "outputSampleRate": 44100,
     "outputChannels": 2,
-    "processingElapsedMs": 274,
+    "processingElapsedMs": 283,
     "encodePasses": 1,
     "workerUsed": true,
     "passthrough": false,
     "peakBufferedBytes": 705600,
-    "maxHeartbeatGapMs": 112.20000004768372,
+    "maxHeartbeatGapMs": 115,
     "progress": {
       "events": 4,
       "maxRatioGap": 1,

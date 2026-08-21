@@ -38,7 +38,7 @@
       "generation": "npm run audio:s2:gate -> scripts/audio-probe/generate-fixture.mjs into an os.tmpdir() directory; deleted after capture",
       "result": "docs/evidence/V2-S2/audio-200-to-100.json",
       "outputBytes": 20834880,
-      "outputSha256": "7490E27B43CA99B5563CB6FFF877556C866FAA29F74B54E6557A033071D045CD"
+      "outputSha256": "9394F96A5CDBD87823BB3223F584BB844471A74C6AA73DAB2B0EB44C39F16FBC"
     },
     {
       "name": "tabbit-200mb-real-gate",
