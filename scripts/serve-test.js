@@ -13,6 +13,7 @@ const mimeTypes = {
   '.json': 'application/json; charset=utf-8',
   '.png': 'image/png'
 };
+const serverHeader = { 'x-uploadfit-test-server': '1' };
 
 function resolveRequestPath(requestUrl) {
   const parsedUrl = new URL(requestUrl ?? '/', 'http://127.0.0.1');
@@ -28,20 +29,37 @@ const server = createServer(async (request, response) => {
   try {
     const filePath = resolveRequestPath(request.url);
     if (!filePath || !existsSync(filePath)) {
-      response.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
+      response.writeHead(404, {
+        'content-type': 'text/plain; charset=utf-8',
+        ...serverHeader
+      });
       response.end('Not found');
       return;
     }
     const body = await readFile(filePath);
     const contentType = mimeTypes[path.extname(filePath).toLowerCase()]
       ?? 'application/octet-stream';
-    response.writeHead(200, { 'content-type': contentType });
+    response.writeHead(200, { 'content-type': contentType, ...serverHeader });
     response.end(body);
   } catch (error) {
-    response.writeHead(500, { 'content-type': 'text/plain; charset=utf-8' });
+    response.writeHead(500, {
+      'content-type': 'text/plain; charset=utf-8',
+      ...serverHeader
+    });
     response.end('Internal test server error');
     console.error(error);
   }
+});
+
+server.on('error', (error) => {
+  if (error.code === 'EADDRINUSE') {
+    // run-e2e.js probes for the marker before starting us. This handler also
+    // covers a narrow startup race without printing an unhandled stack.
+    process.exitCode = 0;
+    return;
+  }
+  console.error(error);
+  process.exitCode = 1;
 });
 
 server.listen(port, '127.0.0.1', () => {

@@ -5,29 +5,88 @@ import { fileURLToPath } from 'node:url';
 
 const rootDir = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const healthUrl = 'http://127.0.0.1:8765/test-pages/probe.html';
-const serverProcess = spawn(process.execPath, ['scripts/serve-test.js'], {
-  cwd: rootDir,
-  stdio: 'inherit'
-});
+let serverProcess = null;
+let ownsServer = false;
 
-function stopServer() {
-  if (!serverProcess.killed) serverProcess.kill();
+function probeServer(url, timeoutMs = 500) {
+  return new Promise((resolve) => {
+    let settled = false;
+    let timer;
+    const finish = (available) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(available);
+    };
+
+    const requestHandle = request(url, { method: 'HEAD' }, (response) => {
+      const isUploadFitServer = response.headers['x-uploadfit-test-server'] === '1';
+      response.resume();
+      finish(isUploadFitServer && response.statusCode >= 200 && response.statusCode < 500);
+    });
+    requestHandle.setTimeout(timeoutMs, () => {
+      requestHandle.destroy();
+      finish(false);
+    });
+    requestHandle.once('error', () => finish(false));
+    timer = setTimeout(() => {
+      requestHandle.destroy();
+      finish(false);
+    }, timeoutMs + 50);
+    requestHandle.end();
+  });
+}
+
+function startServer() {
+  serverProcess = spawn(process.execPath, ['scripts/serve-test.js'], {
+    cwd: rootDir,
+    stdio: 'inherit'
+  });
+  ownsServer = true;
+  serverProcess.once('error', (error) => {
+    // The child has its own listener for EADDRINUSE. Keep the parent from
+    // turning a recoverable race with an already healthy test server into an
+    // unhandled error.
+    if (error.code !== 'EADDRINUSE') console.error(error);
+  });
+}
+
+async function stopServer() {
+  if (!ownsServer || !serverProcess) return;
+  const child = serverProcess;
+  ownsServer = false;
+  serverProcess = null;
+  if (child.exitCode !== null || child.signalCode !== null) return;
+
+  await new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve();
+    };
+    const timer = setTimeout(finish, 2_000);
+    child.once('exit', finish);
+    try {
+      child.kill();
+    } catch {
+      finish();
+    }
+  });
 }
 
 function waitForServer(url, timeoutMs = 30_000) {
   const startedAt = Date.now();
   return new Promise((resolve, reject) => {
     const check = () => {
-      const requestHandle = request(url, { method: 'HEAD' }, (response) => {
-        response.resume();
-        if (response.statusCode && response.statusCode < 500) {
+      probeServer(url).then((available) => {
+        if (available) {
           resolve();
           return;
         }
         retry();
       });
-      requestHandle.on('error', retry);
-      requestHandle.end();
     };
 
     const retry = () => {
@@ -44,6 +103,11 @@ function waitForServer(url, timeoutMs = 30_000) {
 
 async function main() {
   try {
+    if (await probeServer(healthUrl)) {
+      console.log('Reusing existing UploadFit test server on 127.0.0.1:8765');
+    } else {
+      startServer();
+    }
     await waitForServer(healthUrl);
     const cliPath = path.join(rootDir, 'node_modules', '@playwright', 'test', 'cli.js');
     const testProcess = spawn(process.execPath, [
@@ -61,18 +125,17 @@ async function main() {
     console.error(error);
     process.exitCode = 1;
   } finally {
-    stopServer();
+    await stopServer();
   }
 }
 
 process.once('SIGINT', () => {
-  stopServer();
   process.exitCode = 130;
+  void stopServer();
 });
 process.once('SIGTERM', () => {
-  stopServer();
   process.exitCode = 143;
+  void stopServer();
 });
 
 await main();
-
