@@ -24,9 +24,11 @@ async function installRunner(page, source) {
     const workerRuntime = await import('/src/audio/worker-runtime.js');
     const validators = await import('/src/audio/validators.js');
     window.__s2Runtime = workerRuntime.createAudioWorkerRuntime({ implementationSource: impl });
-    window.__s2Wav = (seconds, sampleRate = 44100, channels = 2) => {
+    window.__s2Wav = (seconds, sampleRate = 44100, channels = 2, bitDepth = 16) => {
       const frames = Math.round(seconds * sampleRate);
-      const dataBytes = frames * channels * 2;
+      const bytesPerSample = bitDepth / 8;
+      const blockAlign = channels * bytesPerSample;
+      const dataBytes = frames * blockAlign;
       const bytes = new Uint8Array(44 + dataBytes);
       const view = new DataView(bytes.buffer);
       const put = (offset, value) => [...value].forEach((char, index) => {
@@ -40,15 +42,23 @@ async function installRunner(page, source) {
       view.setUint16(20, 1, true);
       view.setUint16(22, channels, true);
       view.setUint32(24, sampleRate, true);
-      view.setUint32(28, sampleRate * channels * 2, true);
-      view.setUint16(32, channels * 2, true);
-      view.setUint16(34, 16, true);
+      view.setUint32(28, sampleRate * blockAlign, true);
+      view.setUint16(32, blockAlign, true);
+      view.setUint16(34, bitDepth, true);
       put(36, 'data');
       view.setUint32(40, dataBytes, true);
       for (let frame = 0; frame < frames; frame += 1) {
-        const sample = Math.round(Math.sin((2 * Math.PI * 440 * frame) / sampleRate) * 12000);
+        const sine = Math.sin((2 * Math.PI * 440 * frame) / sampleRate);
         for (let channel = 0; channel < channels; channel += 1) {
-          view.setInt16(44 + (frame * channels + channel) * 2, sample, true);
+          const offset = 44 + (frame * channels + channel) * bytesPerSample;
+          if (bitDepth === 16) view.setInt16(offset, Math.round(sine * 12000), true);
+          else if (bitDepth === 24) {
+            let sample = Math.round(sine * 0x3fffff);
+            if (sample < 0) sample += 0x1000000;
+            bytes[offset] = sample & 0xff;
+            bytes[offset + 1] = (sample >>> 8) & 0xff;
+            bytes[offset + 2] = (sample >>> 16) & 0xff;
+          } else view.setInt32(offset, Math.round(sine * 0x3fffffff), true);
         }
       }
       return new File([bytes], 'voice.wav', { type: 'audio/wav' });
@@ -122,6 +132,8 @@ async function installRunner(page, source) {
           peakBufferedBytes: result.peakBufferedBytes,
           validationValid: validation.valid,
           violations: validation.violations.map((item) => item.code),
+          frameValidation: validation.frameValidation,
+          cleanup: result.cleanup ?? null,
           progress
         };
       } catch (error) {
@@ -165,6 +177,42 @@ test.describe('S2 audio engine with the real frozen lamejs Worker', () => {
       expect(ratios[index]).toBeGreaterThanOrEqual(ratios[index - 1]);
     }
     expect(ratios.at(-1)).toBe(1);
+  });
+
+  test('encodes every frozen PCM bit-depth and channel variant in the real Worker', async ({ page }) => {
+    await installRunner(page, await implementationSource());
+    const outcomes = await page.evaluate(async () => {
+      const results = [];
+      for (const bitDepth of [16, 24, 32]) {
+        for (const channels of [1, 2]) {
+          results.push({
+            bitDepth,
+            channels,
+            result: await window.__s2Run(window.__s2Wav(1, 44100, channels, bitDepth), 1_000_000)
+          });
+        }
+      }
+      return results;
+    });
+    for (const { bitDepth, channels, result } of outcomes) {
+      expect(result.ok, `PCM${bitDepth}/${channels}ch`).toBe(true);
+      expect(result.outputType).toBe('audio/mpeg');
+      expect(result.outputSize).toBeGreaterThan(0);
+      expect(result.outputSize).toBeLessThanOrEqual(1_000_000);
+      expect(result.sampleRate).toBe(44100);
+      expect(result.channels).toBe(channels);
+      expect(result.workerUsed).toBe(true);
+      expect(result.encodePasses).toBe(1);
+      expect(result.validationValid).toBe(true);
+      expect(result.violations).toEqual([]);
+      expect(result.frameValidation).toMatchObject({ valid: true });
+      expect(result.cleanup).toMatchObject({
+        workerTerminated: true,
+        objectUrlRevoked: true,
+        queueCleared: true,
+        disposed: true
+      });
+    }
   });
 
   test('honours the planner ladder when the page budget forces a lower rung', async ({ page }) => {

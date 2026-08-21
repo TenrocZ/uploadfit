@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { createAudioProcessingPlan, resolveAudioConfirmation } from '../../src/audio/planner.js';
-import { processAudio } from '../../src/audio/pipeline.js';
+import { createAudioPipeline, processAudio } from '../../src/audio/pipeline.js';
 
 const metadata = {
   mediaKind: 'audio', signatureMime: 'audio/wav', container: 'wav', codec: 'pcm',
@@ -148,6 +148,86 @@ test.describe('S2 audio pipeline harness', () => {
       validateOutput: () => ({ valid: true, violations: [], warnings: [], safeAutoFixes: [], requiredConfirmations: [], unfixable: [] })
     })).rejects.toMatchObject({ code: 'AUDIO_PROCESSING_CANCELLED' });
     expect(runs).toBe(0);
+  });
+
+  test('recomputes canonical stops and rejects forged executable plans before runtime use', async () => {
+    let runs = 0;
+    const runtime = {
+      async run() {
+        runs += 1;
+        return { blob: fakeOutput(10), stats: { workerUsed: true } };
+      },
+      dispose() {}
+    };
+    const input = new File([new Uint8Array([0])], 'source.wav', { type: 'audio/wav' });
+    const cases = [
+      { code: 'OFFICIAL_TOOL_REQUIRED', metadata, rules: { ...rules, safetyFlags: ['OFFICIAL_TOOL_REQUIRED'] } },
+      { code: 'AUDIO_ORIGINAL_REQUIRED', metadata, rules: { ...rules, safetyFlags: ['AUDIO_ORIGINAL_REQUIRED'] } },
+      { code: 'AUDIO_LOSSLESS_REQUIRED', metadata, rules: { ...rules, safetyFlags: ['AUDIO_LOSSLESS_REQUIRED'] } },
+      {
+        code: 'AUDIO_DURATION_LIMIT_UNFIXABLE',
+        metadata,
+        rules: { ...rules, duration: { minMs: null, maxMs: 60_000 } }
+      },
+      {
+        code: 'AUDIO_TARGET_UNSAFE',
+        metadata: { ...metadata, durationMs: 100_000 },
+        rules: { ...rules, maxBytes: 700_000 }
+      },
+      {
+        code: 'AUDIO_CODEC_UNSUPPORTED',
+        metadata: {
+          ...metadata,
+          signatureMime: 'audio/mpeg', container: 'mp3', codec: 'mp3', size: 150_000_000
+        },
+        rules
+      }
+    ];
+    for (const item of cases) {
+      const canonical = createAudioProcessingPlan(item.metadata, item.rules);
+      expect(canonical.unfixable).toContain(item.code);
+      const forged = { ...canonical, executable: true, unfixable: [] };
+      await expect(processAudio(input, forged, {
+        metadata: item.metadata,
+        rules: item.rules,
+        workerRuntime: runtime,
+        inspectOutput: async () => outputMetadata(),
+        validateOutput: () => ({ valid: true, violations: [], warnings: [] })
+      })).rejects.toMatchObject({ code: item.code });
+    }
+    expect(runs).toBe(0);
+  });
+
+  test('active pipeline dispose settles its self-created runtime immediately', async () => {
+    class SilentWorker {
+      postMessage(message) {
+        if (message.type === 'START') {
+          queueMicrotask(() => this.onmessage?.({ data: { type: 'READY', taskId: message.taskId } }));
+        }
+      }
+      terminate() { this.terminated = true; }
+    }
+    const urls = new Set();
+    const globalRef = {
+      Worker: SilentWorker,
+      Blob,
+      URL: {
+        createObjectURL() { const url = `blob:pipeline-${urls.size}`; urls.add(url); return url; },
+        revokeObjectURL(url) { urls.delete(url); }
+      },
+      setTimeout,
+      clearTimeout,
+      performance
+    };
+    const pipeline = createAudioPipeline({ workerOptions: { globalRef, workerSource: '' } });
+    const pending = pipeline.process(
+      new File([new Uint8Array([0])], 'source.wav', { type: 'audio/wav' }),
+      resolvedPlan(),
+      { metadata, rules, timeoutMs: 1000 }
+    );
+    pipeline.dispose();
+    await expect(pending).rejects.toMatchObject({ code: 'AUDIO_PROCESSING_CANCELLED' });
+    expect(urls.size).toBe(0);
   });
 
   test('surfaces decode errors and maps inspection/validation failures to the stable code', async () => {

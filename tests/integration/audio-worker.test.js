@@ -170,4 +170,62 @@ test.describe('S2 audio worker protocol', () => {
     expect(second.workerUsed).toBe(true);
     expect(FakeWorker.instances.length).toBeGreaterThanOrEqual(2);
   });
+
+  test('settles and fully cleans an active task immediately on dispose', async () => {
+    class SilentWorker extends FakeWorker {
+      postMessage(message) {
+        this.messages.push(message);
+        if (message.type === 'START') {
+          queueMicrotask(() => this.onmessage?.({ data: { type: 'READY', taskId: message.taskId } }));
+        }
+      }
+    }
+    const globalRef = globals();
+    globalRef.Worker = SilentWorker;
+    const runtime = createAudioWorkerRuntime({ globalRef, workerSource: '' });
+    const startedAt = Date.now();
+    const pending = runtime.run(
+      { size: 1 },
+      { targetMaxBytes: 100, safeTargetBytes: 90 },
+      { timeoutMs: 1000 }
+    );
+    runtime.dispose();
+    await expect(pending).rejects.toMatchObject({
+      code: 'AUDIO_PROCESSING_CANCELLED',
+      details: { cleanup: { workerTerminated: true, objectUrlRevoked: true, queueCleared: true } }
+    });
+    expect(Date.now() - startedAt).toBeLessThan(500);
+    expect(globalRef.urls.size).toBe(0);
+    expect(SilentWorker.instances.at(-1).terminated).toBe(true);
+    runtime.dispose();
+    await expect(runtime.run({ size: 1 }, { targetMaxBytes: 100, safeTargetBytes: 90 }))
+      .rejects.toMatchObject({ code: 'AUDIO_WORKER_UNAVAILABLE' });
+  });
+
+  test('ignores a late RESULT emitted after active dispose', async () => {
+    class LateResultWorker extends FakeWorker {
+      postMessage(message) {
+        this.messages.push(message);
+        if (message.type === 'START') {
+          queueMicrotask(() => this.onmessage?.({ data: { type: 'READY', taskId: message.taskId } }));
+        }
+        if (message.type === 'DISPOSE') {
+          queueMicrotask(() => this.onmessage?.({
+            data: {
+              type: 'RESULT', taskId: message.taskId,
+              blob: new Blob([new Uint8Array([1])], { type: 'audio/mpeg' })
+            }
+          }));
+        }
+      }
+    }
+    const globalRef = globals();
+    globalRef.Worker = LateResultWorker;
+    const runtime = createAudioWorkerRuntime({ globalRef, workerSource: '' });
+    const pending = runtime.run({ size: 1 }, { targetMaxBytes: 100, safeTargetBytes: 90 });
+    runtime.dispose();
+    await expect(pending).rejects.toMatchObject({ code: 'AUDIO_PROCESSING_CANCELLED' });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(globalRef.urls.size).toBe(0);
+  });
 });

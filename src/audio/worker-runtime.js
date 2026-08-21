@@ -5,25 +5,13 @@ import {
   AUDIO_PROGRESS_INTERVAL_MS
 } from '../config.js';
 import {
+  AUDIO_ERROR_CODES,
   AudioProcessingError,
   asAudioProcessingError
 } from './errors.js';
 import { AUDIO_ENCODER_DESCRIPTOR, isFrozenAudioEncoderDescriptor } from './encoder-contract.js';
 
-const STABLE_WORKER_CODES = new Set([
-  'AUDIO_CODEC_UNSUPPORTED',
-  'AUDIO_METADATA_INVALID',
-  'AUDIO_DECODE_FAILED',
-  'AUDIO_ENCODE_FAILED',
-  'AUDIO_TARGET_UNSAFE',
-  'AUDIO_OUTPUT_TOO_LARGE',
-  'AUDIO_OUTPUT_FORMAT_NOT_ALLOWED',
-  'AUDIO_DURATION_LIMIT_UNFIXABLE',
-  'AUDIO_MEMORY_BUDGET_EXCEEDED',
-  'AUDIO_WORKER_UNAVAILABLE',
-  'AUDIO_PROCESSING_CANCELLED',
-  'AUDIO_OUTPUT_VALIDATION_FAILED'
-]);
+const STABLE_WORKER_CODES = new Set(AUDIO_ERROR_CODES);
 
 function stableWorkerCode(code, fallback = 'AUDIO_ENCODE_FAILED') {
   return STABLE_WORKER_CODES.has(code) ? code : fallback;
@@ -213,6 +201,7 @@ export function createAudioWorkerRuntime(options = {}) {
     }
 
     let cancelTask = null;
+    let disposeTask = null;
     const promise = new Promise((resolve, reject) => {
       let settled = false;
       let ready = false;
@@ -221,6 +210,8 @@ export function createAudioWorkerRuntime(options = {}) {
       let timeoutTimer = null;
       let lastProgressAt = -Infinity;
       let lastRatio = 0;
+      let cleaned = false;
+      let detach = () => {};
       const startedAt = now(globalRef);
       const cleanupState = {
         workerTerminated: false,
@@ -229,8 +220,12 @@ export function createAudioWorkerRuntime(options = {}) {
         disposed: false
       };
       const cleanup = () => {
+        if (cleaned) return;
+        cleaned = true;
         if (timeoutTimer) globalRef.clearTimeout(timeoutTimer);
         if (cancelTimer) globalRef.clearTimeout(cancelTimer);
+        worker.onmessage = null;
+        worker.onerror = null;
         try { worker.postMessage({ type: 'DISPOSE', taskId }); } catch {}
         try { worker.terminate?.(); cleanupState.workerTerminated = true; } catch {}
         try { globalRef.URL.revokeObjectURL(url); cleanupState.objectUrlRevoked = true; } catch {}
@@ -240,6 +235,7 @@ export function createAudioWorkerRuntime(options = {}) {
       const finish = (callback, value) => {
         if (settled) return;
         settled = true;
+        detach();
         cleanup();
         if (value instanceof AudioProcessingError) {
           value.details = {
@@ -265,7 +261,15 @@ export function createAudioWorkerRuntime(options = {}) {
       cancelTask = abort;
       const onAbort = () => abort();
       signal?.addEventListener?.('abort', onAbort, { once: true });
-      const detach = () => signal?.removeEventListener?.('abort', onAbort);
+      detach = () => signal?.removeEventListener?.('abort', onAbort);
+      disposeTask = () => {
+        if (settled) return false;
+        finish(reject, new AudioProcessingError('AUDIO_PROCESSING_CANCELLED', undefined, {
+          taskId,
+          disposed: true
+        }));
+        return true;
+      };
       const fail = (error) => {
         detach();
         finish(reject, error instanceof AudioProcessingError
@@ -347,7 +351,13 @@ export function createAudioWorkerRuntime(options = {}) {
       }
       if (signal?.aborted) abort();
     });
-    active = { taskId, promise, worker, cancel: () => cancelTask?.() };
+    active = {
+      taskId,
+      promise,
+      worker,
+      cancel: () => cancelTask?.(),
+      dispose: () => disposeTask?.()
+    };
     return promise;
   };
 
@@ -358,11 +368,10 @@ export function createAudioWorkerRuntime(options = {}) {
   };
 
   const dispose = () => {
+    if (disposed) return false;
     disposed = true;
-    if (!active) return;
-    try { active.worker.postMessage({ type: 'DISPOSE', taskId: active.taskId }); } catch {}
-    try { active.worker.terminate?.(); } catch {}
-    active = null;
+    if (!active) return true;
+    return active.dispose?.() ?? false;
   };
 
   return Object.freeze({ run, process: run, cancel, dispose, get activeTaskId() { return active?.taskId ?? null; } });

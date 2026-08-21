@@ -15,7 +15,11 @@ export const AUDIO_ERROR_CODES = Object.freeze([
   // harness/controller can distinguish a rejected plan from a codec failure.
   'AUDIO_CONFIRMATION_REQUIRED',
   'AUDIO_PIPELINE_BUSY',
-  'AUDIO_OUTPUT_VALIDATION_FAILED'
+  'AUDIO_OUTPUT_VALIDATION_FAILED',
+  'OFFICIAL_TOOL_REQUIRED',
+  'AUDIO_ORIGINAL_REQUIRED',
+  'AUDIO_LOSSLESS_REQUIRED',
+  'RULES_INSUFFICIENT'
 ]);
 
 export const AUDIO_ERROR_MESSAGES = Object.freeze({
@@ -32,7 +36,11 @@ export const AUDIO_ERROR_MESSAGES = Object.freeze({
   AUDIO_PROCESSING_CANCELLED: '音频处理已取消，原文件保持不变。',
   AUDIO_CONFIRMATION_REQUIRED: '音频处理需要先完成必要确认。',
   AUDIO_PIPELINE_BUSY: '已有音频任务正在处理，请稍后重试。',
-  AUDIO_OUTPUT_VALIDATION_FAILED: '生成的 MP3 未通过独立复检，原文件未被修改。'
+  AUDIO_OUTPUT_VALIDATION_FAILED: '生成的 MP3 未通过独立复检，原文件未被修改。',
+  OFFICIAL_TOOL_REQUIRED: '网页要求使用官方工具，UploadFit 未处理文件。',
+  AUDIO_ORIGINAL_REQUIRED: '网页要求保留原始录音，UploadFit 未处理文件。',
+  AUDIO_LOSSLESS_REQUIRED: '网页要求无损音频，UploadFit 未执行有损处理。',
+  RULES_INSUFFICIENT: '页面没有给出足够明确的音频格式和大小规则。'
 });
 
 export class AudioMetadataError extends Error {

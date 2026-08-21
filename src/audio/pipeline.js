@@ -104,16 +104,27 @@ function sameJson(first, second) {
   try { return JSON.stringify(first) === JSON.stringify(second); } catch { return false; }
 }
 
+function stablePlanStop(plan) {
+  if (!Array.isArray(plan?.unfixable) || plan.unfixable.length === 0) return null;
+  return plan.unfixable.find((code) => AUDIO_ERROR_CODES.includes(code)) ?? 'AUDIO_TARGET_UNSAFE';
+}
+
 function validatePlanAgainstMetadata(plan, metadata, rules, options = {}) {
+  const canonicalOptions = {
+    ...options,
+    ...(metadata?.channels === 2 && plan?.targetChannels === 1 ? { targetChannels: 1 } : {})
+  };
+  const canonical = createAudioProcessingPlan(metadata, rules, canonicalOptions);
+  const canonicalStop = stablePlanStop(canonical);
+  if (canonicalStop) {
+    throw new AudioProcessingError(canonicalStop, undefined, {
+      canonicalUnfixable: [...canonical.unfixable]
+    });
+  }
   if (!isAudioPlanExecutable(plan)) {
     const declined = plan?.confirmations?.some((item) => item?.resolved === true && item.accepted === false);
-    // A deterministic planner stop (unsupported codec, unsafe target, …) is
-    // reported as its own stable code instead of a misleading confirmation ask.
-    const stopCode = Array.isArray(plan?.unfixable)
-      ? plan.unfixable.find((code) => AUDIO_ERROR_CODES.includes(code)) ?? null
-      : null;
     throw new AudioProcessingError(
-      declined ? 'AUDIO_PROCESSING_CANCELLED' : stopCode ?? 'AUDIO_CONFIRMATION_REQUIRED',
+      declined ? 'AUDIO_PROCESSING_CANCELLED' : stablePlanStop(plan) ?? 'AUDIO_CONFIRMATION_REQUIRED',
       undefined,
       { declined }
     );
@@ -121,11 +132,6 @@ function validatePlanAgainstMetadata(plan, metadata, rules, options = {}) {
   if (plan.encodePassLimit !== AUDIO_ENCODE_PASS_LIMIT) {
     throw new AudioProcessingError('AUDIO_TARGET_UNSAFE');
   }
-  const canonicalOptions = {
-    ...options,
-    ...(metadata?.channels === 2 && plan.targetChannels === 1 ? { targetChannels: 1 } : {})
-  };
-  const canonical = createAudioProcessingPlan(metadata, rules, canonicalOptions);
   const authority = [
     'sourceContainer',
     'sourceCodec',
@@ -138,7 +144,8 @@ function validatePlanAgainstMetadata(plan, metadata, rules, options = {}) {
     'targetSampleRate',
     'targetChannels',
     'operations',
-    'passthrough'
+    'passthrough',
+    'unfixable'
   ];
   for (const field of authority) {
     if (!sameJson(plan[field], canonical[field])) {
@@ -417,13 +424,22 @@ export async function processAudio(file, plan, options = {}) {
 
 export function createAudioPipeline(options = {}) {
   let disposed = false;
-  const runtime = options.workerRuntime ?? null;
+  let runtime = options.workerRuntime ?? null;
+  const ensureRuntime = () => {
+    runtime ??= createAudioWorkerRuntime(options.workerOptions ?? options);
+    return runtime;
+  };
   return Object.freeze({
     process(file, plan, runOptions = {}) {
       if (disposed) return Promise.reject(new AudioProcessingError('AUDIO_WORKER_UNAVAILABLE'));
-      return processAudio(file, plan, { ...options, ...runOptions, workerRuntime: runtime ?? runOptions.workerRuntime });
+      return processAudio(file, plan, {
+        ...options,
+        ...runOptions,
+        workerRuntime: runOptions.workerRuntime ?? ensureRuntime()
+      });
     },
     dispose() {
+      if (disposed) return;
       disposed = true;
       try { runtime?.dispose?.(); } catch {}
     }

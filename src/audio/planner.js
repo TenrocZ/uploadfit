@@ -449,6 +449,8 @@ export function isAudioPlanExecutable(plan) {
     && plan.safeTargetBytes <= plan.targetMaxBytes
     && AUDIO_BITRATE_LADDER_KBPS.includes(plan.targetBitrateKbps)
     && plan.targetBitrateKbps >= AUDIO_MIN_BITRATE_KBPS
+    && Array.isArray(plan.unfixable)
+    && plan.unfixable.length === 0
     && Array.isArray(plan.confirmations)
     && plan.confirmations.every((item) => item.required !== true
       || (item.resolved === true && item.accepted === true)));

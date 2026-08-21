@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   AUDIO_BITRATE_LADDER_KBPS,
   createAudioProcessingPlan,
+  isAudioPlanExecutable,
   resolveAudioConfirmation
 } from '../../src/audio/planner.js';
 
@@ -109,6 +110,15 @@ describe('S2 audio planner', () => {
       .toContain('AUDIO_OUTPUT_FORMAT_NOT_ALLOWED');
     expect(createAudioProcessingPlan(metadata(), rules({ maxBytes: undefined })).unfixable)
       .toContain('RULES_INSUFFICIENT');
+  });
+
+  it('never treats a plan with unfixable stops as executable', () => {
+    const stopped = createAudioProcessingPlan(metadata(), rules({
+      safetyFlags: ['OFFICIAL_TOOL_REQUIRED']
+    }));
+    expect(stopped.unfixable).toContain('OFFICIAL_TOOL_REQUIRED');
+    expect(isAudioPlanExecutable({ ...stopped, executable: true })).toBe(false);
+    expect(isAudioPlanExecutable({ ...stopped, executable: true, unfixable: null })).toBe(false);
   });
 
   it('pins exact ladder rungs from hand-computed budgets', () => {
@@ -221,4 +231,3 @@ describe('S2 audio planner', () => {
     expect(monoFloor.targetSampleRate).toBe(32_000);
   });
 });
-

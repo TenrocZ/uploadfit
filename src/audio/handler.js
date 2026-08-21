@@ -3,7 +3,7 @@ import {
   createAudioProcessingPlan,
   resolveAudioConfirmation
 } from './planner.js';
-import { processAudio } from './pipeline.js';
+import { createAudioPipeline } from './pipeline.js';
 import {
   validateAudioMetadata,
   validateAudioOutput,
@@ -30,6 +30,7 @@ function isAudioLike(file) {
 export function createAudioHandler(options = {}) {
   let disposed = false;
   const pipelineOptions = { ...options };
+  const pipeline = createAudioPipeline(pipelineOptions);
   return Object.freeze({
     kind: 'audio',
     supports(file, uploaderContext) {
@@ -51,8 +52,7 @@ export function createAudioHandler(options = {}) {
     },
     process(file, plan, processOptions = {}) {
       if (disposed) return Promise.reject(new Error('Audio handler is disposed.'));
-      return processAudio(file, plan, {
-        ...pipelineOptions,
+      return pipeline.process(file, plan, {
         ...processOptions,
         rules: processOptions.rules ?? options.rules
       });
@@ -65,7 +65,7 @@ export function createAudioHandler(options = {}) {
     },
     dispose() {
       disposed = true;
-      try { options.workerRuntime?.dispose?.(); } catch {}
+      try { pipeline.dispose(); } catch {}
     }
   });
 }
