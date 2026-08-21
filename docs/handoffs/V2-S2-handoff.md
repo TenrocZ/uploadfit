@@ -3,7 +3,7 @@
 - Status: `READY_FOR_ACCEPTANCE`（返工第 1 轮完成，申请复验）
 - Date: 2026-08-21
 - Start commit: `31d3d2b669ab5bf390cdd6a84b153e802811fb1f`
-- End commit: `a289226`（本轮 S2 复验修复的聚焦提交；历史 V2-S0..S2 聚合基线为 `07d25a4`，未对已验收历史做破坏性重写）
+- End commit: `80f559c`（本轮 S2 复验修复与非 WAV 停止回归的聚焦提交；历史 V2-S0..S2 聚合基线为 `07d25a4`，未对已验收历史做破坏性重写）
 - Rework order: `docs/handoffs/V2-S2-acceptance-rework-order.md`
 - Rework report: `docs/handoffs/V2-S2-rework-report.md`
 - Prerequisites: V2-S0 `ACCEPTED`、V2-S1 `ACCEPTED`（用户已确认）

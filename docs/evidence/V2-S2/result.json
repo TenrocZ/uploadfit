@@ -2,7 +2,7 @@
   "stage": "V2-S2",
   "status": "READY_FOR_ACCEPTANCE",
   "startCommit": "31d3d2b669ab5bf390cdd6a84b153e802811fb1f",
-  "endCommit": "a289226",
+  "endCommit": "80f559c",
   "prerequisites": {
     "s0": { "handoff": "docs/handoffs/V2-S0-handoff.md", "status": "ACCEPTED" },
     "s1": { "handoff": "docs/handoffs/V2-S1-handoff.md", "status": "ACCEPTED" }
