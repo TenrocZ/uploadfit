@@ -71,6 +71,13 @@ describe('audio validation boundaries', () => {
       signatureMime: 'audio/wav', container: 'wav', codec: 'pcm', size: 5_000_000
     }), rules());
     expect(largerWav.requiredConfirmations[0].id).not.toBe(wav.requiredConfirmations[0].id);
+
+    const m4a = validateAudioMetadata(mp3Metadata({
+      signatureMime: 'audio/mp4', container: 'mp4', codec: 'aac-lc', size: 4_000_000
+    }), rules());
+    expect(m4a.safeAutoFixes).not.toEqual(expect.arrayContaining(['REENCODE_AUDIO', 'TRANSCODE_AUDIO']));
+    expect(m4a.requiredConfirmations).toEqual([]);
+    expect(m4a.unfixable).toContain('AUDIO_CODEC_UNSUPPORTED');
   });
 
   it('stops when MP3/maxBytes are not explicit or when duration is the blocker', () => {

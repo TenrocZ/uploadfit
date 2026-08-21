@@ -75,6 +75,8 @@ async function installRunner(page, source) {
       const planSnapshot = {
         passthrough: plan.passthrough,
         executable: plan.executable,
+        operations: [...(plan.operations ?? [])],
+        confirmations: plan.confirmations.map((item) => item.type),
         targetBitrateKbps: plan.targetBitrateKbps,
         targetChannels: plan.targetChannels,
         safeTargetBytes: plan.safeTargetBytes,
@@ -240,6 +242,8 @@ test.describe('S2 audio engine with the real frozen lamejs Worker', () => {
     expect(result.ok).toBe(false);
     expect(result.plan.unfixable).toContain('AUDIO_CODEC_UNSUPPORTED');
     expect(result.plan.executable).toBe(false);
+    expect(result.plan.operations).toEqual([]);
+    expect(result.plan.confirmations).toEqual([]);
     expect(result.errorCode).toBe('AUDIO_CODEC_UNSUPPORTED');
   });
 
