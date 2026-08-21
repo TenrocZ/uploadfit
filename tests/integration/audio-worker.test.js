@@ -150,7 +150,9 @@ test.describe('S2 audio worker protocol', () => {
       code: 'AUDIO_PROCESSING_CANCELLED',
       details: { forcedTerminate: true }
     });
-    expect(Date.now() - startedAt).toBeLessThan(2500);
+    // The runtime's hard deadline is 1000ms; allow a small scheduler margin
+    // while keeping this well below the old multi-second false-green window.
+    expect(Date.now() - startedAt).toBeLessThanOrEqual(1500);
     expect(SilentWorker.instances.at(-1).terminated).toBe(true);
     expect(globalRef.urls.size).toBe(0);
   });

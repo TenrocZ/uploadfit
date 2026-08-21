@@ -1,6 +1,7 @@
 import { AUDIO_ERROR_CODES } from './errors.js';
 import { inspectAudio } from './metadata.js';
 import { findMp3Frame, parseMp3Header } from './signatures.js';
+import { confirmationId } from './confirmation.js';
 
 const SUPPORTED_MIMES = Object.freeze(['audio/mpeg', 'audio/mp4', 'audio/wav']);
 const SUPPORTED_CONTAINERS = Object.freeze(['mp3', 'mp4', 'wav']);
@@ -26,7 +27,7 @@ function unfixable(result, code) {
 
 function confirmation(type, suggestedPayload) {
   return {
-    id: `confirmation-${type.toLowerCase()}`,
+    id: confirmationId(type, suggestedPayload),
     type,
     required: true,
     resolved: false,

@@ -66,6 +66,11 @@ describe('audio validation boundaries', () => {
     }), rules());
     expect(wav.safeAutoFixes).toContain('TRANSCODE_AUDIO');
     expect(wav.requiredConfirmations.map((item) => item.type)).toContain('AUDIO_LOSSY_TRANSCODE');
+    expect(wav.requiredConfirmations[0].id).toMatch(/^confirmation-audio_lossy_transcode-/);
+    const largerWav = validateAudioMetadata(mp3Metadata({
+      signatureMime: 'audio/wav', container: 'wav', codec: 'pcm', size: 5_000_000
+    }), rules());
+    expect(largerWav.requiredConfirmations[0].id).not.toBe(wav.requiredConfirmations[0].id);
   });
 
   it('stops when MP3/maxBytes are not explicit or when duration is the blocker', () => {

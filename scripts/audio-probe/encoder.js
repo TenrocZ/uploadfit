@@ -150,6 +150,7 @@ function progressEvent(cursor, end, plan) {
 export async function encodeWavToMp3(file, options = {}) {
   const signal = options.signal;
   const targetChannels = options.targetChannels === 2 ? 2 : 1;
+  const enforceMaxBytes = options.enforceMaxBytes !== false;
   const maxBytes = Number.isFinite(options.maxBytes) ? options.maxBytes : S0_RESOURCE_LIMITS.hardOutputBytes;
   const inputChunkBytes = Math.min(
     Number.isFinite(options.inputChunkBytes) ? options.inputChunkBytes : DEFAULT_INPUT_CHUNK_BYTES,
@@ -224,7 +225,7 @@ export async function encodeWavToMp3(file, options = {}) {
     };
   }
   const blob = new Blob(chunks, { type: 'audio/mpeg' });
-  if (blob.size > maxBytes || blob.size <= 0) {
+  if (blob.size <= 0 || (enforceMaxBytes && blob.size > maxBytes)) {
     const error = new Error('AUDIO_OUTPUT_SIZE_INVALID');
     error.code = 'AUDIO_OUTPUT_SIZE_INVALID';
     throw error;

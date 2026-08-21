@@ -94,7 +94,11 @@ async function main() {
   const smallFixture = process.argv.includes('--small');
   const minimumBytes = smallFixture ? HEADER_BYTES + FRAME_BYTES : DEFAULT_BYTES;
   const requestedBytes = Math.max(minimumBytes, Math.floor(numericArgument('bytes', DEFAULT_BYTES)));
-  const dataBytes = requestedBytes - (requestedBytes % FRAME_BYTES);
+  // `--bytes` is the requested total file size, including the 44-byte WAV
+  // header.  Align only the data region so a PCM32 stereo request of
+  // 200,000,044 bytes is actually emitted at exactly that size.
+  const requestedDataBytes = requestedBytes - HEADER_BYTES;
+  const dataBytes = requestedDataBytes - (requestedDataBytes % FRAME_BYTES);
   const target = outputPath();
   await mkdir(path.dirname(target), { recursive: true });
   await rm(target, { force: true });

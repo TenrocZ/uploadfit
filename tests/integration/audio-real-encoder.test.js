@@ -254,6 +254,6 @@ test.describe('S2 audio engine with the real frozen lamejs Worker', () => {
     expect(result.abortLatencyMs).not.toBeNull();
     // The runtime forces termination at the 1000ms deadline even if the
     // worker never honours CANCEL, so the rejection must land close to it.
-    expect(result.abortLatencyMs).toBeLessThan(3000);
+    expect(result.abortLatencyMs).toBeLessThanOrEqual(1000);
   });
 });

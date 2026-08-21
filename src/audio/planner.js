@@ -6,6 +6,7 @@ import {
   AUDIO_SAFE_TARGET_RATIO
 } from '../config.js';
 import { frozenEncoderOutputSampleRate } from './encoder-contract.js';
+import { confirmationId, stableJson } from './confirmation.js';
 
 const MP3_MIME = 'audio/mpeg';
 const MP3_CONTAINER = 'mp3';
@@ -34,41 +35,6 @@ function clone(value) {
     return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, clone(item)]));
   }
   return value;
-}
-
-function stableValue(value) {
-  if (Array.isArray(value)) return value.map((item) => stableValue(item));
-  if (isRecord(value)) {
-    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, stableValue(value[key])]));
-  }
-  return value;
-}
-
-function stableJson(value) {
-  try {
-    return JSON.stringify(stableValue(value));
-  } catch {
-    return '';
-  }
-}
-
-// Confirmation ids are bound to their suggested payload so a confirmation
-// minted for one plan (file size, bitrate, targets) cannot be replayed against
-// a plan whose parameters changed.  FNV-1a plus a positional round keep the id
-// short without a crypto dependency inside the planner.
-function confirmationFingerprint(json) {
-  let first = 0x811c9dc5;
-  let second = 0x01000193;
-  for (let index = 0; index < json.length; index += 1) {
-    const code = json.charCodeAt(index);
-    first = Math.imul(first ^ code, 0x01000193) >>> 0;
-    second = (second + Math.imul(code, index + 1)) >>> 0;
-  }
-  return `${first.toString(36)}${second.toString(36)}`;
-}
-
-function confirmationId(type, payload) {
-  return `confirmation-${type.toLowerCase()}-${confirmationFingerprint(stableJson(payload))}`;
 }
 
 function normalizeMime(value) {

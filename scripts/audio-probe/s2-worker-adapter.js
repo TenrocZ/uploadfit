@@ -17,8 +17,11 @@ import { encodeWavToMp3 } from './encoder.js';
 
 self.__uploadfitAudioEncode = async (file, plan, limits, signal, emitProgress) => {
   const result = await encodeWavToMp3(file, {
-    // Infinite: the pipeline re-inspects and decides passes itself.
-    maxBytes: Infinity,
+    // The planner's max is mapped for encoder accounting, but the adapter
+    // never rejects on it. The pipeline owns the two-pass decision after
+    // independent output inspection.
+    maxBytes: Number.isFinite(plan?.targetMaxBytes) ? plan.targetMaxBytes : Infinity,
+    enforceMaxBytes: false,
     bitrateKbps: Number.isFinite(plan?.targetBitrateKbps) ? plan.targetBitrateKbps : undefined,
     targetChannels: plan?.targetChannels === 2 ? 2 : 1,
     inputChunkBytes: Number.isFinite(limits?.inputChunkBytes) ? limits.inputChunkBytes : undefined,

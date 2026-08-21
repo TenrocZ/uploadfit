@@ -305,7 +305,7 @@ async function main() {
     && summary.cancel?.ok === false
     && summary.cancel?.errorCode === 'AUDIO_PROCESSING_CANCELLED'
     && Number.isFinite(summary.cancel?.cancelLatencyMs)
-    && summary.cancel.cancelLatencyMs <= 3000
+    && summary.cancel.cancelLatencyMs <= 1000
     && summary.reuse?.ok === true
   );
   process.exitCode = passed ? 0 : 1;
