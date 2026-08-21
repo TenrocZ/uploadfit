@@ -225,7 +225,12 @@ export async function encodeWavToMp3(file, options = {}) {
     };
   }
   const blob = new Blob(chunks, { type: 'audio/mpeg' });
-  if (blob.size <= 0 || (enforceMaxBytes && blob.size > maxBytes)) {
+  // A caller-supplied page max is deliberately optional for the S2 adapter;
+  // the pipeline owns that decision.  The frozen S0 hard ceiling remains a
+  // memory/output safety bound even when page-max enforcement is disabled.
+  if (blob.size <= 0
+    || blob.size > S0_RESOURCE_LIMITS.hardOutputBytes
+    || (enforceMaxBytes && blob.size > maxBytes)) {
     const error = new Error('AUDIO_OUTPUT_SIZE_INVALID');
     error.code = 'AUDIO_OUTPUT_SIZE_INVALID';
     throw error;
