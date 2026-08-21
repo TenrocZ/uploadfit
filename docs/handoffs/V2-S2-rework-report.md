@@ -80,3 +80,13 @@ R2-1 的真实编码测试暴露第二个行为事实：冻结 lamejs 在低码�
 ## 7. 申请顺序
 
 仅申请 S2 复验；S3 在 S2 独立通过前继续 HOLD。
+
+## 8. 第二轮复验返修（R3）
+
+上一轮业务用例虽全部通过，但 `run-e2e.js` 无条件启动固定 8765 服务，遇到陈旧/外部 listener 时会产生未捕获 `EADDRINUSE`，且不等待自有 child 完整退出。本轮以 `ab6a765` 修复：
+
+- `serve-test.js` 为所有响应增加 `x-uploadfit-test-server: 1`，并对端口冲突注册可控 error handler；
+- `run-e2e.js` 启动前探测 marker，只复用明确的 UploadFit 服务；新 child 登记 ownership，finally 只停止自有服务并等待 `exit`（2 秒兜底）；
+- 自启路径与已有新版服务复用路径各实测 `23/23` S2 audio tests；输出无 `EADDRINUSE`、`Unhandled 'error'` 或等待超时，结束后 8765 无残留监听。
+
+第二轮返修单：`docs/handoffs/V2-S2-reacceptance-rework-order.md`。S2 仍只申请独立验收；真实 Tabbit 200MB 门禁继续归 V2-S4。

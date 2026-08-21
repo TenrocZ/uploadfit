@@ -1,10 +1,10 @@
 # V2-S2 Handoff：音频规划、流式处理与复检
 
-- Status: `READY_FOR_ACCEPTANCE`（返工第 1 轮完成，申请复验）
+- Status: `READY_FOR_ACCEPTANCE`（返工第 2 轮完成，申请复验）
 - Date: 2026-08-21
 - Start commit: `31d3d2b669ab5bf390cdd6a84b153e802811fb1f`
-- End commit: `8e198b2`（本轮 S2 复验修复、processing 取消清理、非 WAV 停止与冻结编码器硬上限的聚焦提交；历史 V2-S0..S2 聚合基线为 `07d25a4`，未对已验收历史做破坏性重写）
-- Rework order: `docs/handoffs/V2-S2-acceptance-rework-order.md`
+- End commit: `ab6a765`（第二轮返修聚焦修复 E2E 测试服务归属、冲突与优雅关闭；上一轮 S2 代码基线为 `8e198b2`，历史 V2-S0..S2 聚合基线为 `07d25a4`，均未做破坏性重写）
+- Rework order: `docs/handoffs/V2-S2-acceptance-rework-order.md`; second-round reacceptance: `docs/handoffs/V2-S2-reacceptance-rework-order.md`
 - Rework report: `docs/handoffs/V2-S2-rework-report.md`
 - Prerequisites: V2-S0 `ACCEPTED`、V2-S1 `ACCEPTED`（用户已确认）
 - Scope: 独立 audio MediaHandler；没有接入正式 upload intercept、DOM/controller、DataTransfer 或确认 UI
@@ -116,6 +116,8 @@ git diff --check
 ```
 
 返工第 1 轮（2026-08-21）实测：25 个 Node/Vitest 测试文件、227 个测试通过；`npm run test:e2e -- --reporter=line --workers=1` 141/141 通过（含 6 个真实 lamejs Worker 集成用例）；production bundle 185,068 bytes，SHA-256 `8BBBD1CB9564E2A6D01E53ABEC71B8B6D46AABB765FA90C16C3C7960E7EE404E`，与返工前逐字节一致（音频引擎未进生产入口，S3/S4 接线）。
+
+返工第 2 轮（`ab6a765`）补齐 E2E harness 生命周期：runner 先识别 `x-uploadfit-test-server: 1` 再决定复用或自启；只回收自有 child，并等待退出。`S2 audio` targeted E2E 的自启与复用路径各为 23/23，通过后无 `EADDRINUSE`/未捕获 child error；全量回归为 141/141，且无该 warning；自有服务结束后 8765 无残留监听。详见 `docs/handoffs/V2-S2-reacceptance-rework-order.md`。
 
 ## 大文件慢速门禁（已执行一次）
 

@@ -1,6 +1,6 @@
 # V2-S2 证据目录
 
-状态：`READY_FOR_ACCEPTANCE`（返工第 1 轮完成，等待复验）。S0/S1 前置已由用户确认验收；本阶段只交付独立音频处理引擎，不接入正式上传拦截、controller 或 UI。返工单：`docs/handoffs/V2-S2-acceptance-rework-order.md`；返工报告：`docs/handoffs/V2-S2-rework-report.md`。
+状态：`READY_FOR_ACCEPTANCE`（返工第 2 轮完成，申请复验）。S0/S1 前置已由用户确认验收；本阶段只交付独立音频处理引擎，不接入正式上传拦截、controller 或 UI。返工单：`docs/handoffs/V2-S2-acceptance-rework-order.md`、`docs/handoffs/V2-S2-reacceptance-rework-order.md`；返工报告：`docs/handoffs/V2-S2-rework-report.md`。
 
 ## 已交付
 
@@ -24,6 +24,7 @@
 | 真实编码器 | `tests/integration/audio-real-encoder.test.js` | 真实 lamejs Worker：WAV→MP3 全链成功、64kbps 档位真实生效、合规 MP3 passthrough、共享 runtime 第二任务、M4A 停止、真实取消时延 |
 | production/static | `npm run build`、`npm run static-check` | 通过；bundle 185,068 bytes，SHA-256 `8BBBD1CB9564E2A6D01E53ABEC71B8B6D46AABB765FA90C16C3C7960E7EE404E`（与返工前逐字节一致，音频引擎未进生产包） |
 | V1/V2 Playwright regression | `npm run test:e2e -- --reporter=line --workers=1` | 141 个测试通过 |
+| E2E runner 生命周期复验 | `npm run test:e2e -- --grep "S2 audio" --reporter=line --workers=1`（自启 + 复用） | 两次均 23/23；无 `EADDRINUSE`/未捕获 child error；自有服务结束后 8765 无残留监听 |
 
 ## production-equivalent 200MB→100MB 门禁（本轮已执行）
 

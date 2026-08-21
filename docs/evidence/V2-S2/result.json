@@ -9,8 +9,9 @@
   },
   "rework": {
     "order": "docs/handoffs/V2-S2-acceptance-rework-order.md",
+    "reacceptanceOrder": "docs/handoffs/V2-S2-reacceptance-rework-order.md",
     "report": "docs/handoffs/V2-S2-rework-report.md",
-    "round": 1
+    "round": 2
   },
   "encoder": {
     "package": "lamejs",
@@ -55,6 +56,33 @@
     "command": "npm run test:e2e -- --reporter=line --workers=1",
     "passed": 141,
     "failed": 0
+  },
+  "e2eHarness": {
+    "runner": "scripts/run-e2e.js",
+    "serverMarker": "x-uploadfit-test-server: 1",
+    "ownershipPolicy": "probe and reuse only a marked UploadFit server; stop and await exit only for a child started by this runner",
+    "freshStart": {
+      "command": "npm run test:e2e -- --grep \"S2 audio\" --reporter=line --workers=1",
+      "passed": 23,
+      "failed": 0,
+      "serverLifecycle": "started by runner, awaited exit, port 8765 released",
+      "eaddrinuse": false
+    },
+    "reuseExisting": {
+      "command": "npm run test:e2e -- --grep \"S2 audio\" --reporter=line --workers=1",
+      "passed": 23,
+      "failed": 0,
+      "serverLifecycle": "marked server reused and left running; no duplicate child",
+      "eaddrinuse": false
+    },
+    "fullRegression": {
+      "command": "npm run test:e2e -- --reporter=line --workers=1",
+      "passed": 141,
+      "failed": 0,
+      "eaddrinuse": false
+    },
+    "unhandledChildError": false,
+    "codeCommit": "ab6a765"
   },
   "bundle": {
     "productionBytes": 185068,
