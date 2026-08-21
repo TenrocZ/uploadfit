@@ -6,7 +6,7 @@ import {
   sanitizeEvidenceText,
   selectRelevantText,
 } from '../utils/text.js';
-import { getAssociatedTexts } from './input-discovery.js';
+import { classifyMediaKind, getAssociatedTexts } from './input-discovery.js';
 
 const uploaderIds = new WeakMap();
 const EXCLUDED_TAGS = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'NAV', 'FOOTER']);
@@ -277,6 +277,7 @@ export function extractRelevantContext(input, selectedText = null, options = {})
 
   return {
     uploaderId: options.uploaderId ?? getUploaderId(input),
+    mediaKind: classifyMediaKind(input),
     label: sanitizeEvidenceText(associatedTexts[0] ?? '').slice(0, CONTEXT_TEXT_LIMIT),
     attributes: {
       accept: sanitizeEvidenceText(input.getAttribute?.('accept') ?? '') || null,

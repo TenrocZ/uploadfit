@@ -255,6 +255,18 @@ export function resolveRules(candidates = []) {
     'extensions',
     ruleSet.conflicts
   );
+  ruleSet.mediaKind = chooseScalar(
+    collectFieldEntries(sorted, 'mediaKind', (value) => value),
+    'mediaKind',
+    ruleSet.conflicts
+  );
+  if (!ruleSet.mediaKind) {
+    const hasAudio = ruleSet.formats.some((format) => String(format).startsWith('audio/'))
+      || ruleSet.extensions.some((extension) => /^\.(?:mp3|m4a|aac|wav|webm)$/i.test(extension));
+    const hasImage = ruleSet.formats.some((format) => String(format).startsWith('image/'))
+      || ruleSet.extensions.some((extension) => /^(?:jpg|jpeg|png|webp)$/i.test(extension));
+    ruleSet.mediaKind = hasAudio && hasImage ? null : hasAudio ? 'audio' : hasImage ? 'image' : null;
+  }
   ruleSet.minBytes = chooseScalar(
     collectFieldEntries(sorted, 'minBytes', (value) => value),
     'minBytes',
@@ -265,6 +277,24 @@ export function resolveRules(candidates = []) {
     'maxBytes',
     ruleSet.conflicts
   );
+  const duration = { exactMs: null, minMs: null, maxMs: null };
+  for (const bound of ['exactMs', 'minMs', 'maxMs']) {
+    duration[bound] = chooseScalar(
+      collectFieldEntries(sorted, 'duration', (value) => value?.[bound]),
+      `duration.${bound}`,
+      ruleSet.conflicts
+    );
+  }
+  ruleSet.duration = duration;
+  const audio = { sampleRates: [], channels: [], bitDepths: [] };
+  for (const field of Object.keys(audio)) {
+    audio[field] = chooseArray(
+      collectFieldEntries(sorted, 'audio', (value) => value?.[field]),
+      `audio.${field}`,
+      ruleSet.conflicts
+    );
+  }
+  ruleSet.audio = audio;
   ruleSet.width = chooseDimension(sorted, 'width', ruleSet.conflicts);
   ruleSet.height = chooseDimension(sorted, 'height', ruleSet.conflicts);
   ruleSet.aspectRatio = chooseScalar(
@@ -313,5 +343,13 @@ export function resolveRules(candidates = []) {
   ruleSet.actionable = hasExecutableRules(ruleSet)
     && !hasUnresolvableConflict
     && ruleSet.safetyFlags.length === 0;
+  if (ruleSet.mediaKind === 'audio') {
+    const mp3Allowed = ruleSet.formats.includes('audio/mpeg')
+      || ruleSet.extensions.some((extension) => String(extension).toLowerCase() === '.mp3');
+    // S1 only establishes an executable audio precondition when the page has
+    // explicit MP3 evidence and a trustworthy byte ceiling. Duration/sample
+    // rate/other advisory fields never create a processing plan by themselves.
+    if (!mp3Allowed || ruleSet.maxBytes === null) ruleSet.actionable = false;
+  }
   return ruleSet;
 }

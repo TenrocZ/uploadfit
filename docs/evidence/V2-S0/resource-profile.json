@@ -1,0 +1,8 @@
+{
+  "stage": "V2-S0",
+  "status": "ACCEPTED",
+  "designLimits": { "inputChunkBytes": 4194304, "selectedInputChunkBytes": 262144, "pcmBufferBudgetBytes": 33554432, "metadataReadLimitBytes": 1048576, "progressIntervalMs": 100, "heartbeatTargetMs": 500, "cancelDeadlineMs": 1000, "maxEncodePasses": 2, "hardOutputBytes": 100000000, "safeOutputBytes": 95000000 },
+  "auxiliaryChromium": { "workerCreated": true, "workerMessage": true, "workerTerminated": true, "largeAudioProcessing": "NOT_RUN", "maxHeartbeatGapMs": null, "peakBufferedBytes": null },
+  "tabbit": { "status": "VERIFIED_REAL_TABBIT", "largeAudioProcessing": "PASS", "processingElapsedMs": null, "processingElapsedStatus": "NOT_CAPTURED_IN_ORIGINAL_LARGE_RUN; required in S2 production-equivalent gate", "maxHeartbeatGapMs": 189, "peakBufferedBytes": 62832320, "measuredEncodePeakBufferedBytes": 21162560, "verificationBufferBytes": 20834880, "hashBufferBytes": 20834880, "peakPcmBytes": 327680, "inputChunkBytes": 262144, "withinPcmBudget": true, "withinOutputBudget": true, "heartbeatWithinTarget": true, "evidence": "docs/evidence/V2-S0/audio-200-to-100.json" },
+  "interpretation": "The probe keeps bounded input/PCM/output buffers and measures heartbeat through Worker progress/completion. The encode-stage peak is measured; peakBufferedBytes includes a conservative upper bound for Blob chunks, verification arrayBuffer, SHA-256 arrayBuffer and peak PCM. Full output verification uses a bounded first-frame decode plus a complete MP3 frame scan."
+}

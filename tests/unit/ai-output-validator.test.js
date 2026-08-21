@@ -351,6 +351,24 @@ test('dimension and size upper bounds are enforced', () => {
   expect(validateAiRuleOutput(output2, INPUT).errors).toContain('MAX_SIZE_OUT_OF_RANGE');
 });
 
+test('audio AI evidence accepts MiB limits above the V1 image ceiling', () => {
+  const input = '音频仅支持 MP3，单文件最大 100MiB。';
+  const result = validateAiRuleOutput({
+    formats: ['mp3'],
+    minSize: null,
+    maxSize: { value: 100, unit: 'MiB' },
+    width: null,
+    height: null,
+    aspectRatio: null,
+    semanticRequirements: [],
+    evidence: ['仅支持 MP3', '单文件最大 100MiB'],
+    confidence: 0.95
+  }, input);
+  expect(result.ok).toBe(true);
+  expect(result.candidate.rules.formats).toEqual(['audio/mpeg']);
+  expect(result.candidate.rules.maxBytes).toBe(104_857_600);
+});
+
 test('output with no substantive rules is rejected', () => {
   const output = {
     formats: null,

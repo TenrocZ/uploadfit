@@ -1,0 +1,8 @@
+:root { color-scheme: light; font-family: system-ui, sans-serif; }
+body { margin: 0; padding: 32px; color: #172033; background: #f5f7fb; }
+main { max-width: 960px; margin: 0 auto; padding: 24px; background: #fff; border: 1px solid #dfe5ef; border-radius: 14px; }
+button { margin-right: 8px; padding: 8px 14px; border: 1px solid #aebbd0; border-radius: 8px; background: #fff; cursor: pointer; }
+button:disabled { cursor: wait; opacity: .6; }
+label { display: inline-block; margin: 16px 8px 8px 0; }
+input[type="file"] { max-width: 100%; }
+pre { min-height: 320px; max-height: 720px; overflow: auto; margin-top: 16px; padding: 16px; color: #dbeafe; background: #101827; border-radius: 8px; white-space: pre-wrap; }

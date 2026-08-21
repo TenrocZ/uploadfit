@@ -1,0 +1,55 @@
+{
+  "generatedBy": "tests/unit/audio-signatures.test.js",
+  "privacy": "deterministic synthetic bytes only; no user files or network",
+  "fixtures": [
+    {
+      "name": "mp3-cbr-id3-3frames",
+      "container": "mp3",
+      "codec": "mp3",
+      "parameters": { "mpegVersion": 1, "layer": 3, "bitrateKbps": 128, "sampleRate": 44100, "channels": 2, "frames": 3, "id3v2": true },
+      "bytes": 1261,
+      "sha256": "2B3E1C0A882154E2E42678438B81488849AE74F6EA0758E9FE372DA6A66BB74D",
+      "purpose": "ID3v2 skip, frame sync, CBR duration and MIME/extension conflict"
+    },
+    {
+      "name": "wav-pcm16-mono-stereo",
+      "container": "wav",
+      "codec": "pcm",
+      "parameters": { "sampleRate": 16000, "channels": [1, 2], "bitDepth": 16 },
+      "variants": [
+        { "name": "mono-default", "bytes": 3244, "sha256": "2976DA01E205A110C9FA41D47659E238A5C6D3C3F3137582F2949853FAA201DD" },
+        { "name": "stereo-large-read", "sampleRate": 48000, "frames": 4800, "bytes": 19244, "sha256": "3AC1BDF363578593C029CE12BF607BA277901C9C959AD7FED11B05D0EDAADB06" }
+      ],
+      "purpose": "RIFF/WAVE chunk bounds, PCM metadata and duration cross-check"
+    },
+    {
+      "name": "wav-pcm16-large-data-chunk",
+      "container": "wav",
+      "codec": "pcm",
+      "parameters": { "sampleRate": 48000, "channels": 2, "bitDepth": 16, "frames": 600000, "dataBytes": 2400000, "totalBytes": 2400044 },
+      "bytes": 2400044,
+      "sha256": "434F51A25785D7DB10E8284C2B9F95D5A35E6F4341A4C374BD385AAEEE6F6D3F",
+      "purpose": "real data chunk >1MiB; header-only metadata read with inspectedBytes <=1MiB"
+    },
+    {
+      "name": "m4a-aac-lc",
+      "container": "mp4",
+      "codec": "aac-lc",
+      "parameters": { "timescale": 1000, "duration": 2000, "sampleRate": 44100, "channels": 2, "objectType": 2 },
+      "bytes": 172,
+      "sha256": "88CBCD4FF01A96F3558DFADE07F81540DFB631EEBC5D19486CBA496FFCB88D48",
+      "variants": [
+        { "name": "short-mono-48k", "duration": 1000, "sampleRate": 48000, "channels": 1, "bytes": 172, "sha256": "21C070282083F04C5E264871A740E080E867792B96713C4AFE3AB38B7E7FCFEA" }
+      ],
+      "purpose": "ftyp/moov/mdhd/mp4a/esds AAC-LC subset"
+    },
+    {
+      "name": "corrupt-and-unsupported",
+      "container": "none",
+      "codec": null,
+      "parameters": { "truncated": true, "forgedChunkLength": true, "webmHeader": true },
+      "derivedFrom": ["wav-pcm16-mono", "m4a-aac-lc"],
+      "purpose": "stable AUDIO_DECODE_FAILED/AUDIO_CODEC_UNSUPPORTED paths"
+    }
+  ]
+}

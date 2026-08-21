@@ -1,0 +1,17 @@
+{
+  "stage": "V2-S1",
+  "status": "ACCEPTED",
+  "startCommit": "31d3d2b669ab5bf390cdd6a84b153e802811fb1f",
+  "endCommit": "WORKTREE",
+  "adr": { "path": "docs/decisions/ADR-004-V2-S1-音频契约增量.md", "status": "ACCEPTED" },
+  "s0Dependency": { "handoff": "docs/handoffs/V2-S0-handoff.md", "status": "ACCEPTED", "independentAcceptance": "PASS", "adr": "docs/decisions/ADR-005-V2-S0-音频编解码方案.md" },
+  "bundle": { "bytes": 185068, "sha256": "8BBBD1CB9564E2A6D01E53ABEC71B8B6D46AABB765FA90C16C3C7960E7EE404E" },
+  "tests": [ "npm test -- --run (23 files, 209 tests)", "npm run build", "npm run static-check", "npm run test:e2e -- --grep \"S1 audio discovery\" --reporter=line --workers=1", "npm run test:e2e -- --reporter=line --workers=1", "git diff --check" ],
+  "unitTests": { "testFiles": 23, "tests": 209 },
+  "s1E2E": { "passed": 2, "externalAudioRequests": 0, "businessSubmitClicks": 0 },
+  "fullE2E": { "passed": 118, "failed": 0 },
+  "e2eHarness": { "playwrightPassed": 2, "fullRegressionPassed": 118, "helperWarning": "run-e2e helper emitted EADDRINUSE on 127.0.0.1:8765 after passing tests; no assertion failed." },
+  "reworkRegression": { "largeWav": "PASS: 2,400,044-byte WAV, data chunk 2,400,000 bytes, inspectedBytes <=1MiB", "negativeCases": ["forged dataEnd", "zero data", "inconsistent blockAlign", "truncated fmt"], "targetedTests": "48 passed across 5 files" },
+  "privacy": { "externalAudioRequests": 0, "persistedAudio": false, "aiReceivedAudioMetadata": false },
+  "knownLimitations": [ "S1 does not encode, create a Worker, render confirmation UI or refill an input; those behaviors belong to S2/S3.", "WebM/Opus, raw AAC, compressed WAV and malformed/truncated input remain deterministic stops under the accepted subset." ]
+}

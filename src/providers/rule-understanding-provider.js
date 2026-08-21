@@ -1,4 +1,4 @@
-import { AI_TEXT_LIMIT, ASPECT_RATIO_TOLERANCE } from '../config.js';
+import { AI_TEXT_LIMIT, ASPECT_RATIO_TOLERANCE, AUDIO_MAX_RULE_BYTES } from '../config.js';
 import { normalizeRuleText, normalizeFormats, toBytes } from '../rules/normalizer.js';
 import { createRuleCandidate } from '../rules/schema.js';
 import { ALLOWED_SEMANTICS, validateRuleCandidate } from '../rules/validators.js';
@@ -41,7 +41,7 @@ function invalid(errors) {
 }
 
 const NUMBER_TOKEN_PATTERN = /(?<![\d.])\d+(?:[.,]\d+)?(?![\d.])/g;
-const BYTE_TOKEN_PATTERN = /(\d+(?:[.,]\d+)?)\s*(mb|m\b|kb|k\b|b)\b/gi;
+const BYTE_TOKEN_PATTERN = /(\d+(?:[.,]\d+)?)\s*(mib|mb|m\b|kib|kb|k\b|字节|bytes?|b)(?=\s|$|[^a-z0-9])/gi;
 const RATIO_TOKEN_PATTERN = /(\d+(?:[.,]\d+)?)\s*[:\/]\s*(\d+(?:[.,]\d+)?)/g;
 const CONTEXTUAL_RATIO_PATTERN = /(?:宽高比|(?:图片|照片|图像)?比例|aspect\s*ratio)\s*(?:为|是|=|:|：)?\s*(\d+(?:[.,]\d+)?)/gi;
 
@@ -61,7 +61,11 @@ function byteValue(number, unit, kind) {
   const value = normalizedNumber(number);
   const token = String(unit ?? 'B').toUpperCase();
   if (!Number.isFinite(value)) return null;
-  const multiplier = token === 'MB' || token === 'M'
+  const multiplier = token === 'MIB'
+    ? 1024 ** 2
+    : token === 'KIB'
+      ? 1024
+      : token === 'MB' || token === 'M'
     ? (kind === 'min' ? 1024 ** 2 : 1000 ** 2)
     : token === 'KB' || token === 'K'
       ? (kind === 'min' ? 1024 : 1000)
@@ -113,7 +117,7 @@ export function containsSensitiveAiInput(text) {
   return findSensitiveAiInput(text) !== null;
 }
 
-function readSizeRule(value, field, kind, errors) {
+function readSizeRule(value, field, kind, errors, limit = undefined) {
   if (value === undefined || value === null) return null;
   if (!isPlainObject(value)) {
     errors.push(`${field}_INVALID`);
@@ -129,12 +133,12 @@ function readSizeRule(value, field, kind, errors) {
     return null;
   }
   const unitToken = String(unit ?? 'B').toUpperCase();
-  if (!['B', 'K', 'KB', 'M', 'MB'].includes(unitToken)) {
+  if (!['B', 'K', 'KB', 'KIB', 'M', 'MB', 'MIB'].includes(unitToken)) {
     // GB/TB 等超上限单位直接拒绝（任务书：文件上限 ≤10GB）。
     errors.push(`${field}_OUT_OF_RANGE`);
     return null;
   }
-  const bytes = toBytes(size, unit, kind);
+  const bytes = toBytes(size, unit, kind, limit);
   if (bytes === null || bytes > AI_MAX_BYTES) {
     errors.push(`${field}_OUT_OF_RANGE`);
     return null;
@@ -391,15 +395,17 @@ export function validateAiRuleOutput(rawOutput, inputText) {
     return invalid(['CONFIDENCE_INVALID']);
   }
 
-  const minBytes = readSizeRule(parsed.minSize, 'MIN_SIZE', 'min', errors);
-  const maxBytes = readSizeRule(parsed.maxSize, 'MAX_SIZE', 'max', errors);
+  const formats = readFormats(parsed.formats, errors);
+  const audioRule = formats.formats?.some((format) => String(format).startsWith('audio/'));
+  const sizeLimit = audioRule ? AUDIO_MAX_RULE_BYTES : undefined;
+  const minBytes = readSizeRule(parsed.minSize, 'MIN_SIZE', 'min', errors, sizeLimit);
+  const maxBytes = readSizeRule(parsed.maxSize, 'MAX_SIZE', 'max', errors, sizeLimit);
   if (minBytes !== null && maxBytes !== null && minBytes > maxBytes) {
     errors.push('BYTES_RANGE_REVERSED');
   }
   const width = readDimensionRule(parsed.width, 'WIDTH', errors);
   const height = readDimensionRule(parsed.height, 'HEIGHT', errors);
   const aspectRatio = readAspectRatio(parsed.aspectRatio, errors);
-  const formats = readFormats(parsed.formats, errors);
   const semanticRequirements = readSemanticRequirements(parsed.semanticRequirements, errors);
   validateInternalConsistency({ width, height, aspectRatio, minBytes, maxBytes }, errors);
   if (errors.length) return invalid(errors);

@@ -2,6 +2,7 @@
   "name": "uploadfit",
   "version": "0.1.0",
   "private": true,
+  "license": "UNLICENSED",
   "description": "Local image constraint adaptation for browser upload controls.",
   "type": "module",
   "engines": {
@@ -16,6 +17,11 @@
     "pretest:e2e": "npm run build && npm run build:test",
     "test:e2e": "node scripts/run-e2e.js",
     "fixtures:generate": "node tests/fixtures/generate-fixtures.js",
+    "audio:probe:build": "node scripts/audio-probe/build.mjs",
+    "audio:probe:tabbit-capture": "node scripts/audio-probe/capture-tabbit.mjs",
+    "audio:fixture": "node scripts/audio-probe/generate-fixture.mjs",
+    "audio:s2:adapter": "node scripts/audio-probe/build-s2-adapter.mjs",
+    "audio:s2:gate": "node scripts/audio-probe/run-s2-gate.mjs",
     "serve:test": "node scripts/serve-test.js",
     "static-check": "node scripts/static-check.js",
     "check": "npm test -- --run && npm run build && npm run static-check"
@@ -24,5 +30,8 @@
     "@playwright/test": "^1.62.1",
     "esbuild": "^0.28.2",
     "vitest": "^4.1.10"
+  },
+  "dependencies": {
+    "lamejs": "1.2.1"
   }
 }

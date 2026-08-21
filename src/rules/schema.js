@@ -16,10 +16,13 @@ export function getSourcePriority(sourceType) {
 
 export function createEmptyRuleSet() {
   return {
+    mediaKind: null,
     formats: [],
     extensions: [],
     minBytes: null,
     maxBytes: null,
+    duration: { exactMs: null, minMs: null, maxMs: null },
+    audio: { sampleRates: [], channels: [], bitDepths: [] },
     width: { exact: null, min: null, max: null },
     height: { exact: null, min: null, max: null },
     aspectRatio: null,

@@ -1,0 +1,92 @@
+import { describe, expect, it } from 'vitest';
+import { validateAudioMetadata, isAudioPassthrough } from '../../src/audio/validators.js';
+
+const mp3Metadata = (overrides = {}) => ({
+  mediaKind: 'audio',
+  fileType: 'audio/mpeg',
+  signatureMime: 'audio/mpeg',
+  container: 'mp3',
+  codec: 'mp3',
+  size: 2_000_000,
+  durationMs: 120_000,
+  sampleRate: 44100,
+  channels: 1,
+  bitDepth: null,
+  averageBitrate: 128_000,
+  variableBitrate: false,
+  seekable: true,
+  inspectedBytes: 100,
+  errorCode: null,
+  warnings: [],
+  ...overrides
+});
+
+const rules = (overrides = {}) => ({
+  mediaKind: 'audio',
+  formats: ['audio/mpeg'],
+  extensions: ['.mp3'],
+  minBytes: null,
+  maxBytes: 3_000_000,
+  duration: { exactMs: null, minMs: null, maxMs: null },
+  audio: { sampleRates: [], channels: [], bitDepths: [] },
+  width: { exact: null, min: null, max: null },
+  height: { exact: null, min: null, max: null },
+  aspectRatio: null,
+  dpi: null,
+  count: { max: null },
+  background: null,
+  semanticRequirements: [],
+  confidence: 0.95,
+  sources: [],
+  conflicts: [],
+  advisories: [],
+  safetyFlags: [],
+  actionable: true,
+  ...overrides
+});
+
+describe('audio validation boundaries', () => {
+  it('passes a compliant MP3 through without a confirmation', () => {
+    const metadata = mp3Metadata();
+    const result = validateAudioMetadata(metadata, rules());
+    expect(result).toMatchObject({ valid: true, violations: [], requiredConfirmations: [] });
+    expect(isAudioPassthrough(metadata, rules(), result)).toBe(true);
+  });
+
+  it('requires lossy confirmation for over-limit WAV and stops over-limit MP3 as unsupported', () => {
+    // ADR-005 froze an encode-only lamejs: an over-limit MP3 needs a decoder,
+    // so it must stop instead of promising a re-encode auto-fix.
+    const overMp3 = validateAudioMetadata(mp3Metadata({ size: 4_000_000 }), rules());
+    expect(overMp3.valid).toBe(false);
+    expect(overMp3.safeAutoFixes).not.toContain('REENCODE_AUDIO');
+    expect(overMp3.requiredConfirmations).toEqual([]);
+    expect(overMp3.unfixable).toContain('AUDIO_CODEC_UNSUPPORTED');
+    const wav = validateAudioMetadata(mp3Metadata({
+      signatureMime: 'audio/wav', container: 'wav', codec: 'pcm', size: 4_000_000
+    }), rules());
+    expect(wav.safeAutoFixes).toContain('TRANSCODE_AUDIO');
+    expect(wav.requiredConfirmations.map((item) => item.type)).toContain('AUDIO_LOSSY_TRANSCODE');
+  });
+
+  it('stops when MP3/maxBytes are not explicit or when duration is the blocker', () => {
+    expect(validateAudioMetadata(mp3Metadata(), rules({ formats: [], extensions: [], maxBytes: null })).unfixable)
+      .toEqual(expect.arrayContaining(['RULES_INSUFFICIENT', 'AUDIO_OUTPUT_FORMAT_NOT_ALLOWED']));
+    const duration = validateAudioMetadata(mp3Metadata({ durationMs: 7_200_001 }), rules({
+      duration: { exactMs: null, minMs: null, maxMs: 7_200_000 }
+    }));
+    expect(duration.unfixable).toContain('AUDIO_DURATION_LIMIT_UNFIXABLE');
+    const unsafe = validateAudioMetadata(mp3Metadata(), rules({ maxBytes: null }));
+    expect(unsafe.unfixable).toContain('RULES_INSUFFICIENT');
+  });
+
+  it('stops for semantic original/lossless/official requirements and corrupt metadata', () => {
+    const result = validateAudioMetadata(mp3Metadata(), rules({
+      semanticRequirements: ['原始录音', '无损音频', '必须使用官方工具']
+    }));
+    expect(result.unfixable).toEqual(expect.arrayContaining([
+      'AUDIO_ORIGINAL_REQUIRED', 'AUDIO_LOSSLESS_REQUIRED', 'OFFICIAL_TOOL_REQUIRED'
+    ]));
+    expect(validateAudioMetadata({ errorCode: 'AUDIO_CODEC_UNSUPPORTED' }, rules()).unfixable)
+      .toContain('AUDIO_CODEC_UNSUPPORTED');
+  });
+});

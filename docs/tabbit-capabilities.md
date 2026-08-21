@@ -60,3 +60,20 @@ C:\Users\蔡天乐\AppData\Local\Tabbit Browser\User Data\DevToolsActivePort
 - Tabbit 官方脚本生命周期与 LLMBridge 实机证据：`docs/evidence/S0/tabbit-llmbridge-result.json`
 - LLMBridge 安全摘要截图：`docs/evidence/S0/tabbit-llmbridge-probe.png`
 - S0 最终交接：`docs/handoffs/S0-handoff.md`
+
+## V2-S0 音频补充（2026-08-21）
+
+V2-S0 已在真实 Tabbit `1.10.16.0` 执行音频探针。大文件证据使用项目 CDP `9222`；最终带许可证声明的构建、完整能力快照与进度后取消使用隔离临时 profile/CDP `9333`，取证后关闭并删除，日常 Tabbit profile 未被修改。File/Stream、ReadableStream、TransformStream、Blob Worker、Transferable、WASM、AudioContext/OfflineAudioContext 以及 MP3/AAC-LC/Opus decoder 能力通过；WAV 由 bounded PCM parser 处理，不宣称浏览器存在 WAV container API。原生 MP3 `AudioEncoder` 为 `false`，因此采用并精确锁定 `lamejs@1.2.1`。
+
+真实 200,000,044-byte PCM32 WAV → 20,834,880-byte `audio/mpeg` 通过独立首帧解码和全帧扫描；Worker heartbeat 189ms，峰值缓冲 21,162,560 bytes；立即取消证据继续保留。最终带声明 IIFE 为 353,484 bytes，SHA `878ABD08E561E627E9C3024C367ADA4036F9C481AC304FE8617DC2D9C0B4EAED`；剥离 220-byte 纯注释后，可执行 payload 的 bytes/SHA 与大文件已测版本完全一致。该最终构建另以小型合成 WAV 完成“收到首个 Worker 进度后取消”，取消后新增进度与结果均为 0，Worker/URL 清理通过。外部请求与持久化均为 0。
+
+V2-S0 与 V2-S1 已于 2026-08-21 独立验收为 `ACCEPTED`，V2-S2 可开工。V2-S0 的分发合同要求正式含编码器发布物同时提供稳定源码/许可证/NOTICE/替换重建材料；裸 Tabbit share URL 不得单独公开。证据与交接：
+
+- `docs/evidence/V2-S0/capability-matrix.json`
+- `docs/evidence/V2-S0/tabbit-capability-safe-snapshot.json`
+- `docs/evidence/V2-S0/audio-200-to-100.json`
+- `docs/evidence/V2-S0/resource-profile.json`
+- `docs/evidence/V2-S0/cleanup.json`
+- `docs/evidence/V2-S0/licenses/NOTICE.md`
+- `docs/handoffs/V2-S0-handoff.md`
+- `docs/handoffs/V2-S0-S1-final-acceptance.md`

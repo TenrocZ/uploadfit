@@ -1,0 +1,142 @@
+{
+  "stage": "V2-S0",
+  "schemaVersion": 3,
+  "status": "ACCEPTED",
+  "probeDate": "2026-08-21",
+  "tabbit": {
+    "required": true,
+    "status": "VERIFIED_REAL_TABBIT",
+    "version": "1.10.16.0",
+    "privateScriptLargeGate": {
+      "connection": "project remote CDP 9222",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36",
+      "evidence": [
+        "docs/evidence/V2-S0/audio-200-to-100.json",
+        "docs/evidence/V2-S0/cleanup.json",
+        "docs/evidence/V2-S0/tabbit-audio-200-to-100.png"
+      ]
+    },
+    "finalBannerBuildSafeSnapshot": {
+      "connection": "isolated Tabbit executable CDP 9333; temporary account-free profile removed",
+      "browserVersion": "Chrome/150.0.7871.129",
+      "evidence": "docs/evidence/V2-S0/tabbit-capability-safe-snapshot.json"
+    },
+    "capabilityEvidence": {
+      "file": true,
+      "blob": true,
+      "fileStream": true,
+      "readableStream": true,
+      "transformStream": true,
+      "messageChannel": true,
+      "structuredClone": true,
+      "transferableArrayBuffer": true,
+      "worker": true,
+      "blobWorker": { "started": true, "message": true, "terminated": true, "revoked": true, "errorName": null },
+      "webAssembly": { "api": true, "instantiateApi": true, "validatesEmptyModule": true, "errorName": null },
+      "audioContext": true,
+      "offlineAudioContext": true,
+      "decoder": { "mp3": true, "aacLc": true, "opus": true },
+      "encoder": { "mp3": false, "aacLc": true, "opus": true },
+      "wavHandling": "bounded PCM parser; no WebCodecs WAV container API claimed"
+    },
+    "canClaimAudioCodec": true
+  },
+  "auxiliaryChromium": {
+    "status": "AUXILIARY_ONLY",
+    "evidence": "docs/evidence/V2-S0/chromium-capability-result.json",
+    "interpretation": "Retained as a non-Tabbit comparison; it does not carry the S0 gate."
+  },
+  "candidates": [
+    {
+      "id": "tabbit-native-webcodecs",
+      "class": "browser-native-webcodecs",
+      "version": "Tabbit 1.10.16.0 / Chrome 150.0.7871.129",
+      "source": "runtime capability probe",
+      "licenseSpdx": "N/A",
+      "licenseStatus": "NO_DISTRIBUTED_DEPENDENCY",
+      "buildIncrementRawBytes": 0,
+      "runtimeRemoteFetches": 0,
+      "streaming": true,
+      "workerCompatibility": "AudioEncoder API available; native MP3 configuration unsupported",
+      "mp3Encoding": "AudioEncoder.isConfigSupported=false",
+      "decoder": { "mp3": true, "aacLc": true, "opus": true },
+      "performance": "not applicable because required MP3 output cannot be created",
+      "status": "REJECTED_FOR_MP3_ENCODING"
+    },
+    {
+      "id": "lamejs",
+      "class": "pure-javascript",
+      "version": "1.2.1",
+      "source": "https://github.com/zhuker/lamejs/tree/v1.2.1",
+      "packageIntegrity": "sha1-D5LThykhPxBtShne0ggh2n6JyOQ=",
+      "licenseSpdxDeclaredByPackage": "LGPL-3.0",
+      "licenseStatus": "RELINKABLE_SOURCE_DISTRIBUTION_DOCUMENTED",
+      "licenseNotice": "docs/evidence/V2-S0/licenses/NOTICE.md",
+      "relinkingInstructions": "docs/evidence/V2-S0/licenses/RELINKING.md",
+      "licenseFacts": [
+        "Package root LICENSE is a 424-byte usage notice, not the complete GNU text.",
+        "Package also contains a historical GNU Library GPL Version 2 COPYING file; it is preserved without claiming a second SPDX grant."
+      ],
+      "upstreamMinifiedBytes": 156043,
+      "finalProbeBytes": 353484,
+      "licenseBannerBytes": 220,
+      "executablePayloadBytes": 353264,
+      "executablePayloadSha256": "342F301006D05FD5950EB4CD8ED1F66EEC9E7E8C56280D211616B3995E3AD4C8",
+      "api": "Mp3Encoder.encodeBuffer(Int16Array[, Int16Array]) + flush()",
+      "streaming": true,
+      "workerCompatible": true,
+      "runtimeRemoteFetches": 0,
+      "performance": {
+        "inputBytes": 200000044,
+        "outputBytes": 20834880,
+        "maxHeartbeatGapMs": 189,
+        "peakBufferedBytesConservative": 62832320,
+        "encodePasses": 1
+      },
+      "maintenance": "npm 1.2.1 is current but has not been published for several years; open upstream maintenance/license issues remain a supply-chain caveat",
+      "status": "SELECTED"
+    },
+    {
+      "id": "wasm-media-encoders",
+      "class": "embedded-wasm",
+      "version": "0.7.0",
+      "source": "https://github.com/arseneyr/wasm-media-encoders",
+      "licenseSpdxDeclaredByPackage": "MIT",
+      "licenseStatus": "WRAPPER_DECLARED_MIT_LAME_PAYLOAD_REVIEW_INCOMPLETE",
+      "upstreamSize": {
+        "javascriptKiB": 3.3,
+        "mp3WasmKiB": 130,
+        "combinedGzipKiB": 66,
+        "base64InflationApproxPercent": 30,
+        "uploadFitExactIifeBytes": null,
+        "reasonExactIifeNotBuilt": "rejected before integration; switching would invalidate the accepted large-run payload"
+      },
+      "api": "createMp3Encoder(); configure(); repeated encode(Float32Array[]); finalize()",
+      "streaming": true,
+      "workerCompatible": "wrappable in Blob Worker; not run in Tabbit",
+      "runtimeLoading": "ES import can inline Base64 WASM; UMD defaults to remote fetch and is forbidden",
+      "performance": "not benchmarked in Tabbit; upstream documents a small WASM implementation but no UploadFit 200MB result",
+      "maintenance": "0.7.0 source package; exact candidate recorded, not installed",
+      "status": "REJECTED_LICENSE_AND_RETEST_COST"
+    },
+    {
+      "id": "ffmpeg-wasm-core",
+      "class": "large-reference-only",
+      "version": "@ffmpeg/core 0.12.10",
+      "source": "https://github.com/ffmpegwasm/ffmpeg.wasm",
+      "licenseSpdxDeclaredByCorePackage": "GPL-2.0-or-later",
+      "licenseStatus": "OUT_OF_SCOPE_COMPLEX_TRANSITIVE_REVIEW",
+      "streaming": "virtual filesystem workflow normally buffers complete inputs/outputs",
+      "workerCompatible": true,
+      "performance": "not benchmarked; rejected before integration for size, memory and scope",
+      "status": "OUT_OF_SCOPE_REFERENCE"
+    }
+  ],
+  "inputSubset": {
+    "mp3": ["CBR", "VBR with Xing or VBRI", "ID3v2"],
+    "wav": ["PCM16", "PCM24", "PCM32", "mono", "stereo"],
+    "m4a": ["AAC-LC"],
+    "rejected": ["HE-AAC", "ALAC", "spatial audio", "raw AAC", "compressed WAV", "WebM/Opus"]
+  },
+  "decision": "Use exact lamejs 1.2.1 with a single runtime IIFE plus the accompanying relinkable source/license release package defined by ADR-005. Public detached-script distribution without that package is forbidden."
+}

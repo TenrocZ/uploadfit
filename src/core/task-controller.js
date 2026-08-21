@@ -96,10 +96,13 @@ function safeRuleSet(rules) {
     };
   });
   return {
+    mediaKind: rules.mediaKind ?? null,
     formats: [...(rules.formats ?? [])],
     extensions: [...(rules.extensions ?? [])],
     minBytes: rules.minBytes ?? null,
     maxBytes: rules.maxBytes ?? null,
+    duration: cloneValue(rules.duration ?? { exactMs: null, minMs: null, maxMs: null }),
+    audio: cloneValue(rules.audio ?? { sampleRates: [], channels: [], bitDepths: [] }),
     width: cloneValue(rules.width ?? { exact: null, min: null, max: null }),
     height: cloneValue(rules.height ?? { exact: null, min: null, max: null }),
     aspectRatio: cloneValue(rules.aspectRatio),
@@ -127,12 +130,23 @@ function safeRuleSet(rules) {
 function safeMetadata(metadata) {
   if (!metadata || typeof metadata !== 'object') return null;
   return {
+    mediaKind: metadata.mediaKind ?? (String(metadata.mime ?? metadata.signatureMime ?? '').startsWith('audio/') ? 'audio' : 'image'),
     mime: metadata.mime ?? metadata.signatureMime ?? null,
+    container: metadata.container ?? null,
+    codec: metadata.codec ?? null,
     size: Number.isFinite(metadata.size) ? metadata.size : null,
     width: Number.isFinite(metadata.width) ? metadata.width : null,
     height: Number.isFinite(metadata.height) ? metadata.height : null,
     displayWidth: Number.isFinite(metadata.displayWidth) ? metadata.displayWidth : null,
-    displayHeight: Number.isFinite(metadata.displayHeight) ? metadata.displayHeight : null
+    displayHeight: Number.isFinite(metadata.displayHeight) ? metadata.displayHeight : null,
+    durationMs: Number.isFinite(metadata.durationMs) ? metadata.durationMs : null,
+    sampleRate: Number.isFinite(metadata.sampleRate) ? metadata.sampleRate : null,
+    channels: Number.isFinite(metadata.channels) ? metadata.channels : null,
+    bitrateKbps: Number.isFinite(metadata.averageBitrate)
+      ? Math.round(metadata.averageBitrate / 1000)
+      : null,
+    progress: Number.isFinite(metadata.progress) ? Math.max(0, Math.min(1, metadata.progress)) : 0,
+    errorCode: metadata.errorCode ?? null
   };
 }
 
@@ -676,6 +690,12 @@ export class TaskController {
     if (!record || event?.type !== 'change') return { ignored: 'UNKNOWN_UPLOADER' };
     if (consumeInjectionGuard(input, event)) {
       return { ignored: 'INJECTION_GUARD' };
+    }
+    if (record.context.mediaKind === 'audio' || uploaderContext?.mediaKind === 'audio') {
+      // S1 deliberately stops before the image pipeline.  S2/S3 will route
+      // this context through the independent audio handler and confirmation UI.
+      this._notify({ code: 'AUDIO_PIPELINE_NOT_READY', mediaKind: 'audio', uploaderId: record.context.uploaderId });
+      return { ignored: 'AUDIO_PIPELINE_NOT_READY' };
     }
     if (!input?.files?.length) return { ignored: 'EMPTY_FILE_LIST' };
     if (input.multiple && input.files.length > 1) {

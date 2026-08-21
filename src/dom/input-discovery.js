@@ -6,6 +6,9 @@ const FILE_INPUT_SELECTOR = 'input[type="file"]';
 const MAX_DISCOVERY_LABEL_LENGTH = 240;
 const IMAGE_ACCEPT_PATTERN = /^(?:image\/\*|image\/(?:jpeg|png|webp)|\.(?:jpe?g|png|webp))$/i;
 const IMAGE_TEXT_PATTERN = /(?:图片|图像|照片|证件照|头像|封面|扫描件|image|picture|photo|portrait|avatar|cover|scan)/i;
+const AUDIO_ACCEPT_PATTERN = /^(?:audio\/\*|audio\/(?:mpeg|mp3|mp4|aac|wav|x-wav|webm)|\.(?:mp3|m4a|aac|wav|webm))$/i;
+const VIDEO_ACCEPT_PATTERN = /^(?:video\/|\.(?:mp4|mov|avi|mkv|webm))$/i;
+const AUDIO_TEXT_PATTERN = /(?:(?:上传|选择|添加|支持|允许|接受|格式|文件|转写).{0,10}(?:音频|录音|mp3|m4a|aac|wav)|(?:音频|录音|mp3|m4a|aac|wav).{0,10}(?:上传|文件|转写|格式|选择))/i;
 
 function isElement(node) {
   return node?.nodeType === 1;
@@ -82,6 +85,11 @@ export function getAssociatedTexts(input) {
   values.push(input.closest?.('label')?.textContent);
   values.push(input.closest?.('fieldset')?.querySelector?.('legend')?.textContent);
 
+  const describedBy = (input.getAttribute?.('aria-describedby') ?? '').split(/\s+/).filter(Boolean);
+  for (const id of describedBy) values.push(documentRef?.getElementById?.(id)?.textContent);
+  values.push(input.previousElementSibling?.textContent);
+  values.push(input.nextElementSibling?.textContent);
+
   return uniqueTexts(values);
 }
 
@@ -93,6 +101,24 @@ function acceptContainsImage(accept) {
     .some((token) => IMAGE_ACCEPT_PATTERN.test(token));
 }
 
+function acceptTokens(accept) {
+  return typeof accept === 'string'
+    ? accept.split(',').map((token) => token.trim()).filter(Boolean)
+    : [];
+}
+
+function acceptContainsAudio(accept) {
+  return acceptTokens(accept).some((token) => AUDIO_ACCEPT_PATTERN.test(token));
+}
+
+function acceptContainsVideo(accept) {
+  return acceptTokens(accept).some((token) => VIDEO_ACCEPT_PATTERN.test(token));
+}
+
+function acceptContainsMixedMedia(accept) {
+  return acceptContainsImage(accept) && acceptContainsAudio(accept);
+}
+
 /**
  * Return whether an input is an image uploader candidate according to S1-D1.
  * A bare file input without an image accept hint or associated image text is
@@ -101,8 +127,15 @@ function acceptContainsImage(accept) {
 export function isImageUploader(input) {
   if (!isFileInput(input) || isUploadFitUiInput(input)) return false;
   const accept = input.getAttribute('accept');
+  if (acceptContainsMixedMedia(accept) || acceptContainsAudio(accept) || acceptContainsVideo(accept)) {
+    return false;
+  }
+  const associatedTexts = getAssociatedTexts(input);
+  if (acceptContainsImage(accept)
+    && associatedTexts.some((text) => AUDIO_TEXT_PATTERN.test(text))
+    && !associatedTexts.some((text) => IMAGE_TEXT_PATTERN.test(text))) return false;
   return acceptContainsImage(accept)
-    || getAssociatedTexts(input).some((text) => IMAGE_TEXT_PATTERN.test(text));
+    || associatedTexts.some((text) => IMAGE_TEXT_PATTERN.test(text));
 }
 
 /** Validate only a caller-provided File.type/MIME string; no file bytes are read. */
@@ -110,20 +143,63 @@ export function isImageMime(mime) {
   return typeof mime === 'string' && /^image\/[^\s;]+$/i.test(mime.trim());
 }
 
-function createUploaderContext(input) {
+export function isAudioMime(mime) {
+  return typeof mime === 'string'
+    && /^(?:audio\/(?:mpeg|mp3|mp4|aac|wav|x-wav|webm))$/i.test(mime.trim());
+}
+
+export function isAudioUploader(input) {
+  if (!isFileInput(input) || isUploadFitUiInput(input)) return false;
+  const accept = input.getAttribute('accept');
+  if (acceptContainsMixedMedia(accept) || acceptContainsImage(accept) || acceptContainsVideo(accept)) return false;
+  const associatedTexts = getAssociatedTexts(input);
+  if (acceptContainsAudio(accept)
+    && associatedTexts.some((text) => IMAGE_TEXT_PATTERN.test(text))
+    && !associatedTexts.some((text) => AUDIO_TEXT_PATTERN.test(text))) return false;
+  return acceptContainsAudio(accept) || associatedTexts.some((text) => AUDIO_TEXT_PATTERN.test(text));
+}
+
+/** Determine exactly one media kind, preserving the V1 image boundary. */
+export function classifyMediaKind(input, selectedMime = null) {
+  if (!isFileInput(input) || isUploadFitUiInput(input)) return null;
+  const accept = input.getAttribute('accept');
+  if (acceptContainsMixedMedia(accept)) return null;
+  if (isAudioUploader(input)) return 'audio';
+  if (isImageUploader(input)) return 'image';
+  // A selected audio file may upgrade only when nearby text is strong audio
+  // evidence; MIME alone must not turn every bare input into an audio handler.
+  if (isAudioMime(selectedMime) && getAssociatedTexts(input).some((text) => AUDIO_TEXT_PATTERN.test(text))) {
+    return 'audio';
+  }
+  if (isImageMime(selectedMime)) return 'image';
+  return null;
+}
+
+function createUploaderContext(input, selectedMime = null) {
   const documentRef = getOwnerDocument(input);
   const associatedTexts = getAssociatedTexts(input);
+  const uploaderId = createRandomId('uploader');
+  const mediaKind = classifyMediaKind(input, selectedMime);
+  const root = input.getRootNode?.();
 
   return {
     input,
-    uploaderId: createRandomId('uploader'),
+    uploaderId,
+    id: uploaderId,
+    mediaKind,
+    acceptTokens: acceptTokens(input.getAttribute('accept')),
+    associatedText: associatedTexts.join(' ').slice(0, MAX_DISCOVERY_LABEL_LENGTH),
     label: associatedTexts[0] ?? '',
     nearbyTexts: [],
     alertTexts: [],
     accept: input.getAttribute('accept'),
     multiple: Boolean(input.multiple),
+    autoProcessable: mediaKind !== 'audio' || !input.multiple,
+    form: input.form ?? null,
+    rootKind: root?.nodeType === 11 ? 'open-shadow' : 'document',
     pageUrl: getPageUrl(documentRef),
     pageTitle: getPageTitle(documentRef),
+    adapterId: null,
     adapter: null
   };
 }
@@ -193,7 +269,7 @@ function scanTree(root, handlers, local = {}) {
 }
 
 /**
- * Discover image uploaders once in a DOM subtree.
+ * Discover image/audio uploaders once in a DOM subtree.
  * @param {Document|Element|ShadowRoot} root
  * @param {{onProtectedFrame?: (detail: object) => void}} options
  * @returns {Array<object>}
@@ -213,7 +289,7 @@ export function discoverUploaders(root = globalThis.document, options = {}) {
       });
     },
     visitElement(element) {
-      if (!isImageUploader(element) || seenInputs.has(element)) return;
+      if (!classifyMediaKind(element) || seenInputs.has(element)) return;
       seenInputs.add(element);
       contexts.push(createUploaderContext(element));
     }
@@ -282,9 +358,10 @@ export function createUploaderDiscovery({
   const registerInput = (input, mime = null) => {
     if (!active || !isFileInput(input) || registeredInputs.has(input)) return null;
     if (isUploadFitUiInput(input)) return null;
-    if (!isInputInRoot(input) || (!isImageUploader(input) && !isImageMime(mime))) return null;
+    const mediaKind = classifyMediaKind(input, mime);
+    if (!isInputInRoot(input) || !mediaKind) return null;
     registeredInputs.add(input);
-    const context = createUploaderContext(input);
+    const context = createUploaderContext(input, mime);
     contexts.set(input, context);
     onDiscover(context);
     return context;
@@ -414,7 +491,7 @@ export function createUploaderDiscovery({
   const onComposedEvent = (event) => {
     if (!active) return;
     const input = findFileInputFromEvent(event);
-    if (input && isImageUploader(input)) registerInput(input);
+    if (input && classifyMediaKind(input)) registerInput(input);
   };
 
   return {
@@ -450,7 +527,7 @@ export function createUploaderDiscovery({
     },
 
     upgradeFromMime(input, mime) {
-      if (!isImageMime(mime) || !isInputInRoot(input)) return null;
+      if ((!isImageMime(mime) && !isAudioMime(mime)) || !isInputInRoot(input)) return null;
       return contexts.get(input) ?? registerInput(input, mime);
     },
 

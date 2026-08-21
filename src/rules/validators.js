@@ -1,14 +1,23 @@
-import { MAX_DIMENSION, MAX_INPUT_BYTES } from '../config.js';
+import { AUDIO_MAX_RULE_BYTES, MAX_DIMENSION, MAX_INPUT_BYTES } from '../config.js';
 import { RULE_SOURCE_TYPES, getSourcePriority } from './schema.js';
 import { ALLOWED_SAFETY_FLAGS } from './safety-semantics.js';
 
 export const ALLOWED_FORMATS = Object.freeze([
   'image/jpeg',
   'image/png',
-  'image/webp'
+  'image/webp',
+  'audio/mpeg',
+  'audio/mp4',
+  'audio/aac',
+  'audio/wav',
+  'audio/webm'
 ]);
 
-export const ALLOWED_EXTENSIONS = Object.freeze(['jpg', 'jpeg', 'png', 'webp']);
+export const ALLOWED_EXTENSIONS = Object.freeze([
+  'jpg', 'jpeg', 'png', 'webp',
+  '.mp3', '.m4a', '.aac', '.wav', '.webm',
+  'mp3', 'm4a', 'aac', 'wav', 'webm'
+]);
 export const ALLOWED_BACKGROUNDS = Object.freeze(['blue', 'white', 'red', 'green', 'black', 'transparent']);
 export const ALLOWED_SEMANTICS = Object.freeze([
   '蓝色背景',
@@ -17,7 +26,10 @@ export const ALLOWED_SEMANTICS = Object.freeze([
   '清晰',
   '不得拉伸',
   '文件名需包含姓名和身份证号',
-  '必须使用官方工具'
+  '必须使用官方工具',
+  '原始录音',
+  '证据原件',
+  '无损音频'
 ]);
 export { ALLOWED_SAFETY_FLAGS } from './safety-semantics.js';
 
@@ -30,8 +42,11 @@ const MAX_EVIDENCE_CHARS = 6000;
 const ALLOWED_RULE_FIELDS = new Set([
   'formats',
   'extensions',
+  'mediaKind',
   'minBytes',
   'maxBytes',
+  'duration',
+  'audio',
   'width',
   'height',
   'aspectRatio',
@@ -61,8 +76,17 @@ const ALLOWED_RULE_SET_FIELDS = new Set([
 const FORMAT_EXTENSIONS = Object.freeze({
   'image/jpeg': ['jpg', 'jpeg'],
   'image/png': ['png'],
-  'image/webp': ['webp']
+  'image/webp': ['webp'],
+  'audio/mpeg': ['.mp3'],
+  'audio/mp4': ['.m4a'],
+  'audio/aac': ['.aac'],
+  'audio/wav': ['.wav'],
+  'audio/webm': ['.webm']
 });
+const REQUIRED_RULE_FIELDS = new Set([
+  'formats', 'extensions', 'minBytes', 'maxBytes', 'width', 'height', 'aspectRatio',
+  'dpi', 'count', 'background', 'semanticRequirements'
+]);
 const DIMENSION_FIELDS = new Set(['exact', 'min', 'max']);
 const ASPECT_RATIO_FIELDS = new Set(['value', 'tolerance']);
 const COUNT_FIELDS = new Set(['max']);
@@ -139,17 +163,26 @@ function validateRulesObject(rules, { required = false } = {}) {
   if (!rules || typeof rules !== 'object' || Array.isArray(rules)) return ['RULES_INVALID'];
   const errors = [];
   if (required) {
-    for (const field of ALLOWED_RULE_FIELDS) {
+    for (const field of REQUIRED_RULE_FIELDS) {
       if (!hasOwn(rules, field)) errors.push(`RULE_${field.toUpperCase()}_MISSING`);
     }
   }
   for (const key of Object.keys(rules)) {
     if (!ALLOWED_RULE_FIELDS.has(key)) errors.push(`RULE_FIELD_${key}_UNKNOWN`);
   }
+  if (hasOwn(rules, 'mediaKind')
+    && rules.mediaKind !== null
+    && !['image', 'audio', 'ambiguous'].includes(rules.mediaKind)) {
+    errors.push('MEDIA_KIND_INVALID');
+  }
   validateFormatsAndExtensions(rules, errors);
 
+  const audioRule = rules.mediaKind === 'audio'
+    || (Array.isArray(rules.formats) && rules.formats.some((format) => String(format).startsWith('audio/')))
+    || (Array.isArray(rules.extensions) && rules.extensions.some((extension) => /^\./.test(extension)));
+  const byteLimit = audioRule ? AUDIO_MAX_RULE_BYTES : MAX_INPUT_BYTES;
   for (const key of ['minBytes', 'maxBytes']) {
-    if (hasOwn(rules, key) && !optionalNumber(rules[key], MAX_INPUT_BYTES)) {
+    if (hasOwn(rules, key) && !optionalNumber(rules[key], byteLimit)) {
       errors.push(`${key.toUpperCase()}_INVALID`);
     }
   }
@@ -161,6 +194,42 @@ function validateRulesObject(rules, { required = false } = {}) {
 
   errors.push(...validateDimensionRule(rules.width, 'WIDTH'));
   errors.push(...validateDimensionRule(rules.height, 'HEIGHT'));
+
+  if (rules.duration !== undefined && rules.duration !== null) {
+    if (!rules.duration || typeof rules.duration !== 'object' || Array.isArray(rules.duration)) {
+      errors.push('DURATION_INVALID');
+    } else {
+      for (const key of Object.keys(rules.duration)) {
+        if (!['exactMs', 'minMs', 'maxMs'].includes(key)) errors.push(`DURATION_FIELD_${key}_UNKNOWN`);
+      }
+      for (const key of ['exactMs', 'minMs', 'maxMs']) {
+        if (hasOwn(rules.duration, key) && !optionalNumber(rules.duration[key], Number.MAX_SAFE_INTEGER)) {
+          errors.push(`DURATION_${key.toUpperCase()}_INVALID`);
+        }
+      }
+      if (Number.isFinite(rules.duration.minMs) && Number.isFinite(rules.duration.maxMs)
+        && rules.duration.minMs > rules.duration.maxMs) errors.push('DURATION_RANGE_REVERSED');
+    }
+  }
+
+  if (rules.audio !== undefined && rules.audio !== null) {
+    if (!rules.audio || typeof rules.audio !== 'object' || Array.isArray(rules.audio)) {
+      errors.push('AUDIO_RULE_INVALID');
+    } else {
+      for (const key of Object.keys(rules.audio)) {
+        if (!['sampleRates', 'channels', 'bitDepths'].includes(key)) errors.push(`AUDIO_RULE_FIELD_${key}_UNKNOWN`);
+      }
+      for (const key of ['sampleRates', 'channels', 'bitDepths']) {
+        const value = rules.audio[key];
+        if (value !== undefined && (!Array.isArray(value) || value.length > MAX_ARRAY_ITEMS
+          || value.some((item) => !Number.isInteger(item) || item <= 0 || item > 1_000_000))) {
+          errors.push(`AUDIO_RULE_${key.toUpperCase()}_INVALID`);
+        }
+      }
+      if (Array.isArray(rules.audio.channels)
+        && rules.audio.channels.some((item) => item > 2)) errors.push('AUDIO_RULE_CHANNELS_UNSUPPORTED');
+    }
+  }
 
   if (rules.aspectRatio !== undefined && rules.aspectRatio !== null) {
     if (!rules.aspectRatio || typeof rules.aspectRatio !== 'object' || Array.isArray(rules.aspectRatio)) {

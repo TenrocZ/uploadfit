@@ -5,4 +5,6 @@ test-results/
 coverage/
 *.log
 tests/fixtures/generated/
+test-pages/generated/
+audio-probe-output/
 .learnings/

@@ -22,9 +22,54 @@ import {
   createUploaderDiscovery,
   discoverUploaders,
   findFileInputFromEvent,
+  classifyMediaKind,
+  isAudioMime,
+  isAudioUploader,
   isImageMime,
   isImageUploader
 } from './dom/input-discovery.js';
+import { inspectAudio, audioMetadataSnapshot } from './audio/metadata.js';
+import {
+  validateAudioMetadata,
+  isAudioPassthrough,
+  pageAllowsMp3,
+  isSupportedAudioMetadata,
+  validateAudioOutput,
+  validateAudioOutputFile
+} from './audio/validators.js';
+import {
+  createAudioProcessingPlan,
+  createAudioPlan,
+  buildAudioPlan,
+  resolveAudioConfirmation,
+  resolveAudioProcessingConfirmation,
+  resolveConfirmation
+} from './audio/planner.js';
+import { processAudio, processAudioFile, createAudioPipeline } from './audio/pipeline.js';
+import { createAudioHandler, audioHandler } from './audio/handler.js';
+import {
+  canUseAudioWorker,
+  createAudioWorkerRuntime,
+  createAudioWorkerSource,
+  runAudioWorker
+} from './audio/worker-runtime.js';
+import { AUDIO_ENCODER_DESCRIPTOR, isFrozenAudioEncoderDescriptor } from './audio/encoder-contract.js';
+import { createMediaHandlerRegistry, createMediaHandlers } from './core/media-handlers.js';
+import {
+  AUDIO_ERROR_CODES,
+  AUDIO_ERROR_MESSAGES,
+  AudioMetadataError,
+  AudioProcessingError,
+  audioErrorMessage
+} from './audio/errors.js';
+import {
+  detectAudioSignature,
+  findMp3Frame,
+  parseMp3Header,
+  parseMp3Signature,
+  parseWavChunks,
+  parseM4aSignature
+} from './audio/signatures.js';
 import {
   injectFile,
   markUntrustedEventBlocked,
@@ -75,6 +120,9 @@ export {
   discoverUploaders,
   extractRelevantContext,
   findFileInputFromEvent,
+  classifyMediaKind,
+  isAudioMime,
+  isAudioUploader,
   genericAdapter,
   cnipaPublicGuideAdapter,
   RuleUnderstandingProvider,
@@ -91,6 +139,44 @@ export {
   inspectImage,
   isImageMime,
   isImageUploader,
+  inspectAudio,
+  audioMetadataSnapshot,
+  validateAudioMetadata,
+  isAudioPassthrough,
+  pageAllowsMp3,
+  isSupportedAudioMetadata,
+  validateAudioOutput,
+  validateAudioOutputFile,
+  createAudioProcessingPlan,
+  createAudioPlan,
+  buildAudioPlan,
+  resolveAudioConfirmation,
+  resolveAudioProcessingConfirmation,
+  resolveConfirmation,
+  processAudio,
+  processAudioFile,
+  createAudioPipeline,
+  createAudioHandler,
+  audioHandler,
+  canUseAudioWorker,
+  createAudioWorkerRuntime,
+  createAudioWorkerSource,
+  runAudioWorker,
+  AUDIO_ENCODER_DESCRIPTOR,
+  isFrozenAudioEncoderDescriptor,
+  createMediaHandlerRegistry,
+  createMediaHandlers,
+  AUDIO_ERROR_CODES,
+  AUDIO_ERROR_MESSAGES,
+  AudioMetadataError,
+  AudioProcessingError,
+  audioErrorMessage,
+  detectAudioSignature,
+  findMp3Frame,
+  parseMp3Header,
+  parseMp3Signature,
+  parseWavChunks,
+  parseM4aSignature,
   markUntrustedEventBlocked,
   normalizeRuleText,
   parseRulesDeterministically,
