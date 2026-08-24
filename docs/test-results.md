@@ -1,4 +1,16 @@
-# S5 测试结果
+# UploadFit V2-S4 测试结果（Phase 1）
+
+## 当前施工状态
+
+本阶段状态为 `IN_PROGRESS`，不是 `READY_FOR_ACCEPTANCE` 或 `ACCEPTED`。Phase 1 定向音频/安全/快速性能 runner 通过 24/24；`npm run check` 通过 25 个 Vitest 文件、229/229，production `dist/uploadfit.js` 为 421,348 bytes，SHA-256 为 `ABFA41EBB606CA0E7ED84F8DEE2F17783CAF0BDFA11CE777FB1BAEFBD173D18A`。A01–A18、S01–S06、P01–P03 的精确映射和 debug/production 边界见 [`docs/evidence/V2-S4/README.md`](evidence/V2-S4/README.md)。
+
+执行命令：
+
+`node scripts/run-e2e.js tests/e2e/v2-audio-scenarios.spec.js tests/e2e/v2-audio-security.spec.js tests/e2e/v2-audio-performance.spec.js tests/integration/v2-media-regression.test.js --reporter=line --workers=1`
+
+本阶段尚未执行实际 >200,000,000-byte 慢门禁，也尚未执行 Tabbit LR1–LR10；它们统一记录为 `NOT_RUN_PHASE_2`，不引用 S0/S2 历史结果，不以 Playwright/debug harness 冒充实机。
+
+## 历史 S5 测试结果
 
 ## 结论
 

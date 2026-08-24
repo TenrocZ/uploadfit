@@ -1,4 +1,18 @@
-# S5 性能记录
+# UploadFit V2-S4 性能记录（Phase 1）
+
+## 快速自动化
+
+状态为 `IN_PROGRESS`。`v2-audio-performance.spec.js` P01–P03 在定向 runner 中 3/3 通过：
+
+- P01：Worker 处理小型 PCM WAV，progress 单调、事件频率 ≤10/s、heartbeat 最大间隔 ≤500ms、输出 ≤规则上限，记录 cleanup/encodePasses。
+- P02：收到 encode progress 后取消，`AUDIO_PROCESSING_CANCELLED` 在 ≤1,000ms 返回，无迟到 progress/result，Worker/object URL/queue 清理通过。
+- P03：连续两个任务分别完成，Worker/object URL 清理字段完整，无 stale state。
+
+这是浏览器 debug harness 的快速门禁，不是 Tabbit 结果；生产页音频/图片回归进入最终 `npm run test:e2e`。实际 >200,000,000-byte 成功/取消门禁属于 Phase 2，当前 `NOT_RUN_PHASE_2`，不得引用 S0/S2 历史慢门禁冒充本轮。
+
+production `dist/uploadfit.js`：421,348 bytes，SHA-256 `ABFA41EBB606CA0E7ED84F8DEE2F17783CAF0BDFA11CE777FB1BAEFBD173D18A`。
+
+## 历史 S5 性能记录
 
 ## 门禁
 

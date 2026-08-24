@@ -1,0 +1,37 @@
+{
+  "stage": "V2-S4",
+  "phase": "PHASE_1",
+  "status": "IN_PROGRESS",
+  "bundle": {
+    "path": "dist/uploadfit.js",
+    "bytes": 421348,
+    "sha256": "ABFA41EBB606CA0E7ED84F8DEE2F17783CAF0BDFA11CE777FB1BAEFBD173D18A",
+    "sameShaRequiredForPhase2": true
+  },
+  "environment": {
+    "tabbit": "NOT_RUN_PHASE_2",
+    "officialPrivateScriptContextVerified": false,
+    "remoteCdp": "DEFERRED_TO_PHASE_2",
+    "substitutionPolicy": "No Playwright/mock/debug bundle/history may be recorded as Tabbit PASS."
+  },
+  "lr": {
+    "LR1": { "status": "NOT_RUN_PHASE_2" },
+    "LR2": { "status": "NOT_RUN_PHASE_2" },
+    "LR3": { "status": "NOT_RUN_PHASE_2" },
+    "LR4": { "status": "NOT_RUN_PHASE_2" },
+    "LR5": { "status": "NOT_RUN_PHASE_2" },
+    "LR6": { "status": "NOT_RUN_PHASE_2" },
+    "LR7": { "status": "NOT_RUN_PHASE_2" },
+    "LR8": { "status": "NOT_RUN_PHASE_2" },
+    "LR9": { "status": "NOT_RUN_PHASE_2" },
+    "LR10": { "status": "NOT_RUN_PHASE_2" }
+  },
+  "redaction": {
+    "scriptIds": "NOT_RECORDED",
+    "fullPrompts": "NOT_RECORDED",
+    "fullResponses": "NOT_RECORDED",
+    "filenames": "NOT_RECORDED",
+    "paths": "NOT_RECORDED",
+    "accountIdentifiers": "NOT_RECORDED"
+  }
+}

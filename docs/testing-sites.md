@@ -2,6 +2,13 @@
 
 自动化测试使用本地最小 DOM 夹具，避免公网波动改变 CI 结果；原网址用于发布前人工复核。
 
+## V2-S4 音频 Phase 1
+
+- 本地 production 音频页：`test-pages/audio-s3.html?scenario=A`、`?scenario=B`、`?scenario=C`、`?scenario=G`、`?scenario=H`；由既有 production IIFE E2E 覆盖 passthrough、PCM→MP3、M4A/AAC/超限 MP3 stop、取消/解绑和一次拒收 retry。
+- 确定性 debug API 页：`test-pages/probe.html`；由 `tests/e2e/v2-audio-scenarios.spec.js`、`v2-audio-security.spec.js`、`v2-audio-performance.spec.js` 和 `tests/integration/v2-media-regression.test.js` 使用，不冒充 Tabbit 实机。
+- 当前候选 production bundle：421,348 bytes，SHA-256 `ABFA41EBB606CA0E7ED84F8DEE2F17783CAF0BDFA11CE777FB1BAEFBD173D18A`。
+- Phase 2 才在 Tabbit 官方私有脚本和部分网址匹配下复跑 LR1–LR10，并执行 >200,000,000-byte 合成音频成功/处理中取消；当前不公开脚本 ID、prompt/response、文件名、路径或账号信息。
+
 ## Zent v7 Upload
 
 - 原网址：https://youzan.github.io/zent-v7/zh/component/upload

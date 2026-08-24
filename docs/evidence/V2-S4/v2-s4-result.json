@@ -1,0 +1,100 @@
+{
+  "stage": "V2-S4",
+  "phase": "PHASE_1",
+  "status": "IN_PROGRESS",
+  "baseCommit": "e9fea4c06f9602125df7434434fc6bbc1fd9f7c4",
+  "phase1Commit": "LOCAL_COMMIT_REPORTED_TO_ROOT",
+  "environment": {
+    "os": "Windows",
+    "node": "v22.20.0",
+    "npm": "10.9.3",
+    "testServer": "http://127.0.0.1:8765",
+    "browserRunner": "Playwright via scripts/run-e2e.js",
+    "tabbit": "DEFERRED_TO_PHASE_2"
+  },
+  "bundle": {
+    "path": "dist/uploadfit.js",
+    "bytes": 421348,
+    "sha256": "ABFA41EBB606CA0E7ED84F8DEE2F17783CAF0BDFA11CE777FB1BAEFBD173D18A",
+    "format": "single IIFE",
+    "runtimeRemoteDependencies": 0
+  },
+  "commands": {
+    "npmCi": { "status": "PASS", "scope": "BASELINE_ALREADY_EXECUTED" },
+    "check": {
+      "status": "PASS",
+      "vitestFiles": 25,
+      "vitestTests": 229,
+      "staticCheck": "PASS"
+    },
+    "phase1TargetedE2E": {
+      "status": "PASS",
+      "tests": 24,
+      "passed": 24,
+      "failed": 0,
+      "workers": 1
+    },
+    "fullE2E": {
+      "status": "PASS",
+      "tests": 186,
+      "passed": 186,
+      "failed": 0,
+      "workers": 8,
+      "durationSeconds": 50.1
+    }
+  },
+  "audioScope": {
+    "mp3Passthrough": "COVERED",
+    "pcmWavToMp3": "COVERED_16_24_32_MONO_STEREO",
+    "overLimitMp3": "AUDIO_CODEC_UNSUPPORTED_WORKER_0",
+    "m4aAac": "AUDIO_CODEC_UNSUPPORTED_WORKER_0",
+    "decoderAdded": false,
+    "secondControllerAdded": false,
+    "musicOrCutOrSplitOrDenoiseAdded": false
+  },
+  "mapping": {
+    "A01_A18": "docs/evidence/V2-S4/README.md",
+    "security": ["S01", "S02", "S03", "S04", "S05", "S06"],
+    "quickPerformance": ["P01", "P02", "P03"]
+  },
+  "privacy": {
+    "externalAudioRequests": 0,
+    "businessSubmitClicks": 0,
+    "persistentAudio": 0,
+    "sensitiveAiCalls": 0,
+    "maliciousMarkupExecution": 0
+  },
+  "slow200MbGate": {
+    "status": "NOT_RUN_PHASE_2",
+    "success": null,
+    "cancel": null,
+    "fixtureBytes": null,
+    "fixtureSha256": null,
+    "outputBytes": null,
+    "outputSha256": null,
+    "cleanup": "NOT_RUN_PHASE_2"
+  },
+  "tabbit": {
+    "status": "NOT_RUN_PHASE_2",
+    "sameProductionShaRequired": true,
+    "browser": null,
+    "officialPrivateScriptContextVerified": false,
+    "lr": {
+      "LR1": "NOT_RUN_PHASE_2",
+      "LR2": "NOT_RUN_PHASE_2",
+      "LR3": "NOT_RUN_PHASE_2",
+      "LR4": "NOT_RUN_PHASE_2",
+      "LR5": "NOT_RUN_PHASE_2",
+      "LR6": "NOT_RUN_PHASE_2",
+      "LR7": "NOT_RUN_PHASE_2",
+      "LR8": "NOT_RUN_PHASE_2",
+      "LR9": "NOT_RUN_PHASE_2",
+      "LR10": "NOT_RUN_PHASE_2"
+    }
+  },
+  "knownLimitations": [
+    "Phase 1 does not execute the >200000000-byte real slow gate.",
+    "Phase 1 does not execute Tabbit LR1-LR10.",
+    "Debug harness assertions are not Tabbit or production-IIFE evidence; production-page regressions remain in the full E2E run."
+  ]
+}

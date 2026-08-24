@@ -1,4 +1,12 @@
-# S5 安全复核
+# UploadFit V2-S4 安全复核（Phase 1）
+
+## 当前施工状态
+
+状态为 `IN_PROGRESS`。`npm run static-check` PASS；Phase 1 安全 runner `v2-audio-security.spec.js` S01–S06 与格式/registry 对抗共计在定向 24/24 中通过。浏览器拦截计数覆盖 fetch/XHR/WebSocket/EventSource/sendBeacon/storage，核心音频路径 external requests=0、persistent audio=0；AI 敏感模式在 bridge 前返回 `AI_SENSITIVE_INPUT`；伪 Worker taskId、异常长度/格式、CSP/Worker 不可用均稳定停止。生产产物 bytes/SHA 为 421,348 / `ABFA41EBB606CA0E7ED84F8DEE2F17783CAF0BDFA11CE777FB1BAEFBD173D18A`。
+
+新测试文件使用本地 `dist/uploadfit.test.js` debug harness 做确定性 API/Worker 断言，不能写成 Tabbit 或 production IIFE 实机证据；既有生产页 E2E 和最终全量 E2E 负责 production controller/UI 回归。实际 200MB 与 Tabbit LR1–LR10 是 Phase 2，当前未运行。
+
+## 历史 S5 安全复核
 
 ## 结论
 
