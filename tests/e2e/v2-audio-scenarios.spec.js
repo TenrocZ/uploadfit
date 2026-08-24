@@ -1,10 +1,10 @@
 import { expect, test } from '@playwright/test';
 
 /*
- * V2-S4's scenario matrix deliberately stays small and deterministic.  The
- * S3 page tests exercise the production IIFE; this file exercises the same
- * public debug API in a browser so that the QA assertions can name each S4
- * case without adding another production code path.
+ * Phase-1 evidence is provenance-labelled. These scenarios use the debug
+ * bundle in a local page, but the controller paths use the real audio
+ * handler/Worker and real File/DataTransfer objects. Plan-only and fake
+ * runtime tests never claim production or Tabbit coverage.
  */
 
 function rules(overrides = {}) {
@@ -33,8 +33,8 @@ async function open(page) {
   await page.evaluate(() => globalThis.__uploadfit_debug_bundle__.cleanupSession());
 }
 
-async function install(page, ruleSet = rules()) {
-  await page.evaluate((configuredRules) => {
+async function install(page, ruleSet = rules(), options = {}) {
+  await page.evaluate(({ configuredRules, forceMono, failProcessedInjection, observeRejections }) => {
     const api = globalThis.__uploadfit_debug_bundle__;
     const input = document.createElement('input');
     input.type = 'file';
@@ -44,21 +44,93 @@ async function install(page, ruleSet = rules()) {
 
     const NativeWorker = window.Worker;
     let workerStarts = 0;
+    let activeWorkers = 0;
+    let maxActiveWorkers = 0;
     if (typeof NativeWorker === 'function') {
       window.Worker = class CountingWorker extends NativeWorker {
         constructor(...args) {
           workerStarts += 1;
+          activeWorkers += 1;
+          maxActiveWorkers = Math.max(maxActiveWorkers, activeWorkers);
           super(...args);
+        }
+
+        terminate(...args) {
+          activeWorkers = Math.max(0, activeWorkers - 1);
+          return super.terminate(...args);
         }
       };
     }
+
+    const loggerEntries = [];
+    const logger = {
+      emit(event, fields = {}) {
+        loggerEntries.push({ event, ...fields });
+        return true;
+      },
+      getEntries() { return loggerEntries.slice(); },
+      clear() { loggerEntries.length = 0; }
+    };
+    const nativeInject = api.injectFile;
+    let injectionCalls = 0;
+    const injectionReasons = [];
+    const injectFileFn = (inputElement, file, injectOptions = {}) => {
+      injectionCalls += 1;
+      injectionReasons.push(injectOptions.reason ?? null);
+      if (failProcessedInjection && injectOptions.reason === 'processed') {
+        return {
+          ok: false,
+          inputFilesVerified: false,
+          eventsDispatched: [],
+          fallback: 'download',
+          errorCode: 'DATATRANSFER_UNAVAILABLE'
+        };
+      }
+      return nativeInject(inputElement, file, injectOptions);
+    };
+
+    const nativeAudio = forceMono ? api.createAudioHandler() : null;
+    const audioHandler = nativeAudio ? {
+      kind: 'audio',
+      supports: (...args) => nativeAudio.supports(...args),
+      inspect: (...args) => nativeAudio.inspect(...args),
+      validate: (...args) => nativeAudio.validate(...args),
+      plan: (metadata, audioRules, planOptions = {}) => api.createAudioProcessingPlan(
+        metadata,
+        audioRules,
+        { ...planOptions, targetChannels: 1 }
+      ),
+      resolveConfirmation: (...args) => nativeAudio.resolveConfirmation(...args),
+      process: (...args) => nativeAudio.process(...args),
+      validateOutput: (...args) => nativeAudio.validateOutput(...args),
+      dispose: () => nativeAudio.dispose()
+    } : undefined;
+    const rejectionHooks = [];
+    let rejectionSignals = 0;
 
     const controller = api.createTaskController({
       documentRef: document,
       globalRef: window,
       parseRulesFn: () => [],
-      resolveRulesFn: () => configuredRules
+      resolveRulesFn: () => configuredRules,
+      logger,
+      injectFileFn,
+      ...(audioHandler ? { audioHandler } : {})
     });
+    if (observeRejections) {
+      controller.observeRejection = (task, context, callbacks) => {
+        const wrappedCallbacks = {
+          ...callbacks,
+          onRejection: (detail) => {
+            rejectionSignals += 1;
+            return callbacks.onRejection(detail);
+          }
+        };
+        const hook = { task, context, callbacks: wrappedCallbacks, stopped: false };
+        rejectionHooks.push(hook);
+        return () => { hook.stopped = true; };
+      };
+    }
     controller.registerUploader({
       input,
       uploaderId: 'v2-s4-audio-uploader',
@@ -75,9 +147,22 @@ async function install(page, ruleSet = rules()) {
       input,
       controller,
       get workerStarts() { return workerStarts; },
+      get activeWorkers() { return activeWorkers; },
+      get maxActiveWorkers() { return maxActiveWorkers; },
+      get injectionCalls() { return injectionCalls; },
+      injectionReasons,
+      logger,
+      configuredRules,
+      rejectionHooks,
+      get rejectionSignals() { return rejectionSignals; },
       NativeWorker
     };
-  }, ruleSet);
+  }, {
+    configuredRules: ruleSet,
+    forceMono: options.forceMono === true,
+    failProcessedInjection: options.failProcessedInjection === true,
+    observeRejections: options.observeRejections === true
+  });
 }
 
 async function select(page, kind, options = {}) {
@@ -110,11 +195,53 @@ async function select(page, kind, options = {}) {
       return new File([bytes], 'voice.mp3', { type: 'audio/mpeg' });
     };
     const m4a = () => {
-      const bytes = new Uint8Array(64);
-      const view = new DataView(bytes.buffer);
-      view.setUint32(0, bytes.length, false);
-      ascii(bytes, 4, 'ftyp'); ascii(bytes, 8, 'M4A '); ascii(bytes, 16, 'M4A ');
-      return new File([bytes], 'voice.m4a', { type: 'audio/mp4' });
+      const concat = (...parts) => {
+        const bytes = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));
+        let offset = 0;
+        for (const part of parts) { bytes.set(part, offset); offset += part.length; }
+        return bytes;
+      };
+      const box = (type, payload) => {
+        const bytes = new Uint8Array(8 + payload.length);
+        const view = new DataView(bytes.buffer);
+        view.setUint32(0, bytes.length, false);
+        ascii(bytes, 4, type);
+        bytes.set(payload, 8);
+        return bytes;
+      };
+      const mdhdPayload = new Uint8Array(24);
+      const mdhdView = new DataView(mdhdPayload.buffer);
+      mdhdView.setUint32(12, 1000, false);
+      mdhdView.setUint32(16, 2000, false);
+      const frequencyIndex = 4;
+      const asc = new Uint8Array([
+        (2 << 3) | (frequencyIndex >> 1),
+        ((frequencyIndex & 1) << 7) | (2 << 3)
+      ]);
+      const esds = new Uint8Array([
+        0, 0, 0, 0, 0x03, 0x10, 0, 0, 0, 0, 0x04, 0x08, 0, 0, 0, 0,
+        0x05, 0x02, asc[0], asc[1]
+      ]);
+      const samplePayload = new Uint8Array(28);
+      const sampleView = new DataView(samplePayload.buffer);
+      sampleView.setUint16(16, 2, false);
+      sampleView.setUint16(18, 16, false);
+      sampleView.setUint32(24, 44100 << 16, false);
+      const sampleEntry = box('mp4a', concat(samplePayload, box('esds', esds)));
+      const stsdPayload = new Uint8Array(8 + sampleEntry.length);
+      new DataView(stsdPayload.buffer).setUint32(4, 1, false);
+      stsdPayload.set(sampleEntry, 8);
+      const stbl = box('stbl', box('stsd', stsdPayload));
+      const moov = box('moov', box('trak', box('mdia', concat(
+        box('mdhd', mdhdPayload),
+        box('minf', stbl)
+      ))));
+      const ftyp = box('ftyp', concat(
+        new TextEncoder().encode('M4A '),
+        new Uint8Array([0, 0, 0, 0]),
+        new TextEncoder().encode('M4A ')
+      ));
+      return new File([concat(ftyp, moov)], 'voice.m4a', { type: 'audio/mp4' });
     };
     const file = sourceKind === 'wav' ? wav() : sourceKind === 'mp3' ? mp3() : m4a();
     const transfer = new DataTransfer();
@@ -161,7 +288,225 @@ async function dispose(page) {
 }
 
 test.describe('V2-S4 A01-A18 audio QA matrix', () => {
-  test('A01 compliant MP3 is passthrough with identity and no Worker', async ({ page }) => {
+  test('Q-S4-P01 [DEBUG_CONTROLLER_REAL_FILE] A02/A04 stop actual over-limit MP3 and valid M4A before processing', async ({ page }) => {
+    await open(page);
+    for (const source of [
+      { kind: 'mp3', options: { frameCount: 330, bitrateIndex: 14 } },
+      { kind: 'm4a', options: {} }
+    ]) {
+      await install(page);
+      await select(page, source.kind, source.options);
+      await waitFor(page, () => __v2S4.controller.getSnapshot().activeTask?.status === 'STOPPED');
+      const result = await page.evaluate(() => {
+        const task = __v2S4.controller.getSnapshot().activeTask;
+        return {
+          status: task?.status,
+          errorCode: task?.errorCode,
+          sameFile: __v2S4.input.files[0] === __v2S4.originalFile,
+          workerStarts: __v2S4.workerStarts,
+          processStarts: __v2S4.logger.getEntries()
+            .filter((entry) => entry.event === 'AUDIO_PROCESSING_STARTED').length,
+          injectionCalls: __v2S4.injectionCalls,
+          inputType: __v2S4.input.files[0]?.type ?? null
+        };
+      });
+      expect(result.status).toBe('STOPPED');
+      expect(result.errorCode).toBe('AUDIO_CODEC_UNSUPPORTED');
+      expect(result.sameFile).toBe(true);
+      expect(result.workerStarts).toBe(0);
+      expect(result.processStarts).toBe(0);
+      expect(result.injectionCalls).toBe(0);
+      expect(result.inputType).toBe(source.kind === 'mp3' ? 'audio/mpeg' : 'audio/mp4');
+      await dispose(page);
+    }
+  });
+
+  test('Q-S4-P02 [DEBUG_CONTROLLER_REAL_FILE] A10 accepts lossy then rejects mono without processing', async ({ page }) => {
+    await open(page);
+    await install(page, rules({ maxBytes: 2_000_000 }), { forceMono: true });
+    await select(page, 'wav', { seconds: 1, channels: 2, bitDepth: 16 });
+    await waitFor(page, () => __v2S4.controller.getSnapshot().activeTask?.status === 'NEEDS_CONFIRMATION');
+    const first = await page.evaluate(() => __v2S4.controller.getSnapshot().activeTask.plan.confirmations
+      .find((item) => item.required && !item.resolved)?.type);
+    expect(first).toBe('AUDIO_LOSSY_TRANSCODE');
+    await confirm(page, true);
+    await waitFor(page, () => __v2S4.controller.getSnapshot().activeTask?.status === 'NEEDS_CONFIRMATION');
+    const second = await page.evaluate(() => __v2S4.controller.getSnapshot().activeTask.plan.confirmations
+      .find((item) => item.required && !item.resolved)?.type);
+    expect(second).toBe('AUDIO_DOWNMIX_MONO');
+    await confirm(page, false);
+    await waitFor(page, () => __v2S4.controller.getSnapshot().activeTask?.status === 'STOPPED');
+    const result = await page.evaluate(() => ({
+      status: __v2S4.controller.getSnapshot().activeTask?.status,
+      errorCode: __v2S4.controller.getSnapshot().activeTask?.errorCode,
+      sameFile: __v2S4.input.files[0] === __v2S4.originalFile,
+      inputType: __v2S4.input.files[0]?.type ?? null,
+      workerStarts: __v2S4.workerStarts,
+      processStarts: __v2S4.logger.getEntries()
+        .filter((entry) => entry.event === 'AUDIO_PROCESSING_STARTED').length,
+      injectionCalls: __v2S4.injectionCalls,
+      processedInjectionCalls: __v2S4.injectionReasons.filter((reason) => reason === 'processed').length
+    }));
+    expect(result.status).toBe('STOPPED');
+    expect(result.errorCode).toBe('USER_CANCELLED');
+    expect(result.sameFile).toBe(true);
+    expect(result.inputType).toBe('audio/wav');
+    expect(result.workerStarts).toBe(0);
+    expect(result.processStarts).toBe(0);
+    expect(result.processedInjectionCalls).toBe(0);
+    await dispose(page);
+  });
+
+  test('Q-S4-P03 [DEBUG_CONTROLLER_REAL_WORKER] A15 retries one strict rejection and refuses a second retry', async ({ page }) => {
+    await open(page);
+    await install(page, rules({ maxBytes: 500_000 }), { observeRejections: true });
+    await select(page, 'wav', { seconds: 0.6, channels: 1, bitDepth: 16 });
+    await waitFor(page, () => __v2S4.controller.getSnapshot().activeTask?.status === 'NEEDS_CONFIRMATION');
+    await confirm(page, true);
+    await waitFor(page, () => __v2S4.controller.getSnapshot().activeTask?.status === 'SUCCESS');
+    await waitFor(page, () => __v2S4.rejectionHooks.some((hook) => !hook.stopped));
+
+    await page.evaluate(() => {
+      __v2S4.controller.resolveRules = () => ({
+        ...__v2S4.configuredRules,
+        maxBytes: 250_000,
+        sources: [{ type: 'nearby-text', priority: 500, confidence: 0.99, evidence: ['MP3 最大 250KB'] }]
+      });
+      const hook = __v2S4.rejectionHooks.find((item) => !item.stopped);
+      hook.callbacks.onRejection({
+        kind: 'explicit',
+        related: true,
+        errorCode: 'REVIEW_REJECTED',
+        candidates: [{ sourceType: 'nearby-text', sourcePriority: 500, confidence: 0.99 }]
+      });
+    });
+    await waitFor(page, () => __v2S4.controller.getSnapshot().activeTask?.status === 'NEEDS_CONFIRMATION');
+    await confirm(page, true);
+    await waitFor(page, () => {
+      const task = __v2S4.controller.getSnapshot().activeTask;
+      return task?.status === 'SUCCESS' && task.retryCount === 1;
+    });
+    await waitFor(page, () => __v2S4.rejectionHooks.filter((hook) => !hook.stopped).length > 0);
+
+    await page.evaluate(() => {
+      const hook = __v2S4.rejectionHooks.find((item) => !item.stopped);
+      hook.callbacks.onRejection({
+        kind: 'explicit',
+        related: true,
+        errorCode: 'REVIEW_REJECTED',
+        candidates: [{ sourceType: 'nearby-text', sourcePriority: 500, confidence: 0.99 }]
+      });
+    });
+    await waitFor(page, () => __v2S4.controller.getSnapshot().activeTask?.status === 'STOPPED');
+    const result = await page.evaluate(() => {
+      const task = __v2S4.controller.getSnapshot().activeTask;
+      const entries = __v2S4.logger.getEntries();
+      const internal = task ? __v2S4.controller.tasks.get(task.taskId) : null;
+      return {
+        status: task?.status,
+        errorCode: task?.errorCode,
+        retryCount: task?.retryCount,
+        processingStarts: entries.filter((entry) => entry.event === 'AUDIO_PROCESSING_STARTED').length,
+        workerStarts: __v2S4.workerStarts,
+        retryEvents: entries.filter((entry) => entry.event === 'RETRY_TRIGGERED').length,
+        rejectionEvents: entries.filter((entry) => entry.event === 'REJECTION_DETECTED').length,
+        rejectionSignals: __v2S4.rejectionSignals,
+        businessClicks: internal?.businessClickCount ?? null,
+        submitEvents: entries.filter((entry) => /SUBMIT|BUSINESS/.test(entry.event)).length
+      };
+    });
+    expect(result.status).toBe('STOPPED');
+    expect(result.errorCode).toBe('PROCESSING_FAILED');
+    expect(result.retryCount).toBe(1);
+    expect(result.processingStarts).toBe(2);
+    expect(result.workerStarts).toBe(2);
+    expect(result.retryEvents).toBe(1);
+    expect(result.rejectionEvents).toBe(1);
+    expect(result.rejectionSignals).toBe(2);
+    expect(result.businessClicks).toBe(0);
+    expect(result.submitEvents).toBe(0);
+    await dispose(page);
+  });
+
+  test('Q-S4-P04 [DEBUG_CONTROLLER_REAL_FILE] A16 safety and ambiguity stops preserve distinct error codes', async ({ page }) => {
+    await open(page);
+    const cases = [
+      { name: 'ambiguous', override: { actionable: false, conflicts: [{ field: 'maxBytes', unresolvable: true }] }, code: 'RULE_CONFLICT' },
+      { name: 'network', override: { actionable: false, safetyFlags: ['NETWORK_OR_TIMEOUT'] }, code: 'NETWORK_OR_TIMEOUT' },
+      { name: 'permission', override: { actionable: false, safetyFlags: ['PERMISSION_OR_LOGIN'] }, code: 'PERMISSION_OR_LOGIN' },
+      { name: 'official', override: { actionable: false, safetyFlags: ['OFFICIAL_TOOL_REQUIRED'] }, code: 'OFFICIAL_TOOL_REQUIRED' }
+    ];
+    for (const item of cases) {
+      await install(page, rules(item.override));
+      await select(page, 'wav', { seconds: 0.4, channels: 1, bitDepth: 16 });
+      await waitFor(page, () => __v2S4.controller.getSnapshot().activeTask?.status === 'STOPPED');
+      const result = await page.evaluate(() => {
+        const task = __v2S4.controller.getSnapshot().activeTask;
+        return {
+          status: task?.status,
+          errorCode: task?.errorCode,
+          sameFile: __v2S4.input.files[0] === __v2S4.originalFile,
+          workerStarts: __v2S4.workerStarts,
+          processStarts: __v2S4.logger.getEntries()
+            .filter((entry) => entry.event === 'AUDIO_PROCESSING_STARTED').length,
+          injectionCalls: __v2S4.injectionCalls
+        };
+      });
+      expect(result.status, item.name).toBe('STOPPED');
+      expect(result.errorCode, item.name).toBe(item.code);
+      expect(result.sameFile, item.name).toBe(true);
+      expect(result.workerStarts, item.name).toBe(0);
+      expect(result.processStarts, item.name).toBe(0);
+      expect(result.injectionCalls, item.name).toBe(0);
+      await dispose(page);
+    }
+  });
+
+  test('Q-S4-P05 [DEBUG_CONTROLLER_REAL_WORKER] A17 rolls back after injection failure and exposes download fallback', async ({ page }) => {
+    await open(page);
+    await install(page, rules({ maxBytes: 2_000_000 }), { failProcessedInjection: true });
+    await select(page, 'wav', { seconds: 0.6, channels: 1, bitDepth: 16 });
+    await waitFor(page, () => __v2S4.controller.getSnapshot().activeTask?.status === 'NEEDS_CONFIRMATION');
+    await confirm(page, true);
+    await waitFor(page, () => __v2S4.controller.getSnapshot().activeTask?.status === 'STOPPED');
+    const result = await page.evaluate(() => {
+      const snapshot = __v2S4.controller.getSnapshot();
+      const task = snapshot.activeTask;
+      const internal = task ? __v2S4.controller.tasks.get(task.taskId) : null;
+      const entries = __v2S4.logger.getEntries();
+      return {
+        status: task?.status,
+        errorCode: task?.errorCode,
+        injection: internal?.injection ?? null,
+        sameFile: __v2S4.input.files[0] === __v2S4.originalFile,
+        fileCount: __v2S4.input.files.length,
+        injectionCalls: __v2S4.injectionCalls,
+        injectionReasons: __v2S4.injectionReasons.slice(),
+        workerStarts: __v2S4.workerStarts,
+        activeWorkers: __v2S4.activeWorkers,
+        processingStarts: entries.filter((entry) => entry.event === 'AUDIO_PROCESSING_STARTED').length,
+        submitEvents: entries.filter((entry) => /SUBMIT|BUSINESS/.test(entry.event)).length,
+        cleanup: internal?.result?.cleanup ?? null,
+        objectUrls: internal?.objectUrls?.length ?? null
+      };
+    });
+    expect(result.status).toBe('STOPPED');
+    expect(result.errorCode).toBe('DATATRANSFER_UNAVAILABLE');
+    expect(result.injection).toMatchObject({ ok: false, fallback: 'download', errorCode: 'DATATRANSFER_UNAVAILABLE' });
+    expect(result.sameFile).toBe(true);
+    expect(result.fileCount).toBe(1);
+    expect(result.injectionCalls).toBe(2);
+    expect(result.injectionReasons).toEqual(['processed', 'restore']);
+    expect(result.workerStarts).toBe(1);
+    expect(result.activeWorkers).toBe(0);
+    expect(result.processingStarts).toBe(1);
+    expect(result.submitEvents).toBe(0);
+    expect(result.cleanup).toMatchObject({ workerTerminated: true, objectUrlRevoked: true, queueCleared: true });
+    expect(result.objectUrls).toBe(0);
+    await dispose(page);
+  });
+
+  test('A01 [DEBUG_CONTROLLER_REAL_FILE] compliant MP3 is passthrough with identity and no Worker', async ({ page }) => {
     await open(page);
     await install(page);
     await select(page, 'mp3', { frameCount: 120, bitrateIndex: 9 });
@@ -181,7 +526,7 @@ test.describe('V2-S4 A01-A18 audio QA matrix', () => {
     await dispose(page);
   });
 
-  test('A02 over-limit MP3 and A04 M4A/AAC stop as codec unsupported before Worker', async ({ page }) => {
+  test('A02/A04 [DEBUG_PURE_PLAN] unsupported codec plans are non-executable (controller proof is Q-S4-P01)', async ({ page }) => {
     await open(page);
     for (const source of [
       { kind: 'mp3', metadata: { signatureMime: 'audio/mpeg', container: 'mp3', codec: 'mp3', size: 300_001 } },
@@ -212,7 +557,7 @@ test.describe('V2-S4 A01-A18 audio QA matrix', () => {
     }
   });
 
-  test('A03 PCM WAV 16/24/32-bit mono/stereo converts through Worker and validates MP3', async ({ page }) => {
+  test('A03 [DEBUG_CONTROLLER_REAL_WORKER] PCM WAV 16/24/32-bit mono/stereo converts through Worker and validates MP3', async ({ page }) => {
     await open(page);
     for (const bitDepth of [16, 24, 32]) {
       for (const channels of [1, 2]) {
@@ -237,7 +582,7 @@ test.describe('V2-S4 A01-A18 audio QA matrix', () => {
     }
   });
 
-  test('A05 missing maxBytes, A06 disallowed MP3, A07 duration-only and A08 unsafe target stop', async ({ page }) => {
+  test('A05-A08 [DEBUG_CONTROLLER_REAL_FILE] missing/unsafe rules stop before Worker', async ({ page }) => {
     await open(page);
     const cases = [
       { name: 'A05', override: { maxBytes: null }, expected: 'RULES_INSUFFICIENT', seconds: 1 },
@@ -262,7 +607,7 @@ test.describe('V2-S4 A01-A18 audio QA matrix', () => {
     }
   });
 
-  test('A09 decline keeps original; A10 mono is an independent confirmation', async ({ page }) => {
+  test('A09 [DEBUG_CONTROLLER_REAL_FILE] decline keeps original; A10 plan confirmation shape is supplementary to Q-S4-P02', async ({ page }) => {
     await open(page);
     await install(page);
     await select(page, 'wav', { seconds: 1, channels: 1 });
@@ -293,7 +638,7 @@ test.describe('V2-S4 A01-A18 audio QA matrix', () => {
     expect(mono).toEqual(['AUDIO_LOSSY_TRANSCODE', 'AUDIO_DOWNMIX_MONO']);
   });
 
-  test('A11 cancellation and A12 input detach stop within the lifecycle boundary', async ({ page }) => {
+  test('A11/A12 [DEBUG_CONTROLLER_REAL_WORKER] cancellation and input detach stop within the task boundary', async ({ page }) => {
     await open(page);
     for (const mode of ['cancel', 'detach']) {
       await install(page);
@@ -322,7 +667,7 @@ test.describe('V2-S4 A01-A18 audio QA matrix', () => {
     }
   });
 
-  test('A13 first oversized output gets one lower-rate pass; A14 second oversized output stops', async ({ page }) => {
+  test('A13/A14 [DEBUG_FAKE_RUNTIME_BRANCH] algorithmic two-pass upper bound and second-pass stop', async ({ page }) => {
     await open(page);
     const outcomes = await page.evaluate(async () => {
       const api = __uploadfit_debug_bundle__;
@@ -366,7 +711,7 @@ test.describe('V2-S4 A01-A18 audio QA matrix', () => {
     expect(outcomes.secondPasses).toBe(2);
   });
 
-  test('A15 only a strictly tighter rejection can retry; A16 ambiguous/official rules never process', async ({ page }) => {
+  test('A15/A16 [DEBUG_PURE_PLAN] strict rejection predicate and safety boundaries (controller proof is Q-S4-P03/P04)', async ({ page }) => {
     await open(page);
     const result = await page.evaluate(() => {
       const api = __uploadfit_debug_bundle__;
@@ -396,7 +741,7 @@ test.describe('V2-S4 A01-A18 audio QA matrix', () => {
     expect(result.videoSupports).toBe(false);
   });
 
-  test('A17 DataTransfer failure returns a fallback; A18 dispose is idempotent and prevents stale work', async ({ page }) => {
+  test('A17 [DEBUG_PURE_PLAN] direct DataTransfer fallback; A18 idempotent dispose only (LR1/LR9 remain NOT_VERIFIED_PHASE_2)', async ({ page }) => {
     await open(page);
     const result = await page.evaluate(() => {
       const api = __uploadfit_debug_bundle__;
