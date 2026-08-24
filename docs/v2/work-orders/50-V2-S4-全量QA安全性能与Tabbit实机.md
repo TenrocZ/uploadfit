@@ -7,6 +7,8 @@
 - 本阶段以发现问题和证据闭环为主；允许修复明确缺陷，但不得扩展功能或降低门槛。
 - 阶段 Agent 只能申请 `READY_FOR_ACCEPTANCE`，主验收 Agent独立复核后才能放行 S5。
 
+冻结范围：S4 只验证 S2 已验收的“合规 MP3 passthrough + PCM WAV 16/24/32-bit mono/stereo→MP3”。超限 MP3 与所有 M4A/AAC 输入必须以 `AUDIO_CODEC_UNSUPPORTED` 停止、Worker 调用数为 0；不得在 QA 阶段补解码器或把 S0 的原始目标文字当成已实现能力。相关扩展归 V2.1 和新 ADR。
+
 ## 2. 必须验证的候选产物
 
 - 先运行 `npm run build`，测试和实机均使用同一份 `dist/uploadfit.js`。
@@ -39,9 +41,9 @@ docs/handoffs/V2-S4-handoff.md
 | ID | 场景 | Must 断言 |
 |---|---|---|
 | A01 | 合规 MP3 | 原 File passthrough，process=0 |
-| A02 | 超限 MP3 | 确认、有损重编码、最终 ≤max、回填 |
+| A02 | 超限 MP3 | `AUDIO_CODEC_UNSUPPORTED`，process=0、原 File 保留 |
 | A03 | WAV→MP3 | 签名正确、时长保持、回填 |
-| A04 | M4A/AAC-LC→MP3 | 支持子集通过，unsupported 子集停止 |
+| A04 | M4A/AAC（含 AAC-LC） | `AUDIO_CODEC_UNSUPPORTED`，process=0、原 File 保留 |
 | A05 | maxBytes 缺失 | 不形成 executable plan |
 | A06 | MP3 未允许 | 不处理 |
 | A07 | 只有 duration limit | `AUDIO_DURATION_LIMIT_UNFIXABLE` |
@@ -61,7 +63,7 @@ docs/handoffs/V2-S4-handoff.md
 
 - MP3 CBR/VBR、ID3v2、大/小标签、截断帧、伪扩展；
 - WAV PCM 已支持位深、异常 chunk、超声道、data 长度伪造；
-- M4A AAC-LC、S0 明确拒绝 codec、moov 前后布局、截断 box；
+- M4A AAC-LC、其他 codec、moov 前后布局、截断 box：均有界识别并稳定停止，不进入 Worker；
 - MIME/扩展名/签名冲突；
 - 0 字节、零时长、NaN/Infinity、极端 duration/size；
 - 规则冲突、数字子串伪证据、其他 uploader 文本污染；
@@ -137,9 +139,9 @@ docs/handoffs/V2-S4-handoff.md
 |---|---|---|
 | LR1 | 安装/保存/刷新 | 版本、bundle SHA、1 host/1 session、无模块错误 |
 | LR2 | 合规 MP3 | passthrough、File 未替换、submit click=0 |
-| LR3 | 小型超限 MP3 | 确认→处理→复检→回填、external=0 |
+| LR3 | 小型 PCM WAV→MP3 | 确认→处理→复检→回填、external=0 |
 | LR4 | 实际 200MB→100MB | 完整结构化结果、进度可响应、最终字节、截图 |
-| LR5 | WAV 与 M4A 支持子集 | 输出 MP3、时长/字节、unsupported 诚实停止 |
+| LR5 | 冻结输入边界 | PCM WAV 输出 MP3；超限 MP3 与 M4A/AAC 诚实停止且 Worker=0 |
 | LR6 | 处理中取消 | ≤1s 停止、原文件保留、Worker/URL 清理 |
 | LR7 | 明确拒收重试 | source=rejection、retryCount=1、无第二次自动重试 |
 | LR8 | AI 文本规则路径 | LLMBridge 仅收去敏规则文本；本地 validator；音频数据 0 |

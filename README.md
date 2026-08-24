@@ -27,7 +27,7 @@ npm run test:e2e
 
 不要把源码目录、多文件 import 或 Markdown 代码围栏粘贴到 Tabbit。发布时保留生产包的实际字节数与 SHA-256；项目不设置固定体积上限。
 
-当前 `dist/uploadfit.js` **仍不包含音频功能**。音频 V2 的 S0–S2 已验收，下一步是 S3 controller/UI/DataTransfer 接线；在 S3–S5 完成前不能按 PRD 对当前生产包宣传音频功能。
+当前 `dist/uploadfit.js` **仍不包含音频功能**。音频 V2 的 S0–S2 已验收，S3 controller/UI/DataTransfer 接线已启动；在 S3–S5 完成前不能按 PRD 对当前生产包宣传音频功能。
 
 ## 文档导航
 

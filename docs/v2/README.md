@@ -12,7 +12,7 @@ V2 在已验收的图片上传适配基线上增加一个收缩后的音频 MVP�
 4. [work-orders/01-共享契约与接口基线.md](work-orders/01-共享契约与接口基线.md)
 5. 当前领取阶段的任务书
 
-当前状态：**V2-S0、V2-S1、V2-S2 已验收，V2-S3 前置已满足、可以启动**。S2 只交付独立音频处理引擎，尚未接入正式上传 controller/UI/DataTransfer；不得跳过 S3 直接宣传生产音频功能。状态和证据见 `work-orders/90-需求追踪矩阵.md`、`../handoffs/V2-S2-handoff.md`。
+当前状态：**V2-S0、V2-S1、V2-S2 已验收，V2-S3 已放行施工**。S2 只交付独立音频处理引擎，S3 正在接入正式上传 controller/UI/DataTransfer；不得提前宣传生产音频功能。状态和证据见 `work-orders/90-需求追踪矩阵.md`、`../handoffs/V2-S2-handoff.md`。
 
 ## 历史基线
 
