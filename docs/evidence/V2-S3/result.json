@@ -3,7 +3,7 @@
   "status": "READY_FOR_ACCEPTANCE",
   "acceptance": "PENDING_INDEPENDENT_REVIEW",
   "startCommit": "bf266484ee85d7deb30ea04584ee74e0c6e2d7a8",
-  "endCommit": "5bf25af260ed5df8260e8e659422c11c3cdd95af",
+  "endCommit": "d65df7ee44d4baae558ed673a997838980ecb09c",
   "frozenScope": {
     "compliantMp3": "passthrough",
     "pcmWav": "16/24/32-bit mono/stereo to MP3",

@@ -4,7 +4,7 @@
 - Date: 2026-08-24
 - Agent: `Codex /root/v2_s3_implementation`
 - Start commit: `bf266484ee85d7deb30ea04584ee74e0c6e2d7a8`
-- End code commit: `5bf25af260ed5df8260e8e659422c11c3cdd95af`
+- End code commit: `d65df7ee44d4baae558ed673a997838980ecb09c`
 - Prerequisites: V2-S0、V2-S1、V2-S2 已验收；S2 第三轮交接和 ADR-005 为事实基线
 - Scope: 正式 `TaskController` 的 image/audio registry 路由、音频确认/进度/取消/成功/失败 UI、DataTransfer 回填与事务恢复、拒收一次 retry；不扩展 codec，不执行 S4 门禁
 - Acceptance: 仅提交给独立验收 Agent；本 handoff 不自我标记 `ACCEPTED`
