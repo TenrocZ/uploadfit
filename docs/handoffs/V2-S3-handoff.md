@@ -21,13 +21,15 @@
 
 `src/audio/worker-runtime.js` 允许构建时注入 S2 implementation source，`esbuild.config.js` 将冻结 `lamejs@1.2.1` Worker 真正嵌入 production/test 单 IIFE；显著 ADR-005 约束和可替换构建路径保留。没有 runtime `import`/`export`、网络加载或新的 package dependency。上游源码中不执行的项目 URL 被标为 `embedded://lamejs`，只做静态扫描去歧义；构建同时移除历史尾随空格，不改变编码执行语义。
 
-最终 production artifact：
+最终 production artifact（本次仅 notice/build follow-up 更新）：
 
 ```text
 dist/uploadfit.js
-bytes: 419330
-SHA-256: 472F7A308933618630BA2057046CFA845C973CF1BA41EF4B6F4DD2F61CC83FD4
+bytes: 419478
+SHA-256: 007D9DE412C98E02F9EE0EAE258A45268CFA5F27D1ACE8F32CD9EC23A39BA166
 ```
+
+Production 与 debug IIFE 首行均为稳定显著 notice：`UploadFit embeds lamejs 1.2.1 (package-declared LGPL-3.0)`，并指向 `docs/evidence/V2-S0/licenses/` 的 source/license/NOTICE/relinking 材料。`esbuild.config.js` 对两种 build 做 prefix assertion，`scripts/static-check.js` 对 production（及存在时的 test artifact）做静态断言。
 
 ### UI、生命周期与隐私
 
@@ -51,7 +53,7 @@ SHA-256: 472F7A308933618630BA2057046CFA845C973CF1BA41EF4B6F4DD2F61CC83FD4
 
 | 命令 | 实际结果 |
 |---|---|
-| `npm run check` | 通过：25 个 Vitest 文件、229 个测试；production build 419330 bytes；static-check PASS；SHA 如上 |
+| `npm run check` | 通过：25 个 Vitest 文件、229 个测试；production build 419478 bytes；static-check PASS；SHA 如上 |
 | `npm run test:e2e -- tests/e2e/v2-audio-s3-controller.spec.js tests/e2e/v2-audio-s3.spec.js --reporter=line --workers=1` | 通过：9/9 |
 | `npm run test:e2e -- --reporter=line --workers=1` | 通过：156/156（本阶段唯一一次全量 E2E） |
 | `git diff --check` | 通过 |

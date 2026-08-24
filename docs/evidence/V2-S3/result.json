@@ -14,8 +14,8 @@
   },
   "bundle": {
     "path": "dist/uploadfit.js",
-    "bytes": 419330,
-    "sha256": "472F7A308933618630BA2057046CFA845C973CF1BA41EF4B6F4DD2F61CC83FD4",
+    "bytes": 419478,
+    "sha256": "007D9DE412C98E02F9EE0EAE258A45268CFA5F27D1ACE8F32CD9EC23A39BA166",
     "format": "single IIFE",
     "runtimeExternalAudioRequests": 0
   },

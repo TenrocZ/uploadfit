@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import * as esbuild from 'esbuild';
 import { buildS2WorkerImplementation } from './scripts/audio-probe/build-s2-adapter.mjs';
+import { AUDIO_LICENSE_BANNER, AUDIO_LICENSE_BANNER_PREFIX } from './scripts/audio-probe/license-banner.mjs';
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
 const packageJson = JSON.parse(
@@ -44,6 +45,7 @@ try {
     charset: 'utf8',
     sourcemap: false,
     legalComments: 'none',
+    banner: { js: AUDIO_LICENSE_BANNER },
     define: {
       __UPLOADFIT_VERSION__: JSON.stringify(packageJson.version),
       __UPLOADFIT_MODE__: JSON.stringify(mode),
@@ -55,6 +57,10 @@ try {
   const outputBytes = result.metafile
     ? Object.values(result.metafile.outputs)[0]?.bytes ?? 0
     : readFileSync(path.join(rootDir, outputFile)).byteLength;
+  const outputSource = readFileSync(path.join(rootDir, outputFile), 'utf8');
+  if (!outputSource.startsWith(AUDIO_LICENSE_BANNER_PREFIX)) {
+    throw new Error(`Missing required audio license banner in ${outputFile}`);
+  }
   console.log(`UploadFit build complete: mode=${mode}, entry=${entryPoint}, output=${outputFile}, bytes=${outputBytes}`);
 } catch (error) {
   console.error(error);

@@ -2,10 +2,12 @@ import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { AUDIO_LICENSE_BANNER_PREFIX } from './audio-probe/license-banner.mjs';
 
 const rootDir = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const sourceDir = path.join(rootDir, 'src');
 const buildPath = path.join(rootDir, 'dist', 'uploadfit.js');
+const testBuildPath = path.join(rootDir, 'dist', 'uploadfit.test.js');
 const forbiddenPatterns = [
   { name: 'eval', pattern: /\beval\s*\(/ },
   { name: 'new Function', pattern: /\bnew\s+Function\s*\(/ },
@@ -65,10 +67,20 @@ if (!existsSync(buildPath)) {
   artifactBytes = statSync(buildPath).size;
   artifactSha256 = createHash('sha256').update(readFileSync(buildPath)).digest('hex').toUpperCase();
   const artifact = readFileSync(buildPath, 'utf8');
+  if (!artifact.startsWith(AUDIO_LICENSE_BANNER_PREFIX)) {
+    violations.push('dist/uploadfit.js is missing the required lamejs license banner');
+  }
   for (const forbidden of forbiddenPatterns) {
     if (forbidden.pattern.test(artifact)) {
       violations.push(`dist/uploadfit.js contains ${forbidden.name}`);
     }
+  }
+}
+
+if (existsSync(testBuildPath)) {
+  const testArtifact = readFileSync(testBuildPath, 'utf8');
+  if (!testArtifact.startsWith(AUDIO_LICENSE_BANNER_PREFIX)) {
+    violations.push('dist/uploadfit.test.js is missing the required lamejs license banner');
   }
 }
 

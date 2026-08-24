@@ -42,12 +42,12 @@
 
 | 范围 | 命令 | 结果 |
 |---|---|---|
-| Unit/集成/静态 | `npm run check` | 通过：25 个 Vitest 文件、229 个测试；production `419330` bytes；static-check 通过 |
+| Unit/集成/静态 | `npm run check` | 通过：25 个 Vitest 文件、229 个测试；production `419478` bytes；static-check 通过 |
 | S3 定向 | `npm run test:e2e -- tests/e2e/v2-audio-s3-controller.spec.js tests/e2e/v2-audio-s3.spec.js --reporter=line --workers=1` | 通过：9/9 |
 | 全量 E2E（唯一一次） | `npm run test:e2e -- --reporter=line --workers=1` | 通过：156/156；未运行 S4 真实 Tabbit/200MB 慢速门禁 |
 | 空白检查 | `git diff --check` | 通过 |
 
-最终 production artifact：`dist/uploadfit.js`，419330 bytes，SHA-256 `472F7A308933618630BA2057046CFA845C973CF1BA41EF4B6F4DD2F61CC83FD4`。构建对冻结上游源码仅移除历史尾随空格和替换不执行的上游信息 URL 为 `embedded://lamejs`；未改变 encoder 版本/API/算法。
+最终 production artifact：`dist/uploadfit.js`，419478 bytes，SHA-256 `007D9DE412C98E02F9EE0EAE258A45268CFA5F27D1ACE8F32CD9EC23A39BA166`。本次 follow-up 仅为 production/test IIFE 增加显著 LGPL banner，并在构建/静态检查中锁定 banner；冻结上游源码、encoder 版本/API/算法均未改变。构建仍移除历史尾随空格并将不执行的上游信息 URL 标为 `embedded://lamejs`。
 
 ## 隐私与回填审计
 
