@@ -2,13 +2,17 @@
 
 ## 当前施工状态
 
-状态为 `IN_PROGRESS`。`npm run static-check` PASS；Phase 1 安全 runner `v2-audio-security.spec.js` S01–S06 与格式/registry 对抗共计在定向 24/24 中通过。浏览器拦截计数覆盖 fetch/XHR/WebSocket/EventSource/sendBeacon/storage，核心音频路径 external requests=0、persistent audio=0；AI 敏感模式在 bridge 前返回 `AI_SENSITIVE_INPUT`；伪 Worker taskId、异常长度/格式、CSP/Worker 不可用均稳定停止。生产产物 bytes/SHA 为 421,348 / `ABFA41EBB606CA0E7ED84F8DEE2F17783CAF0BDFA11CE777FB1BAEFBD173D18A`。
+状态为 `IN_PROGRESS`。四文件 Phase 1 定向 runner 本轮实测 `31/31` 通过（workers=1），最终全量 E2E 实测 `193/193`；其中 S01 使用真实小 WAV Worker/controller 路径，从页面初始化后计数和 storage before/after 快照测得 external audio requests=0、local/session persistence 未变化，不能外推为 Tabbit 全平台结论。最终全量中的 S01 样本为 outputBytes=11,493、workerUsed=true、encodePasses=1，阶段耗时 inspect=2.5ms、plan=1.3ms、confirm=0.3ms、process=105.5ms、validate=1.2ms；fetch/XHR/WebSocket/EventSource/sendBeacon/storage counter delta 均为 0。S02–S04 覆盖恶意标签、伪 taskId、异常格式和有界停止；S05 明确为 `FAKE_BRIDGE_REDACTION_HARNESS`，真实 Tabbit MAIN-world AI 仍未测量。生产产物 bytes/SHA 为 421,348 / `ABFA41EBB606CA0E7ED84F8DEE2F17783CAF0BDFA11CE777FB1BAEFBD173D18A`。
 
-新测试文件使用本地 `dist/uploadfit.test.js` debug harness 做确定性 API/Worker 断言，不能写成 Tabbit 或 production IIFE 实机证据；既有生产页 E2E 和最终全量 E2E 负责 production controller/UI 回归。实际 200MB 与 Tabbit LR1–LR10 是 Phase 2，当前未运行。
+新测试文件使用本地 `dist/uploadfit.test.js` debug harness 做确定性 API/Worker 断言，不能写成 Tabbit 或 production IIFE 实机证据；四文件定向中的 A18 production-IIFE 约束和最终全量 E2E 负责生产回归。本轮 `npm run check` 为 25 个 Vitest 文件/229 个测试 PASS，最终全量 E2E 为 193/193 PASS；实际 200MB 与 Tabbit LR1–LR10 是 Phase 2，当前未运行。
 
-## 历史 S5 安全复核
+## Phase 1 结论
 
-## 结论
+当前本地静态/动态安全与格式对抗覆盖已通过；persistent 结论严格限定为 S01 的 local/session storage API scope，IndexedDB/cache、真实 Tabbit 网络和真实 LLMBridge 均为 `NOT_VERIFIED_PHASE_2`。因此本页不把历史 S5 或旧 V1/S0/S2/S4 证据合并进 V2-S4。
+
+## 历史 S5 安全复核（非 V2-S4 证据）
+
+## 历史 S5 结论
 
 本地静态和动态安全检查通过；S5 LR2/LR4 的真实 Tabbit 边界也已完成，未发现 P0/P1/P2 未决缺陷。C/D/E/F 和 X01–X12 按批准轻量范围不重复 Tabbit 实机，保留 `NOT_REPEATED_BY_APPROVED_LIGHTWEIGHT_SCOPE`，不以 Chromium 结果替代这些未重复项。
 

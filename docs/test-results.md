@@ -2,13 +2,15 @@
 
 ## 当前施工状态
 
-本阶段状态为 `IN_PROGRESS`，不是 `READY_FOR_ACCEPTANCE` 或 `ACCEPTED`。Phase 1 定向音频/安全/快速性能 runner 通过 24/24；`npm run check` 通过 25 个 Vitest 文件、229/229，production `dist/uploadfit.js` 为 421,348 bytes，SHA-256 为 `ABFA41EBB606CA0E7ED84F8DEE2F17783CAF0BDFA11CE777FB1BAEFBD173D18A`。A01–A18、S01–S06、P01–P03 的精确映射和 debug/production 边界见 [`docs/evidence/V2-S4/README.md`](evidence/V2-S4/README.md)。
+本阶段状态为 `IN_PROGRESS`，不是 `READY_FOR_ACCEPTANCE` 或 `ACCEPTED`；V2-S5 为 `HOLD`。当前 production `dist/uploadfit.js` 为 421,348 bytes，SHA-256 为 `ABFA41EBB606CA0E7ED84F8DEE2F17783CAF0BDFA11CE777FB1BAEFBD173D18A`。Phase 1 基线提交为 `fbd67194409041c57e4b42d04bf91ef9e62df874`，返工 Batch A=`2a26897`、Batch B=`de768db79b1d70661b017dad4b42ee5712297b46`；Batch C closeout commit 在最终提交后回填。
+
+四文件定向 runner 实测 `31/31`，`npm run check` 实测 25 个 Vitest 文件 / 229 个测试，一次最终全量 E2E 实测 `193/193`（workers=1，约 142s）；旧 V1 `docs/evidence/S4/*.png` 的自动覆盖已按白名单恢复，不能复用旧的 24/24 或 186/186。
 
 执行命令：
 
 `node scripts/run-e2e.js tests/e2e/v2-audio-scenarios.spec.js tests/e2e/v2-audio-security.spec.js tests/e2e/v2-audio-performance.spec.js tests/integration/v2-media-regression.test.js --reporter=line --workers=1`
 
-本阶段尚未执行实际 >200,000,000-byte 慢门禁，也尚未执行 Tabbit LR1–LR10；它们统一记录为 `NOT_RUN_PHASE_2`，不引用 S0/S2 历史结果，不以 Playwright/debug harness 冒充实机。
+Runner 证据强度严格区分：`DEBUG_CONTROLLER_REAL_WORKER`、`DEBUG_CONTROLLER_REAL_FILE`、`DEBUG_PURE_PLAN`、`DEBUG_FAKE_RUNTIME_BRANCH`、`PRODUCTION_IIFE_LOCAL_PAGE`、`REAL_TABBIT_PRODUCTION`、`NOT_VERIFIED_PHASE_2`。plan-only 不填写 Worker=0，fake runtime 不宣称 production encoder；A18、真实 AI、200MB、Tabbit LR1–LR10 仍为 `NOT_VERIFIED_PHASE_2`。
 
 ## 历史 S5 测试结果
 

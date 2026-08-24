@@ -6,7 +6,9 @@
 
 本阶段只完成本地自动化 QA、安全和快速性能，状态 `IN_PROGRESS`。当前 production `dist/uploadfit.js` 为 421,348 bytes，SHA-256 `ABFA41EBB606CA0E7ED84F8DEE2F17783CAF0BDFA11CE777FB1BAEFBD173D18A`。Tabbit LR1–LR10 与实际 200MB 门禁均为 `NOT_RUN_PHASE_2`；本阶段不把 `127.0.0.1:9222` 监听、Playwright、debug bundle 或历史 S0/S2/S4 证据写成 V2-S4 实机 PASS。Phase 2 必须验证官方私有脚本上下文、部分网址匹配和同一 production SHA，并按 `docs/evidence/V2-S4/tabbit-matrix.json` 补齐结构化证据。
 
-## 环境
+以下“环境/能力矩阵/当前 bundle 实机证据”段落是 S0/S2 及既往平台记录，不是本轮 V2-S4 Phase 1 的 LR1–LR10 结果；本轮统一以 `NOT_RUN_PHASE_2` 交接，不从历史记录推导通过。
+
+## 历史环境与平台记录（非 V2-S4 Phase 1 证据）
 
 | 项目 | 值 |
 |---|---|

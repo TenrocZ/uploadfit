@@ -566,16 +566,55 @@ test.describe('V2-S4 A01-A18 audio QA matrix', () => {
         await waitFor(page, () => __v2S4.controller.getSnapshot().activeTask?.status === 'NEEDS_CONFIRMATION');
         await confirm(page, true);
         await waitFor(page, () => __v2S4.controller.getSnapshot().activeTask?.status === 'SUCCESS');
-        const result = await page.evaluate(() => ({
-          task: __v2S4.controller.getSnapshot().activeTask,
-          file: { type: __v2S4.input.files[0]?.type, size: __v2S4.input.files[0]?.size },
-          workerStarts: __v2S4.workerStarts
-        }));
+        const result = await page.evaluate(async () => {
+          const task = __v2S4.controller.getSnapshot().activeTask;
+          const internal = __v2S4.controller.tasks.get(task.taskId);
+          const independentValidation = await __v2S4.api.validateAudioOutputFile(
+            __v2S4.input.files[0],
+            __v2S4.configuredRules,
+            internal.plan,
+            internal.metadata,
+            { allowSingleFrame: true }
+          );
+          const outputMetadata = internal.result.metadata;
+          const sourceDurationMs = internal.metadata.durationMs;
+          const outputDurationMs = outputMetadata.durationMs;
+          const durationToleranceMs = Math.max(250, sourceDurationMs * 0.02);
+          return {
+            task,
+            file: { type: __v2S4.input.files[0]?.type, size: __v2S4.input.files[0]?.size },
+            outputMetadata: {
+              signatureMime: outputMetadata.signatureMime,
+              container: outputMetadata.container,
+              codec: outputMetadata.codec,
+              durationMs: outputDurationMs
+            },
+            sourceDurationMs,
+            outputDurationMs,
+            durationToleranceMs,
+            durationDeltaMs: Math.abs(outputDurationMs - sourceDurationMs),
+            independentValidation: {
+              valid: independentValidation.valid,
+              frameValidation: independentValidation.frameValidation,
+              representativeFrames: independentValidation.representativeFrames
+                ?? independentValidation.frameValidation?.count
+            },
+            workerStarts: __v2S4.workerStarts
+          };
+        });
         expect(result.file.type).toBe('audio/mpeg');
         expect(result.file.size).toBeGreaterThan(0);
         expect(result.file.size).toBeLessThanOrEqual(250_000);
         expect(result.task.result.workerUsed).toBe(true);
         expect(result.task.result.encodePasses).toBeLessThanOrEqual(2);
+        expect(result.outputMetadata.signatureMime).toBe('audio/mpeg');
+        expect(result.outputMetadata.container).toBe('mp3');
+        expect(result.outputMetadata.codec).toBe('mp3');
+        expect(result.independentValidation.valid).toBe(true);
+        expect(result.independentValidation.frameValidation.valid).toBe(true);
+        expect(result.independentValidation.frameValidation.count).toBeGreaterThanOrEqual(2);
+        expect(result.independentValidation.representativeFrames).toBeGreaterThanOrEqual(2);
+        expect(result.durationDeltaMs).toBeLessThanOrEqual(result.durationToleranceMs);
         expect(result.workerStarts).toBe(1);
         await dispose(page);
       }

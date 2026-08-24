@@ -2,17 +2,17 @@
 
 ## 快速自动化
 
-状态为 `IN_PROGRESS`。`v2-audio-performance.spec.js` P01–P03 在定向 runner 中 3/3 通过：
+状态为 `IN_PROGRESS`。四文件 Phase 1 定向 runner 本轮实测 `31/31` 通过（workers=1）。`v2-audio-performance.spec.js` 的 P01/P02/P03 与 Q-S4-P06/P07 均通过；P03 原用例明确是 sequential cleanup harness，Q-S4-P07 才是同页 TaskController 排队证据：两个任务完成，`maxProcessing=1`、`maxActiveWorkers=1`、结束后 active Workers=0。
 
-- P01：Worker 处理小型 PCM WAV，progress 单调、事件频率 ≤10/s、heartbeat 最大间隔 ≤500ms、输出 ≤规则上限，记录 cleanup/encodePasses。
+- P01/Q-S4-P06：Worker 处理小型 PCM WAV，最终全量样本五段耗时实测 inspect=3.8ms、plan=1.4ms、confirm=0.5ms、process=225.8ms、validate=3.7ms；progress 单调 4 次、频率上限 10/s、heartbeat 最大间隔 108.4ms、encodePasses=1、输出 81,502 bytes，并完成独立复检和 cleanup。
 - P02：收到 encode progress 后取消，`AUDIO_PROCESSING_CANCELLED` 在 ≤1,000ms 返回，无迟到 progress/result，Worker/object URL/queue 清理通过。
-- P03：连续两个任务分别完成，Worker/object URL 清理字段完整，无 stale state。
+- P03：连续两个任务分别完成，Worker/object URL 清理字段完整，无 stale state；该项是顺序清理补充，不冒充队列并发测量。
 
-这是浏览器 debug harness 的快速门禁，不是 Tabbit 结果；生产页音频/图片回归进入最终 `npm run test:e2e`。实际 >200,000,000-byte 成功/取消门禁属于 Phase 2，当前 `NOT_RUN_PHASE_2`，不得引用 S0/S2 历史慢门禁冒充本轮。
+这是浏览器 debug harness 的快速门禁，不是 Tabbit 结果；生产页音频/图片回归已进入本轮一次最终全量 E2E（193/193 PASS）。`npm run check` 已完成（25 个 Vitest 文件/229 个测试 PASS）；实际 >200,000,000-byte 成功/取消门禁属于 Phase 2，当前 `NOT_RUN_PHASE_2`，不得引用 S0/S2 历史慢门禁冒充本轮。
 
 production `dist/uploadfit.js`：421,348 bytes，SHA-256 `ABFA41EBB606CA0E7ED84F8DEE2F17783CAF0BDFA11CE777FB1BAEFBD173D18A`。
 
-## 历史 S5 性能记录
+## 历史 S5 性能记录（非 V2-S4 证据）
 
 ## 门禁
 

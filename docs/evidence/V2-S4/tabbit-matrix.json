@@ -2,6 +2,12 @@
   "stage": "V2-S4",
   "phase": "PHASE_1",
   "status": "IN_PROGRESS",
+  "phase1Commit": "fbd67194409041c57e4b42d04bf91ef9e62df874",
+  "reworkCommits": {
+    "batchA": "2a26897",
+    "batchB": "de768db79b1d70661b017dad4b42ee5712297b46",
+    "batchC": "PENDING_FINAL_COMMIT_BACKFILL"
+  },
   "bundle": {
     "path": "dist/uploadfit.js",
     "bytes": 421348,
@@ -11,20 +17,20 @@
   "environment": {
     "tabbit": "NOT_RUN_PHASE_2",
     "officialPrivateScriptContextVerified": false,
-    "remoteCdp": "DEFERRED_TO_PHASE_2",
+    "remoteCdp": "NOT_VERIFIED_PHASE_2",
     "substitutionPolicy": "No Playwright/mock/debug bundle/history may be recorded as Tabbit PASS."
   },
   "lr": {
-    "LR1": { "status": "NOT_RUN_PHASE_2" },
-    "LR2": { "status": "NOT_RUN_PHASE_2" },
-    "LR3": { "status": "NOT_RUN_PHASE_2" },
-    "LR4": { "status": "NOT_RUN_PHASE_2" },
-    "LR5": { "status": "NOT_RUN_PHASE_2" },
-    "LR6": { "status": "NOT_RUN_PHASE_2" },
-    "LR7": { "status": "NOT_RUN_PHASE_2" },
-    "LR8": { "status": "NOT_RUN_PHASE_2" },
-    "LR9": { "status": "NOT_RUN_PHASE_2" },
-    "LR10": { "status": "NOT_RUN_PHASE_2" }
+    "LR1": { "status": "NOT_RUN_PHASE_2", "runner": "NOT_VERIFIED_PHASE_2" },
+    "LR2": { "status": "NOT_RUN_PHASE_2", "runner": "NOT_VERIFIED_PHASE_2" },
+    "LR3": { "status": "NOT_RUN_PHASE_2", "runner": "NOT_VERIFIED_PHASE_2" },
+    "LR4": { "status": "NOT_RUN_PHASE_2", "runner": "NOT_VERIFIED_PHASE_2" },
+    "LR5": { "status": "NOT_RUN_PHASE_2", "runner": "NOT_VERIFIED_PHASE_2" },
+    "LR6": { "status": "NOT_RUN_PHASE_2", "runner": "NOT_VERIFIED_PHASE_2" },
+    "LR7": { "status": "NOT_RUN_PHASE_2", "runner": "NOT_VERIFIED_PHASE_2" },
+    "LR8": { "status": "NOT_RUN_PHASE_2", "runner": "NOT_VERIFIED_PHASE_2" },
+    "LR9": { "status": "NOT_RUN_PHASE_2", "runner": "NOT_VERIFIED_PHASE_2" },
+    "LR10": { "status": "NOT_RUN_PHASE_2", "runner": "NOT_VERIFIED_PHASE_2" }
   },
   "redaction": {
     "scriptIds": "NOT_RECORDED",
