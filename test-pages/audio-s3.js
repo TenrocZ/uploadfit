@@ -7,7 +7,7 @@
       title: '合规 MP3 原文件直通',
       rule: '音频上传仅支持 MP3，文件最大 250KB。合规 MP3 原文件直接上传。',
       accept: 'audio/mpeg',
-      hint: '先在 B 生成并处理一个 PCM WAV，再点击“复用最近 MP3”；也可以直接选择合规 MP3。'
+      hint: '在本页点击“生成本页合规 MP3”或选择本地 MP3；预期 PASSTHROUGH，原文件不被替换。'
     },
     B: {
       title: 'PCM WAV 转 MP3',
@@ -17,10 +17,10 @@
       hint: '推荐生成 4 秒 PCM 16-bit mono WAV（源文件超过 250KB），确认后应只处理一次并回填 audio/mpeg。'
     },
     C: {
-      title: '超限 MP3 稳定停止',
+      title: 'M4A/AAC 与超限 MP3 安全停止',
       rule: '音频上传仅支持 MP3，文件最大 250KB。超限 MP3 不可转码。',
       accept: 'audio/mpeg',
-      hint: '先在 B 生成 MP3，再点击“生成超限 MP3”；预期 AUDIO_CODEC_UNSUPPORTED、Worker/process=0。'
+      hint: '在本页生成超限 MP3，或选择/生成有效 M4A/AAC-LC fixture；两者都应 AUDIO_CODEC_UNSUPPORTED，Worker/process=0。'
     },
     D: {
       title: '无 maxBytes 规则安全停止',
@@ -44,13 +44,17 @@
       title: '取消、脱离与迟到消息隔离',
       rule: '音频上传仅支持 MP3，文件最大 250KB。WAV 需要转换为 MP3。',
       accept: 'audio/mpeg',
-      hint: '生成 WAV 后可在处理中取消，或移除输入；预期 abort、无迟到注入。'
+      wavSeconds: 18,
+      longWavSeconds: 18,
+      hint: '生成 18 秒 PCM WAV，看到 PROCESSING 后立即取消或移除输入；预期 1 秒内 STOPPED、原 File 保留且无迟到注入。'
     },
     H: {
       title: '关联拒收最多一次重试',
-      rule: '音频上传仅支持 MP3，文件最大 250KB。WAV 需要转换为 MP3。',
+      rule: '音频上传仅支持 MP3，文件最大 500KB。WAV 需要转换为 MP3。',
       accept: 'audio/mpeg',
-      hint: '勾选“成功后自动产生一次关联拒收”再生成 WAV；预期最多一次重试且 submit click=0。',
+      wavSeconds: 12,
+      longWavSeconds: 12,
+      hint: '本页生成 12 秒 PCM WAV；初始 500KB 计划成功后自动关联拒收 250KB，预期严格收紧后只重试一次且 submit click=0。',
       autoReject: true
     }
   };
@@ -90,14 +94,20 @@
 
   const controls = node('div', { class: 'controls' });
   const addControl = (id, text) => {
-    const button = node('button', { id, type: 'button' }, text);
+    // input[type=button] keeps the scenario controls out of the controller's
+    // business-click accounting.  The page has no submit control at all.
+    const button = node('input', { id, type: 'button', value: text, 'aria-label': text });
     controls.append(button);
     return button;
   };
   const wavButton = addControl('audio-s3-generate-wav', `生成 ${config.wavSeconds ?? 0.5} 秒 PCM WAV`);
-  const longWavButton = addControl('audio-s3-generate-long-wav', '生成 1.5 秒 PCM WAV');
-  const reuseButton = addControl('audio-s3-reuse-mp3', '复用最近 MP3');
+  const longWavButton = addControl('audio-s3-generate-long-wav', `生成 ${config.longWavSeconds ?? 1.5} 秒 PCM WAV`);
+  const reuseButton = addControl(
+    'audio-s3-reuse-mp3',
+    scenario === 'A' ? '生成本页合规 MP3' : '复用当前页最近 MP3'
+  );
   const largeButton = addControl('audio-s3-large-mp3', '生成超限 MP3');
+  const m4aButton = addControl('audio-s3-generate-m4a', '生成本页 M4A/AAC-LC fixture');
   const declineButton = addControl('audio-s3-decline', '拒绝当前确认');
   const cancelButton = addControl('audio-s3-cancel', '取消当前任务');
   const detachButton = addControl('audio-s3-detach', '移除输入（脱离）');
@@ -136,6 +146,12 @@
     lastMp3: null,
     events: [],
     lastStatus: null,
+    observedTaskId: null,
+    observedTaskStatus: null,
+    processingStarts: 0,
+    injectionStarts: 0,
+    retryDispatches: 0,
+    submitClicks: 0,
     autoRejected: false,
     controller: null,
     unsubscribe: null
@@ -154,9 +170,15 @@
       isTrusted: event.isTrusted === true
     });
     state.events = state.events.slice(-12);
-    eventOutput.textContent = JSON.stringify(state.events, null, 2);
+    renderEventSummary();
   }
   document.addEventListener('change', recordEvent, true);
+  document.addEventListener('click', (event) => {
+    if (event.target?.closest?.('button[type="submit"], input[type="submit"]')) {
+      state.submitClicks += 1;
+    }
+    renderEventSummary();
+  }, true);
   document.addEventListener('submit', (event) => {
     recordEvent(event);
     event.preventDefault();
@@ -189,6 +211,95 @@
     return new File([buffer], `s3-${seconds}-second.wav`, { type: 'audio/wav' });
   }
 
+  function concatBytes(...parts) {
+    const bytes = new Uint8Array(parts.reduce((sum, item) => sum + item.length, 0));
+    let offset = 0;
+    for (const part of parts) {
+      bytes.set(part, offset);
+      offset += part.length;
+    }
+    return bytes;
+  }
+
+  // Minimal MPEG-1 Layer III frames are enough for the production metadata
+  // reader.  C uses a fresh fixture on this page, so it never depends on a
+  // File produced on another query page.
+  function createMp3File(frames = 200, bitrateIndex = 9) {
+    const bitrate = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320][bitrateIndex] ?? 128;
+    const frameLength = Math.floor(144 * bitrate * 1000 / 44100);
+    const frame = new Uint8Array(frameLength);
+    frame.set([0xff, 0xfb, bitrateIndex << 4, 0x00]);
+    return new File([concatBytes(...Array.from({ length: frames }, () => frame))], 's3-local.mp3', {
+      type: 'audio/mpeg'
+    });
+  }
+
+  // This is the same small ISO-BMFF/AAC-LC metadata fixture used by the
+  // signature unit tests, kept inline so the production page has no test
+  // module or network dependency.
+  function createM4aFixture() {
+    const text = (value) => new Uint8Array([...value].map((char) => char.charCodeAt(0)));
+    const box = (type, payload) => {
+      const bytes = new Uint8Array(8 + payload.length);
+      const view = new DataView(bytes.buffer);
+      view.setUint32(0, bytes.length, false);
+      bytes.set(text(type), 4);
+      bytes.set(payload, 8);
+      return bytes;
+    };
+    const mdhdPayload = new Uint8Array(24);
+    const mdhdView = new DataView(mdhdPayload.buffer);
+    mdhdView.setUint32(12, 1000, false);
+    mdhdView.setUint32(16, 2000, false);
+    const frequencyIndex = 4; // 44.1 kHz in the AAC sample-rate table
+    const audioSpecificConfig = new Uint8Array([
+      (2 << 3) | (frequencyIndex >> 1),
+      ((frequencyIndex & 1) << 7) | (2 << 3)
+    ]);
+    const esdsPayload = new Uint8Array([
+      0, 0, 0, 0,
+      0x03, 0x10, 0, 0, 0, 0,
+      0x04, 0x08, 0, 0, 0, 0,
+      0x05, 0x02, audioSpecificConfig[0], audioSpecificConfig[1]
+    ]);
+    const samplePayload = new Uint8Array(28);
+    const sampleView = new DataView(samplePayload.buffer);
+    sampleView.setUint16(16, 2, false);
+    sampleView.setUint16(18, 16, false);
+    sampleView.setUint32(24, 44100 << 16, false);
+    const sampleEntry = box('mp4a', concatBytes(samplePayload, box('esds', esdsPayload)));
+    const stsdPayload = new Uint8Array(8 + sampleEntry.length);
+    new DataView(stsdPayload.buffer).setUint32(4, 1, false);
+    stsdPayload.set(sampleEntry, 8);
+    const stbl = box('stbl', box('stsd', stsdPayload));
+    const moov = box('moov', box('trak', box('mdia', concatBytes(
+      box('mdhd', mdhdPayload),
+      box('minf', stbl)
+    ))));
+    const ftyp = box('ftyp', concatBytes(text('M4A '), new Uint8Array([0, 0, 0, 0]), text('M4A ')));
+    return new File([concatBytes(ftyp, moov)], 's3-aac-lc-fixture.m4a', { type: 'audio/mp4' });
+  }
+
+  function renderEventSummary() {
+    const tasks = state.controller?.tasks instanceof Map
+      ? [...state.controller.tasks.values()]
+      : [];
+    const controllerBusinessClicks = tasks.reduce(
+      (sum, task) => sum + (Number.isFinite(task.businessClickCount) ? task.businessClickCount : 0),
+      0
+    );
+    eventOutput.textContent = JSON.stringify({
+      summary: {
+        processingStarts: state.processingStarts,
+        injectionStarts: state.injectionStarts,
+        retryDispatches: state.retryDispatches,
+        businessSubmitClicks: state.submitClicks,
+        controllerBusinessClickCount: controllerBusinessClicks
+      },
+      events: state.events
+    }, null, 2);
+  }
+
   function setStatus(text) { status.textContent = text; }
 
   function refresh(snapshot) {
@@ -206,10 +317,24 @@
         errorCode: task.errorCode,
         retryCount: task.retryCount,
         progress: task.progress
-      } : null
+    } : null
     };
     snapshotOutput.textContent = JSON.stringify(safe, null, 2);
-    if (!task) return;
+    if (!task) {
+      renderEventSummary();
+      return;
+    }
+    if (state.observedTaskId !== task.taskId) {
+      state.observedTaskId = task.taskId;
+      state.observedTaskStatus = null;
+    }
+    if (task.status !== state.observedTaskStatus) {
+      if (task.status === 'PROCESSING') state.processingStarts += 1;
+      if (task.status === 'INJECTING') state.injectionStarts += 1;
+      if (task.status === 'RETRYING') state.retryDispatches += 1;
+      state.observedTaskStatus = task.status;
+    }
+    renderEventSummary();
     const summary = task.errorCode
       ? `${task.status} / ${task.errorCode}`
       : `${task.status}${task.progress?.ratio !== null && task.progress?.ratio !== undefined ? ` / ${Math.round(task.progress.ratio * 100)}%` : ''}`;
@@ -244,22 +369,22 @@
   }, 10);
 
   wavButton.addEventListener('click', () => transferFile(createWav(config.wavSeconds ?? 0.5)));
-  longWavButton.addEventListener('click', () => transferFile(createWav(1.5)));
+  longWavButton.addEventListener('click', () => transferFile(createWav(config.longWavSeconds ?? 1.5)));
   reuseButton.addEventListener('click', () => {
-    if (!state.lastMp3) {
-      setStatus('尚无最近 MP3：先完成 B 场景转码或选择本地 MP3');
+    if (state.lastMp3) {
+      transferFile(state.lastMp3);
       return;
     }
-    transferFile(state.lastMp3);
+    if (scenario === 'A') {
+      transferFile(createMp3File(200));
+      return;
+    }
+    setStatus('当前页尚无最近 MP3：先在本页生成或选择 MP3');
   });
   largeButton.addEventListener('click', () => {
-    if (!state.lastMp3) {
-      setStatus('尚无最近 MP3：先完成 B 场景转码');
-      return;
-    }
-    const padding = new Uint8Array(300_000);
-    transferFile(new File([state.lastMp3, padding], 's3-over-limit.mp3', { type: 'audio/mpeg' }));
+    transferFile(createMp3File(300, 14));
   });
+  m4aButton.addEventListener('click', () => transferFile(createM4aFixture()));
   declineButton.addEventListener('click', () => {
     const task = state.controller?.getSnapshot?.().activeTask;
     const pending = task?.plan?.confirmations?.find((item) => item.required && !item.resolved);

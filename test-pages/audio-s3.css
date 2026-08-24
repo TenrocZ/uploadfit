@@ -28,9 +28,8 @@ nav a[aria-current="page"] { color: #fff; background: var(--accent); border-colo
 label { font-weight: 650; }
 input[type="file"] { max-width: 100%; padding: 8px; background: #fff; border: 1px solid var(--line); border-radius: 8px; }
 .controls { display: flex; flex-wrap: wrap; gap: 8px; }
-button { min-height: 40px; padding: 8px 13px; color: var(--ink); background: #fff; border: 1px solid #9eb1cf; border-radius: 8px; cursor: pointer; }
-button:hover, button:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px rgb(36 87 197 / 18%); }
-button:disabled { cursor: wait; opacity: .55; }
+button, input[type="button"] { min-height: 40px; padding: 8px 13px; color: var(--ink); background: #fff; border: 1px solid #9eb1cf; border-radius: 8px; cursor: pointer; font: inherit; }
+button:disabled, input[type="button"]:disabled { cursor: wait; opacity: .55; }
 .status { min-height: 32px; margin: 0; padding: 8px 10px; background: #eef3fb; border-radius: 8px; }
 .error { min-height: 28px; color: #9c2c26; }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
