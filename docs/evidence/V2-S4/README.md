@@ -6,17 +6,19 @@
 
 - 基线：`e9fea4c06f9602125df7434434fc6bbc1fd9f7c4`。
 - Phase 1 基线施工提交：`fbd67194409041c57e4b42d04bf91ef9e62df874`。
-- 返工批次：Batch A `2a26897`；Batch B `de768db79b1d70661b017dad4b42ee5712297b46`；Batch C 提交在本轮 closeout 后回填到结构化结果和 handoff。
+- 返工批次：Batch A `2a26897`；Batch B `de768db79b1d70661b017dad4b42ee5712297b46`；Batch C `53bcc5b21879d640dee047677d2462704ed783cd`；Batch D1 `c6e8b3b1fbbee44dba061abab819a14b20fb7cf5`；Batch D2 本轮文档提交在 Phase 2 最终交接时记录。
 - Windows，Node `v22.20.0`，npm `10.9.3`；本地测试服务 `http://127.0.0.1:8765`。
 - 当前 production `dist/uploadfit.js`：421,348 bytes，SHA-256 `ABFA41EBB606CA0E7ED84F8DEE2F17783CAF0BDFA11CE777FB1BAEFBD173D18A`，单 IIFE；runtime remote dependencies=0。
 
 Runner 约定：
 
 - `DEBUG_CONTROLLER_REAL_WORKER`：本地 `dist/uploadfit.test.js` debug API；真实 audio handler/Worker 或真实 TaskController 链路，不能外推为 production IIFE/Tabbit。
+- `DEBUG_DIRECT_PIPELINE_REAL_WORKER`：本地 `dist/uploadfit.test.js` 直接 `processAudio` pipeline 的真实 Worker；不是 TaskController、production IIFE 或 Tabbit 证据。
 - `DEBUG_CONTROLLER_REAL_FILE`：同一 debug controller 使用真实 File/DataTransfer，但该分支在 Worker 前停止。
 - `DEBUG_PURE_PLAN`：只证明确定性 inspect/plan/predicate/边界结果；不填写 Worker/process=0 作为测量。
 - `DEBUG_FAKE_RUNTIME_BRANCH`：注入 fake runtime，仅证明协议/两遍算法分支，不证明真实 encoder/production。
 - `PRODUCTION_IIFE_LOCAL_PAGE`：本地页面加载当前 production IIFE 的回归；不等于 Tabbit。
+- `PRODUCTION_IIFE_STATIC_ARTIFACT + DEBUG_REGISTRY`：当前 production IIFE 只做静态 artifact 校验，registry 断言来自 debug bundle；不写成 production page runtime。
 - `REAL_TABBIT_PRODUCTION`：Phase 2 才允许使用；当前无该 runner 结果。
 - `NOT_VERIFIED_PHASE_2`：尚未执行，不能以 Playwright、mock、debug bundle、历史截图或 S0/S2 结果替代。
 
@@ -50,10 +52,10 @@ Runner 约定：
 | A12 | A11/A12 `[DEBUG_CONTROLLER_REAL_WORKER]` detach 分支 | `INPUT_DETACHED`，原 File 保留，Worker abort/cleanup |
 | A13 | A13/A14 `[DEBUG_FAKE_RUNTIME_BRANCH]` | 仅证明两遍算法上界：第一次超限再 lower-rate；不声称真实 production encoder |
 | A14 | A13/A14 `[DEBUG_FAKE_RUNTIME_BRANCH]` | 第二次仍超限为 `AUDIO_OUTPUT_TOO_LARGE`，不声称真实 production 两遍通过 |
-| A15 | Q-S4-P03 `[DEBUG_CONTROLLER_REAL_WORKER]` 真实 controller + rejection hook + real Worker | 500KB→250KB 仅 retry 一次；第二次明确拒收无第三次 process/第二次 retry/submit |
+| A15 | Q-S4-P03 `[DEBUG_CONTROLLER_REAL_WORKER]` 真实 controller + `src/dom/rejection-observer.js` DOM observer + real Worker | 关联 DOM 错误节点触发 500KB→250KB；仅 retry 一次，第二次明确拒收无第三次 process/第二次 retry/submit |
 | A16 | Q-S4-P04 `[DEBUG_CONTROLLER_REAL_FILE]` | ambiguous/network/permission/official 分别走 controller stop path，错误码不统一误报 |
-| A17 | Q-S4-P05 `[DEBUG_CONTROLLER_REAL_WORKER]` | process→final validation→注入失败→rollback→download fallback；原 File/FileList、cleanup、submit=0 |
-| A18 | Phase 1 仅有 debug dispose 幂等补充；完整关闭/刷新/新标签为 `NOT_VERIFIED_PHASE_2`（LR1/LR9） | 不把两次 dispose 写成完整生命周期通过 |
+| A17 | Q-S4-P05 `[DEBUG_CONTROLLER_REAL_WORKER]` 真实 `injectFile`/`DataTransfer` | 受控首个 DataTransfer 构造失败→真实注入失败→restore 构造成功→rollback/download fallback；原 File/FileList、cleanup、submit=0 |
+| A18 | `[PRODUCTION_IIFE_STATIC_ARTIFACT + DEBUG_REGISTRY]` 静态 production IIFE + debug registry；完整关闭/刷新/新标签为 `NOT_VERIFIED_PHASE_2`（LR1/LR9） | 不把 debug registry 或两次 dispose 写成 production 生命周期通过 |
 
 ## S01–S06 安全映射
 
@@ -70,8 +72,8 @@ Runner 约定：
 
 | ID | runner | 实际证据 |
 |---|---|---|
-| P01 / Q-S4-P06 | `DEBUG_CONTROLLER_REAL_WORKER` | inspect、plan、confirm、process、validate 五段耗时；progress 单调、≤10/s，heartbeat≤500ms，独立输出复检、cleanup |
-| P02 | `DEBUG_CONTROLLER_REAL_WORKER` | encode progress 后取消，≤1,000ms，无迟到 progress/result，cleanup |
+| P01 / Q-S4-P06 | `DEBUG_DIRECT_PIPELINE_REAL_WORKER` | 直接 `processAudio` pipeline 的 inspect、plan、confirm、process、validate 五段耗时；progress 单调、≤10/s，heartbeat≤500ms，独立输出复检、cleanup |
+| P02 | `DEBUG_DIRECT_PIPELINE_REAL_WORKER` | 直接 pipeline 在 encode progress 后取消，≤1,000ms，无迟到 progress/result，cleanup |
 | P03（原） | `DEBUG_SEQUENTIAL_CLEANUP_HARNESS` | 仅为直接 `processAudio` 的连续清理补充，不冒充队列 |
 | P03 / Q-S4-P07 | `DEBUG_CONTROLLER_REAL_WORKER` | 同一页面/同一 TaskController 的两个 uploader 快速选择；两个完成，任一时刻 processing/Worker≤1，active Worker=0，两个 cleanup 完整 |
 

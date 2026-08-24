@@ -6,7 +6,8 @@
   "reworkCommits": {
     "batchA": "2a26897",
     "batchB": "de768db79b1d70661b017dad4b42ee5712297b46",
-    "batchC": "PENDING_FINAL_COMMIT_BACKFILL"
+    "batchC": "53bcc5b21879d640dee047677d2462704ed783cd",
+    "batchD1": "c6e8b3b1fbbee44dba061abab819a14b20fb7cf5"
   },
   "bundle": {
     "path": "dist/uploadfit.js",
@@ -16,7 +17,7 @@
   },
   "environment": {
     "tabbit": "NOT_RUN_PHASE_2",
-    "officialPrivateScriptContextVerified": false,
+    "officialPrivateScriptContextVerified": "NOT_VERIFIED_PHASE_2",
     "remoteCdp": "NOT_VERIFIED_PHASE_2",
     "substitutionPolicy": "No Playwright/mock/debug bundle/history may be recorded as Tabbit PASS."
   },

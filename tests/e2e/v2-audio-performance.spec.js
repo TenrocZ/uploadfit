@@ -7,7 +7,7 @@ async function open(page) {
 }
 
 test.describe('V2-S4 quick audio performance matrix', () => {
-  test('Q-S4-P06 [DEBUG_CONTROLLER_REAL_WORKER] P01 records inspect/plan/confirm/process/validate timings', async ({ page }) => {
+  test('Q-S4-P06 [DEBUG_DIRECT_PIPELINE_REAL_WORKER] P01 records inspect/plan/confirm/process/validate timings', async ({ page }) => {
     await open(page);
     const result = await page.evaluate(async () => {
       const api = __uploadfit_debug_bundle__;
@@ -96,7 +96,7 @@ test.describe('V2-S4 quick audio performance matrix', () => {
     expect(result.cleanup).toMatchObject({ workerTerminated: true, objectUrlRevoked: true, queueCleared: true });
   });
 
-  test('P02 [DEBUG_CONTROLLER_REAL_WORKER] processing cancellation stops within 1s and emits no late result', async ({ page }) => {
+  test('P02 [DEBUG_DIRECT_PIPELINE_REAL_WORKER] processing cancellation stops within 1s and emits no late result', async ({ page }) => {
     await open(page);
     const result = await page.evaluate(async () => {
       const api = __uploadfit_debug_bundle__;

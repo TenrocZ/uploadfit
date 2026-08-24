@@ -8,7 +8,7 @@
 
 ## Phase 1 结论
 
-当前本地静态/动态安全与格式对抗覆盖已通过；persistent 结论严格限定为 S01 的 local/session storage API scope，IndexedDB/cache、真实 Tabbit 网络和真实 LLMBridge 均为 `NOT_VERIFIED_PHASE_2`。因此本页不把历史 S5 或旧 V1/S0/S2/S4 证据合并进 V2-S4。
+当前本地静态/动态安全与格式对抗覆盖已通过；persistent 结论严格限定为 S01 的 local/session storage API scope，IndexedDB/cache、真实 Tabbit 网络和真实 LLMBridge 均为 `NOT_VERIFIED_PHASE_2`。S05 的 fake bridge 字段仅适用于 `NOT_APPLICABLE_FAKE_BRIDGE_HARNESS`，不代表真实 Tabbit 调用。Q-S4-P03/P05 的 A15/A17 现为真实 DOM observer 与真实 DataTransfer/injectFile controller 链。本页不把历史 S5 或旧 V1/S0/S2/S4 证据合并进 V2-S4。
 
 ## 历史 S5 安全复核（非 V2-S4 证据）
 

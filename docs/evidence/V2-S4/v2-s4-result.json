@@ -7,7 +7,8 @@
   "rework": {
     "batchACommit": "2a26897",
     "batchBCommit": "de768db79b1d70661b017dad4b42ee5712297b46",
-    "batchCCommit": "PENDING_FINAL_COMMIT_BACKFILL",
+    "batchCCommit": "53bcc5b21879d640dee047677d2462704ed783cd",
+    "batchD1Commit": "c6e8b3b1fbbee44dba061abab819a14b20fb7cf5",
     "status": "IN_PROGRESS"
   },
   "environment": {
@@ -27,6 +28,7 @@
   },
   "runnerProvenance": {
     "DEBUG_CONTROLLER_REAL_WORKER": "local dist/uploadfit.test.js with actual audio Worker/controller paths; not production-IIFE or Tabbit evidence",
+    "DEBUG_DIRECT_PIPELINE_REAL_WORKER": "local dist/uploadfit.test.js direct processAudio pipeline with real Worker; not TaskController, production-IIFE or Tabbit evidence",
     "DEBUG_CONTROLLER_REAL_FILE": "local debug controller with actual File/DataTransfer, stopped before Worker",
     "DEBUG_PURE_PLAN": "bounded metadata/plan/predicate evidence only; no Worker count inferred",
     "DEBUG_FAKE_RUNTIME_BRANCH": "fake runtime/bridge protocol or two-pass algorithm branch only",
@@ -101,7 +103,7 @@
       "stagesMs": { "inspect": 2.5, "plan": 1.3, "confirm": 0.3, "process": 105.5, "validate": 1.2 }
     },
     "Q-S4-P06": {
-      "runner": "DEBUG_CONTROLLER_REAL_WORKER",
+      "runner": "DEBUG_DIRECT_PIPELINE_REAL_WORKER",
       "stagesMs": { "inspect": 3.8, "plan": 1.4, "confirm": 0.5, "process": 225.8, "validate": 3.7 },
       "heartbeatMaxMs": 108.4,
       "progressCount": 4,
@@ -132,7 +134,7 @@
     "businessSubmitClicks": { "value": 0, "source": "Q-S4-P03/P05/P07 logger + controller task click counters", "scope": "local debug controller", "realTabbit": "NOT_MEASURED_PHASE_1" },
     "persistentAudio": { "value": false, "source": "S01 local/session storage snapshots", "scope": "local/session only", "indexedDbOrCaches": "NOT_MEASURED_PHASE_1" },
     "sensitiveAiCalls": "NOT_MEASURED_PHASE_1",
-    "fakeBridgeSensitiveCalls": 0,
+    "fakeBridgeSensitiveCalls": "NOT_APPLICABLE_FAKE_BRIDGE_HARNESS",
     "maliciousMarkupExecution": { "value": 0, "source": "S02 script node count delta", "scope": "local debug page" }
   },
   "slow200MbGate": {
