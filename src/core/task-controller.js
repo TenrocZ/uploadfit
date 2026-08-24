@@ -39,6 +39,7 @@ import { sanitizeEvidenceText } from '../utils/text.js';
 import { createAdapterRegistry } from '../adapters/registry.js';
 import { classifyMediaKind } from '../dom/input-discovery.js';
 import { AUDIO_ERROR_CODES } from '../audio/errors.js';
+import { pageAllowsMp3 } from '../audio/validators.js';
 import { createMediaHandlerRegistry, createImageHandler } from './media-handlers.js';
 import { createCleanupRegistry } from './cleanup.js';
 import { createStateMachine } from './state-machine.js';
@@ -316,6 +317,93 @@ function safeConfirmation(confirmation) {
 function stableErrorCode(error, fallback = 'PROCESSING_FAILED') {
   if (AUDIO_ERROR_CODES.includes(error?.code)) return error.code;
   return asImageProcessingError(error, fallback).code;
+}
+
+function normalizeAudioRuleValue(value) {
+  const normalized = String(value ?? '').trim().toLowerCase().split(';', 1)[0];
+  if (normalized === 'audio/mp3') return 'audio/mpeg';
+  return normalized.replace(/^\./, '');
+}
+
+function normalizedAudioRuleSet(rules, field) {
+  const values = Array.isArray(rules?.[field]) ? rules[field] : [];
+  return new Set(values.map(normalizeAudioRuleValue).filter(Boolean));
+}
+
+function isProperSubset(subset, superset) {
+  return subset.size > 0
+    && subset.size < superset.size
+    && [...subset].every((value) => superset.has(value));
+}
+
+function compareAllowedSet(previousRules, nextRules, field) {
+  const previous = normalizedAudioRuleSet(previousRules, field);
+  const next = normalizedAudioRuleSet(nextRules, field);
+  const unchanged = previous.size === next.size
+    && [...previous].every((value) => next.has(value));
+  const nextIsSubset = next.size > 0
+    && [...next].every((value) => previous.has(value));
+  return {
+    broader: !unchanged && !nextIsSubset,
+    tightened: isProperSubset(next, previous)
+  };
+}
+
+function compareBound(previousValue, nextValue, direction) {
+  const previousFinite = Number.isFinite(previousValue);
+  const nextFinite = Number.isFinite(nextValue);
+  if (!previousFinite && !nextFinite) return { broader: false, tightened: false };
+  if (!previousFinite && nextFinite) return { broader: false, tightened: true };
+  if (previousFinite && !nextFinite) return { broader: true, tightened: false };
+  if (nextValue === previousValue) return { broader: false, tightened: false };
+  return direction === 'lower-is-tighter'
+    ? { broader: nextValue > previousValue, tightened: nextValue < previousValue }
+    : { broader: nextValue < previousValue, tightened: nextValue > previousValue };
+}
+
+function hasAudioDurationRule(rules) {
+  return Object.values(rules?.duration ?? {})
+    .some((value) => Number.isFinite(value));
+}
+
+function hasAudioSafetySemantic(rules) {
+  if ((rules?.safetyFlags ?? []).length > 0) return true;
+  const text = (rules?.semanticRequirements ?? []).join(' ');
+  return /(?:官方|审核工具|原始|证据原件|原文件|无损|lossless)/i.test(text);
+}
+
+/**
+ * Rejection retry is allowed only when the new audio rules change the
+ * executable plan in a strictly safer direction.  Evidence/source changes,
+ * duplicate rules, and looser rules deliberately return false.
+ */
+export function isStrictlyMoreSpecificAudioRejection(previousRules, nextRules) {
+  if (!previousRules || !nextRules
+    || previousRules.mediaKind !== 'audio'
+    || nextRules.mediaKind !== 'audio'
+    || !nextRules.actionable
+    || !pageAllowsMp3(nextRules)
+    || hasAudioDurationRule(nextRules)
+    || hasAudioSafetySemantic(nextRules)
+    || (nextRules.conflicts ?? []).some((item) => item.unresolvable)) {
+    return false;
+  }
+
+  const maxRelation = compareBound(
+    previousRules.maxBytes,
+    nextRules.maxBytes,
+    'lower-is-tighter'
+  );
+  const formatsRelation = compareAllowedSet(previousRules, nextRules, 'formats');
+  const extensionsRelation = compareAllowedSet(previousRules, nextRules, 'extensions');
+  // S3 has no safe operation that can make an input larger.  A lower bound
+  // therefore never authorizes a retry; only a smaller output ceiling or a
+  // proper format/extension narrowing can change the executable MP3 plan.
+  if ([maxRelation, formatsRelation, extensionsRelation].some((item) => item.broader)) {
+    return false;
+  }
+  return [maxRelation, formatsRelation, extensionsRelation]
+    .some((item) => item.tightened);
 }
 
 function planStopCode(task, plan) {
@@ -1503,13 +1591,25 @@ export class TaskController {
     }
 
     this._stopRejectionObserver(task);
-    task.rejection = detail;
-    task.source = 'rejection';
-    task.ruleCandidates = [
+    const previousRules = task.rules;
+    const nextRuleCandidates = [
       ...(task.ruleCandidates ?? []),
       ...(detail.candidates ?? [])
     ];
-    task.rules = this.resolveRules(task.ruleCandidates);
+    const nextRules = this.resolveRules(nextRuleCandidates);
+    if (task.mediaKind === 'audio'
+      && !isStrictlyMoreSpecificAudioRejection(previousRules, nextRules)) {
+      this.diagnostics.push({
+        code: 'REJECTION_RULE_NOT_STRICTER',
+        taskId: task.taskId
+      });
+      this._stopTask(task, 'PROCESSING_FAILED');
+      return;
+    }
+    task.rejection = detail;
+    task.source = 'rejection';
+    task.ruleCandidates = nextRuleCandidates;
+    task.rules = nextRules;
     if (task.rules.conflicts?.length) {
       this.logger.emit('RULE_CONFLICT', {
         taskId: task.taskId,

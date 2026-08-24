@@ -7,7 +7,7 @@ async function open(page) {
 }
 
 async function installSynthetic(page, mode, options = {}) {
-  await page.evaluate(({ selectedMode, withImage }) => {
+  await page.evaluate(({ selectedMode, withImage, initialMaxBytes }) => {
     const api = globalThis.__uploadfit_debug_bundle__;
     globalThis.__syntheticAudio?.controller?.dispose?.();
     globalThis.__syntheticAudio?.wrapper?.remove?.();
@@ -16,15 +16,21 @@ async function installSynthetic(page, mode, options = {}) {
       mediaKind: 'audio',
       formats: selectedMode === 'no-mp3' ? ['audio/wav'] : ['audio/mpeg'],
       extensions: selectedMode === 'no-mp3' ? ['.wav'] : ['.mp3'],
-      minBytes: null, maxBytes: selectedMode === 'no-max' ? null : 250_000,
+      minBytes: null,
+      maxBytes: selectedMode === 'no-max'
+        ? null
+        : Number.isFinite(initialMaxBytes) ? initialMaxBytes : 250_000,
       duration: { exactMs: null, minMs: null, maxMs: selectedMode === 'duration' ? 1000 : null },
       audio: { sampleRates: [], channels: [], bitDepths: [] },
       confidence: 0.95,
-      sources: [{ type: 'nearby-text', priority: 400, confidence: 0.95, evidence: ['MP3 最大 250KB'] }],
+      sources: [{
+        type: 'nearby-text', priority: 400, confidence: 0.95,
+        evidence: [`MP3 最大 ${Number.isFinite(initialMaxBytes) ? initialMaxBytes / 1000 : 250}KB`]
+      }],
       conflicts: [], advisories: [], safetyFlags: [], semanticRequirements: [], actionable: true
     };
     const imageRules = {
-      mediaKind: 'image', formats: ['image/jpeg'], extensions: ['.jpg'],
+      mediaKind: 'image', formats: ['image/jpeg'], extensions: ['jpg', 'jpeg'],
       minBytes: 1, maxBytes: 250_000,
       width: { exact: null, min: null, max: null }, height: { exact: null, min: null, max: null },
       aspectRatio: null, dpi: null, count: { max: 1 }, background: null,
@@ -69,7 +75,11 @@ async function installSynthetic(page, mode, options = {}) {
       validate: (metadata, rules) => api.validateAudioMetadata(metadata, rules),
       plan: (metadata, rules) => {
         if (selectedMode === 'cancel' || selectedMode === 'detach'
-          || selectedMode === 'rollback' || selectedMode === 'retry') {
+          || selectedMode === 'rollback'
+          || ['retry-same', 'retry-looser', 'retry-strict', 'retry-second'].includes(selectedMode)) {
+          if (selectedMode.startsWith('retry-')) {
+            return api.createAudioProcessingPlan(metadata, rules);
+          }
           return {
             mediaKind: 'audio', sourceContainer: metadata.container, sourceCodec: metadata.codec,
             targetMime: 'audio/mpeg', targetContainer: 'mp3', targetCodec: 'mp3', targetMaxBytes: 250_000,
@@ -137,8 +147,35 @@ async function installSynthetic(page, mode, options = {}) {
       audioHandler,
       imageHandler,
       logger,
-      parseRulesFn: (bundle) => [bundle?.attributes?.accept?.includes('audio') ? audioRules : imageRules],
-      resolveRulesFn: (candidates) => candidates[0]
+      parseRulesFn: (bundle) => {
+        const isAudioBundle = bundle?.uploaderId?.includes('audio')
+          || bundle?.attributes?.accept?.includes('audio');
+        const rules = isAudioBundle ? audioRules : imageRules;
+        const candidateRules = {
+          mediaKind: rules.mediaKind,
+          formats: rules.formats,
+          extensions: rules.extensions,
+          minBytes: rules.minBytes,
+          maxBytes: rules.maxBytes,
+          duration: rules.duration,
+          audio: rules.audio,
+          width: rules.width,
+          height: rules.height,
+          aspectRatio: rules.aspectRatio,
+          dpi: rules.dpi,
+          count: rules.count,
+          background: rules.background,
+          semanticRequirements: rules.semanticRequirements
+        };
+        return [{
+          sourceType: 'nearby-text',
+          sourcePriority: 400,
+          confidence: rules.confidence,
+          evidence: rules.sources?.[0]?.evidence ?? [],
+          rules: candidateRules
+        }];
+      },
+      resolveRulesFn: (candidates) => api.resolveRules(candidates)
     });
     controller.registerUploader({ input, uploaderId: 'synthetic-audio-uploader', label: '音频', mediaKind: 'audio', acceptTokens: ['audio/mpeg'], multiple: false, nearbyTexts: ['MP3 最大 250KB'], alertTexts: [] });
     if (imageInput) controller.registerUploader({ input: imageInput, uploaderId: 'synthetic-image-uploader', label: '图片', mediaKind: 'image', acceptTokens: ['image/jpeg'], multiple: false, nearbyTexts: ['JPG'], alertTexts: [] });
@@ -147,7 +184,11 @@ async function installSynthetic(page, mode, options = {}) {
       if (event.target?.closest?.('button,[type="submit"],[role="button"],a')) stats.submitClicks += 1;
     }, true);
     globalThis.__syntheticAudio = { api, controller, input, imageInput, wrapper, error, stats, logger, resolve: null };
-  }, { selectedMode: mode, withImage: Boolean(options.withImage) });
+  }, {
+    selectedMode: mode,
+    withImage: Boolean(options.withImage),
+    initialMaxBytes: options.initialMaxBytes
+  });
 }
 
 async function selectFile(page, type = 'audio/wav', name = 'secret-source.wav', bytes = 44) {
@@ -168,8 +209,6 @@ test('V2-S3 unsupported MP3/M4A and duration constraints stop before process', a
   for (const [mode, type, name] of [
     ['over-limit', 'audio/mpeg', 'secret-over-limit.mp3'],
     ['m4a', 'audio/mp4', 'secret-source.m4a'],
-    ['no-max', 'audio/wav', 'secret-no-max.wav'],
-    ['no-mp3', 'audio/wav', 'secret-no-mp3.wav'],
     ['duration', 'audio/wav', 'secret-long.wav']
   ]) {
     await installSynthetic(page, mode);
@@ -183,11 +222,7 @@ test('V2-S3 unsupported MP3/M4A and duration constraints stop before process', a
     expect(result.errorCode).toBe(
       mode === 'duration'
         ? 'AUDIO_DURATION_LIMIT_UNFIXABLE'
-        : mode === 'no-max'
-          ? 'RULES_INSUFFICIENT'
-          : mode === 'no-mp3'
-            ? 'AUDIO_OUTPUT_FORMAT_NOT_ALLOWED'
-            : 'AUDIO_CODEC_UNSUPPORTED'
+        : 'AUDIO_CODEC_UNSUPPORTED'
     );
     expect(result.process).toBe(0);
     expect(result.entries.some((entry) => entry.event === 'AUDIO_PROCESSING_STARTED')).toBe(false);
@@ -274,24 +309,66 @@ test('V2-S3 injection rollback leaves a downloadable processed result and restor
   await page.evaluate(() => __syntheticAudio.controller.dispose());
 });
 
-test('V2-S3 related rejection retries once, keeps media isolation, and redacts names from snapshot/logs', async ({ page }) => {
+test('V2-S3 stricter rejection retries once, while same/looser/second rejection never reprocesses', async ({ page }) => {
   await open(page);
-  await installSynthetic(page, 'retry', { withImage: true });
+  await installSynthetic(page, 'retry-strict', { withImage: true, initialMaxBytes: 500_000 });
   await selectFile(page, 'audio/wav', 'private-audio-name.wav');
+  await waitFor(page, () => __syntheticAudio.controller.getSnapshot().activeTask?.status === 'NEEDS_CONFIRMATION');
+  const initialConfirmation = await page.evaluate(() => {
+    const task = __syntheticAudio.controller.getSnapshot().activeTask;
+    return task.plan.confirmations.find((item) => item.required && !item.resolved);
+  });
+  await page.evaluate((confirmation) => {
+    const task = __syntheticAudio.controller.getSnapshot().activeTask;
+    return __syntheticAudio.controller.confirmTask(task.taskId, {
+      id: confirmation.id,
+      type: confirmation.type,
+      accepted: true,
+      payload: confirmation.suggestedPayload
+    });
+  }, initialConfirmation);
   await waitFor(page, () => __syntheticAudio.controller.getSnapshot().activeTask?.status === 'SUCCESS');
   await page.evaluate(() => { __syntheticAudio.error.textContent = '格式不符合：仅支持 MP3，最大 250KB'; });
+  await waitFor(page, () => __syntheticAudio.controller.getSnapshot().activeTask?.status === 'NEEDS_CONFIRMATION');
+  const retryConfirmation = await page.evaluate(() => {
+    const task = __syntheticAudio.controller.getSnapshot().activeTask;
+    return {
+      maxBytes: task.rules.maxBytes,
+      confirmation: task.plan.confirmations.find((item) => item.required && !item.resolved),
+      process: __syntheticAudio.stats.process
+    };
+  });
+  expect(retryConfirmation.maxBytes).toBe(250_000);
+  expect(retryConfirmation.process).toBe(1);
+  await page.evaluate((confirmation) => {
+    const task = __syntheticAudio.controller.getSnapshot().activeTask;
+    return __syntheticAudio.controller.confirmTask(task.taskId, {
+      id: confirmation.id,
+      type: confirmation.type,
+      accepted: true,
+      payload: confirmation.suggestedPayload
+    });
+  }, retryConfirmation.confirmation);
   await waitFor(page, () => {
     const task = __syntheticAudio.controller.getSnapshot().activeTask;
     return task?.status === 'SUCCESS' && task.retryCount === 1 && __syntheticAudio.stats.process === 2;
   });
+  await page.evaluate(() => { __syntheticAudio.error.textContent = '格式不符合：仅支持 MP3，最大 250KB'; });
+  await waitFor(page, () => __syntheticAudio.controller.getSnapshot().activeTask?.status === 'STOPPED');
   const result = await page.evaluate(() => ({
     task: __syntheticAudio.controller.getSnapshot().activeTask,
     logs: __syntheticAudio.logger.getEntries(),
     snapshot: JSON.stringify(__syntheticAudio.controller.getSnapshot()),
+    diagnostics: __syntheticAudio.controller.getDiagnostics().diagnostics,
     imageProcess: __syntheticAudio.stats.imageProcess,
+    process: __syntheticAudio.stats.process,
+    retryEvents: __syntheticAudio.logger.getEntries().filter((entry) => entry.event === 'RETRY_TRIGGERED').length,
     clickCount: [...__syntheticAudio.controller.tasks.values()].find((task) => task.taskId === __syntheticAudio.controller.getSnapshot().activeTask.taskId)?.businessClickCount
   }));
   expect(result.task.retryCount).toBe(1);
+  expect(result.process).toBe(2);
+  expect(result.retryEvents).toBe(1);
+  expect(result.diagnostics.some((item) => item.code === 'PROCESSING_FAILED')).toBe(false);
   expect(result.imageProcess).toBe(0);
   expect(result.clickCount).toBe(0);
   expect(result.snapshot).not.toContain('private-audio-name.wav');
@@ -306,4 +383,120 @@ test('V2-S3 related rejection retries once, keeps media isolation, and redacts n
   await waitFor(page, () => __syntheticAudio.stats.imageProcess === 1);
   expect(await page.evaluate(() => __syntheticAudio.stats.process)).toBe(2);
   await page.evaluate(() => __syntheticAudio.controller.dispose());
+});
+
+test('V2-S3 retry gate rejects a broadened format set even when maxBytes tightens', async ({ page }) => {
+  await open(page);
+  const result = await page.evaluate(() => {
+    const api = globalThis.__uploadfit_debug_bundle__;
+    const base = {
+      mediaKind: 'audio',
+      formats: ['audio/mpeg', 'audio/wav'],
+      extensions: ['.mp3', '.wav'],
+      minBytes: null,
+      maxBytes: 500_000,
+      duration: { exactMs: null, minMs: null, maxMs: null },
+      semanticRequirements: [],
+      safetyFlags: [],
+      conflicts: [],
+      actionable: true
+    };
+    const strictMax = {
+      ...base,
+      formats: ['audio/mpeg'],
+      extensions: ['.mp3'],
+      maxBytes: 250_000
+    };
+    const maxWithBroaderFormats = {
+      ...base,
+      formats: ['audio/mpeg', 'audio/wav', 'audio/webm'],
+      extensions: ['.mp3', '.wav', '.webm'],
+      maxBytes: 250_000
+    };
+    const minOnly = { ...base, minBytes: 100 };
+    return {
+      strictMax: api.isStrictlyMoreSpecificAudioRejection(base, strictMax),
+      maxWithBroaderFormats: api.isStrictlyMoreSpecificAudioRejection(base, maxWithBroaderFormats),
+      minOnly: api.isStrictlyMoreSpecificAudioRejection(base, minOnly)
+    };
+  });
+  expect(result).toEqual({ strictMax: true, maxWithBroaderFormats: false, minOnly: false });
+});
+
+test('V2-S3 no-MP3, duration, and original/lossless semantics never add processing', async ({ page }) => {
+  await open(page);
+  for (const [label, rejectionText] of [
+    ['no-mp3', '格式不符合：仅支持 WAV，最大 250KB'],
+    ['duration', '格式不符合：仅支持 MP3，最大 250KB，时长不超过 1 秒'],
+    ['official', '格式不符合：仅支持 MP3，最大 250KB，必须使用官方工具'],
+    ['original', '格式不符合：仅支持 MP3，最大 250KB，必须保留原始录音'],
+    ['lossless', '格式不符合：仅支持 MP3，最大 250KB，必须无损音频']
+  ]) {
+    await installSynthetic(page, 'retry-same', { initialMaxBytes: 250_000 });
+    await selectFile(page, 'audio/wav', `private-${label}.wav`);
+    await waitFor(page, () => __syntheticAudio.controller.getSnapshot().activeTask?.status === 'NEEDS_CONFIRMATION');
+    const confirmation = await page.evaluate(() => {
+      const task = __syntheticAudio.controller.getSnapshot().activeTask;
+      return task.plan.confirmations.find((item) => item.required && !item.resolved);
+    });
+    await page.evaluate((pending) => {
+      const task = __syntheticAudio.controller.getSnapshot().activeTask;
+      return __syntheticAudio.controller.confirmTask(task.taskId, {
+        id: pending.id, type: pending.type, accepted: true, payload: pending.suggestedPayload
+      });
+    }, confirmation);
+    await waitFor(page, () => __syntheticAudio.controller.getSnapshot().activeTask?.status === 'SUCCESS');
+    await page.evaluate((text) => { __syntheticAudio.error.textContent = text; }, rejectionText);
+    await waitFor(page, () => __syntheticAudio.controller.getSnapshot().activeTask?.status === 'STOPPED');
+    const result = await page.evaluate(() => ({
+      code: __syntheticAudio.controller.getSnapshot().activeTask?.errorCode,
+      process: __syntheticAudio.stats.process,
+      retryCount: __syntheticAudio.controller.getSnapshot().activeTask?.retryCount,
+      retryEvents: __syntheticAudio.logger.getEntries().filter((entry) => entry.event === 'RETRY_TRIGGERED').length,
+      processingStarts: __syntheticAudio.logger.getEntries().filter((entry) => entry.event === 'AUDIO_PROCESSING_STARTED').length,
+      diagnostics: __syntheticAudio.controller.getDiagnostics().diagnostics
+    }));
+    expect(result.code).toBe('PROCESSING_FAILED');
+    expect(result.process).toBe(1);
+    expect(result.retryCount).toBe(0);
+    expect(result.retryEvents).toBe(0);
+    expect(result.processingStarts).toBe(1);
+    await page.evaluate(() => __syntheticAudio.controller.dispose());
+  }
+});
+
+test('V2-S3 same and looser rejection rules stop without process or retry', async ({ page }) => {
+  await open(page);
+  for (const [mode, initialMax, rejectionText] of [
+    ['retry-same', 250_000, '格式不符合：仅支持 MP3，最大 250KB'],
+    ['retry-looser', 250_000, '格式不符合：仅支持 MP3，最大 500KB']
+  ]) {
+    await installSynthetic(page, mode, { initialMaxBytes: initialMax });
+    await selectFile(page, 'audio/wav', `private-${mode}.wav`);
+    await waitFor(page, () => __syntheticAudio.controller.getSnapshot().activeTask?.status === 'NEEDS_CONFIRMATION');
+    const confirmation = await page.evaluate(() => {
+      const task = __syntheticAudio.controller.getSnapshot().activeTask;
+      return task.plan.confirmations.find((item) => item.required && !item.resolved);
+    });
+    await page.evaluate((pending) => {
+      const task = __syntheticAudio.controller.getSnapshot().activeTask;
+      return __syntheticAudio.controller.confirmTask(task.taskId, {
+        id: pending.id, type: pending.type, accepted: true, payload: pending.suggestedPayload
+      });
+    }, confirmation);
+    await waitFor(page, () => __syntheticAudio.controller.getSnapshot().activeTask?.status === 'SUCCESS');
+    await page.evaluate((text) => { __syntheticAudio.error.textContent = text; }, rejectionText);
+    await waitFor(page, () => __syntheticAudio.controller.getSnapshot().activeTask?.status === 'STOPPED');
+    const result = await page.evaluate(() => ({
+      code: __syntheticAudio.controller.getSnapshot().activeTask?.errorCode,
+      process: __syntheticAudio.stats.process,
+      retryCount: __syntheticAudio.controller.getSnapshot().activeTask?.retryCount,
+      diagnostics: __syntheticAudio.controller.getDiagnostics().diagnostics
+    }));
+    expect(result.code).toBe('PROCESSING_FAILED');
+    expect(result.process).toBe(1);
+    expect(result.retryCount).toBe(0);
+    expect(result.diagnostics.some((item) => item.code === 'REJECTION_RULE_NOT_STRICTER')).toBe(true);
+    await page.evaluate(() => __syntheticAudio.controller.dispose());
+  }
 });

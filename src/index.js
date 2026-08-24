@@ -78,7 +78,11 @@ import {
 import { inspectImage, validateFile } from './image/metadata.js';
 import { createProcessingPlan, resolveProcessingConfirmation } from './image/planner.js';
 import { processImage } from './image/canvas-pipeline.js';
-import { createTaskController, TaskController } from './core/task-controller.js';
+import {
+  createTaskController,
+  TaskController,
+  isStrictlyMoreSpecificAudioRejection
+} from './core/task-controller.js';
 import { createSession } from './core/session.js';
 import { createCleanupRegistry, cleanupSession as cleanupResources } from './core/cleanup.js';
 import {
@@ -187,6 +191,7 @@ export {
   createProcessingPlan,
   createTaskController,
   TaskController,
+  isStrictlyMoreSpecificAudioRejection,
   createSession,
   createCleanupRegistry,
   cleanupResources,
