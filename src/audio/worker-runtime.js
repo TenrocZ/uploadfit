@@ -13,6 +13,13 @@ import { AUDIO_ENCODER_DESCRIPTOR, isFrozenAudioEncoderDescriptor } from './enco
 
 const STABLE_WORKER_CODES = new Set(AUDIO_ERROR_CODES);
 
+// Production esbuild replaces this compile-time value with the S0-frozen
+// lamejs/PCM adapter source.  Unit tests and harnesses intentionally leave it
+// undefined and can continue supplying an explicit workerSource/source.
+const BUILT_IN_IMPLEMENTATION_SOURCE = typeof __UPLOADFIT_AUDIO_IMPLEMENTATION_SOURCE__ !== 'undefined'
+  ? __UPLOADFIT_AUDIO_IMPLEMENTATION_SOURCE__
+  : '';
+
 function stableWorkerCode(code, fallback = 'AUDIO_ENCODE_FAILED') {
   return STABLE_WORKER_CODES.has(code) ? code : fallback;
 }
@@ -170,7 +177,7 @@ export function createAudioWorkerRuntime(options = {}) {
     });
   }
   const workerSource = options.workerSource
-    ?? createAudioWorkerSource(options.implementationSource ?? '');
+    ?? createAudioWorkerSource(options.implementationSource ?? BUILT_IN_IMPLEMENTATION_SOURCE);
   let active = null;
   let disposed = false;
 

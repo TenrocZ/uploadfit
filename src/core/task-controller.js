@@ -37,6 +37,9 @@ import { createRandomId } from '../utils/ids.js';
 import { createLogger } from '../utils/logger.js';
 import { sanitizeEvidenceText } from '../utils/text.js';
 import { createAdapterRegistry } from '../adapters/registry.js';
+import { classifyMediaKind } from '../dom/input-discovery.js';
+import { AUDIO_ERROR_CODES } from '../audio/errors.js';
+import { createMediaHandlerRegistry, createImageHandler } from './media-handlers.js';
 import { createCleanupRegistry } from './cleanup.js';
 import { createStateMachine } from './state-machine.js';
 
@@ -50,7 +53,8 @@ const ACTIVE_TASK_STATES = new Set([
   'PROCESSING',
   'INJECTING',
   'RETRYING',
-  'SUCCESS'
+  'SUCCESS',
+  'PASSTHROUGH'
 ]);
 const EVENT_CONSTRUCTOR_FALLBACK = globalThis.Event;
 
@@ -172,16 +176,27 @@ function safeValidation(validation) {
 function safePlan(plan) {
   if (!plan || typeof plan !== 'object') return null;
   return {
+    mediaKind: plan.mediaKind ?? null,
+    sourceContainer: plan.sourceContainer ?? null,
+    sourceCodec: plan.sourceCodec ?? null,
     targetMime: plan.targetMime ?? null,
+    targetContainer: plan.targetContainer ?? null,
+    targetCodec: plan.targetCodec ?? null,
     targetWidth: plan.targetWidth ?? null,
     targetHeight: plan.targetHeight ?? null,
+    targetMaxBytes: plan.targetMaxBytes ?? null,
+    safeTargetBytes: plan.safeTargetBytes ?? null,
+    targetBitrateKbps: plan.targetBitrateKbps ?? null,
+    targetSampleRate: plan.targetSampleRate ?? null,
+    targetChannels: plan.targetChannels ?? null,
+    estimatedOutputBytes: cloneValue(plan.estimatedOutputBytes),
+    encodePassLimit: plan.encodePassLimit ?? null,
     crop: cloneValue(plan.crop),
     proposedCrop: cloneValue(plan.proposedCrop),
     flattenBackground: cloneValue(plan.flattenBackground),
     proposedFlattenBackground: cloneValue(plan.proposedFlattenBackground),
     qualityRange: cloneValue(plan.qualityRange),
     targetMinBytes: plan.targetMinBytes ?? null,
-    targetMaxBytes: plan.targetMaxBytes ?? null,
     operations: [...(plan.operations ?? [])],
     confirmations: (plan.confirmations ?? []).map((item) => ({
       id: item.id,
@@ -207,6 +222,10 @@ function safeResult(result) {
     operations: [...(result.operations ?? [])],
     validation: safeValidation(result.validation),
     durationMs: Number.isFinite(result.durationMs) ? result.durationMs : null,
+    inputBytesRead: Number.isFinite(result.inputBytesRead) ? result.inputBytesRead : null,
+    outputBytes: Number.isFinite(result.outputBytes) ? result.outputBytes : null,
+    encodePasses: Number.isFinite(result.encodePasses) ? result.encodePasses : null,
+    peakBufferedBytes: Number.isFinite(result.peakBufferedBytes) ? result.peakBufferedBytes : null,
     warnings: (result.warnings ?? []).map((item) => ({ code: item.code })),
     passthrough: Boolean(result.passthrough),
     workerUsed: Boolean(result.workerUsed)
@@ -295,7 +314,22 @@ function safeConfirmation(confirmation) {
 }
 
 function stableErrorCode(error, fallback = 'PROCESSING_FAILED') {
+  if (AUDIO_ERROR_CODES.includes(error?.code)) return error.code;
   return asImageProcessingError(error, fallback).code;
+}
+
+function planStopCode(task, plan) {
+  const stops = Array.isArray(plan?.unfixable) ? plan.unfixable : [];
+  // A duration-only page is a distinct safety stop.  Do not let generic
+  // missing-format/size diagnostics mask the fact that S3 never trims or
+  // splits audio.
+  if (task?.mediaKind === 'audio'
+    && stops.includes('AUDIO_DURATION_LIMIT_UNFIXABLE')
+    && !Number.isFinite(task.rules?.maxBytes)) {
+    return 'AUDIO_DURATION_LIMIT_UNFIXABLE';
+  }
+  if (stops.includes('RULE_CONFLICT')) return 'RULE_CONFLICT';
+  return stops[0] ?? null;
 }
 
 function isTaskCurrent(task, record) {
@@ -362,6 +396,23 @@ export class TaskController {
       ?? options.resolveProcessingConfirmation
       ?? resolveProcessingConfirmation;
     this.processImage = options.processImageFn ?? options.processImage ?? processImage;
+    // Keep the existing image functions injectable for V1 tests/adapters while
+    // routing every task through the shared media handler registry.
+    this.mediaHandlers = options.mediaHandlerRegistry
+      ?? options.mediaHandlers
+      ?? createMediaHandlerRegistry({
+        imageHandler: options.imageHandler ?? createImageHandler({
+          inspect: this.inspectImage,
+          validate: this.validateFile,
+          plan: this.createProcessingPlan,
+          resolveConfirmation: this.resolveProcessingConfirmation,
+          process: this.processImage,
+          validateOutput: options.validateImageOutput
+            ?? ((metadata, rules) => this.validateFile(metadata, rules))
+        }),
+        audioHandler: options.audioHandler,
+        audio: options.audio
+      });
     this.injectFile = options.injectFileFn ?? options.injectFile ?? injectFile;
     this.restoreOriginal = options.restoreOriginalFn ?? options.restoreOriginal ?? restoreOriginal;
     this.observeRejection = options.observeRejectionFn
@@ -388,11 +439,45 @@ export class TaskController {
     this.listeners = new Set();
     this.diagnostics = [];
     this.processingTask = null;
+    this.taskSequence = 0;
     this.started = false;
     this.disposed = false;
     this.clickListener = null;
     this.changeCaptureListener = null;
     this.handledEvents = new WeakSet();
+  }
+
+  _mediaKindForContext(context, file = null) {
+    if (context?.mediaKind === 'audio' || context?.mediaKind === 'image') {
+      return context.mediaKind;
+    }
+    const classified = classifyMediaKind(context?.input, file?.type ?? null);
+    return classified === 'audio' ? 'audio' : 'image';
+  }
+
+  _handlerForTask(task) {
+    return this.mediaHandlers?.get?.(task?.mediaKind ?? 'image')
+      ?? this.mediaHandlers?.resolve?.(task?.mediaKind ?? 'image', task?.originalFile, {
+        mediaKind: task?.mediaKind,
+        multiple: false
+      });
+  }
+
+  _handlerForRecord(record, file = null) {
+    const mediaKind = this._mediaKindForContext(record?.context, file);
+    return this.mediaHandlers?.resolve?.(mediaKind, file, {
+      ...(record?.context ?? {}),
+      mediaKind
+    }) ?? this.mediaHandlers?.get?.(mediaKind);
+  }
+
+  _audioLog(task, event, fields = {}) {
+    if (task?.mediaKind !== 'audio') return;
+    this.logger.emit(`AUDIO_${event}`, {
+      taskId: task.taskId,
+      mediaKind: 'audio',
+      ...fields
+    });
   }
 
   start() {
@@ -482,8 +567,10 @@ export class TaskController {
     const url = uploaderContext.pageUrl ?? this.globalRef?.location?.href ?? '';
     const adapter = uploaderContext.adapter
       ?? this.adapterRegistry.resolve(url);
+    const mediaKind = this._mediaKindForContext(uploaderContext);
     const context = {
       ...uploaderContext,
+      mediaKind,
       adapter,
       nearbyTexts: [...(uploaderContext.nearbyTexts ?? [])],
       alertTexts: [...(uploaderContext.alertTexts ?? [])]
@@ -537,6 +624,7 @@ export class TaskController {
 
   _releaseTaskResources(task) {
     if (!task) return;
+    const shouldLogAudioCleanup = task.mediaKind === 'audio';
     task.abortController?.abort?.();
     this._stopRejectionObserver(task);
     const urlApi = task.inputElement?.ownerDocument?.defaultView?.URL
@@ -548,10 +636,18 @@ export class TaskController {
     task.result = null;
     task.metadata = null;
     task.validation = null;
+    task.outputValidation = null;
     task.plan = null;
+    task.handler = null;
     task.contextBundle = null;
     task.ruleCandidates = [];
     task.event = null;
+    if (shouldLogAudioCleanup) {
+      this.logger.emit('AUDIO_RESOURCES_CLEANED', {
+        taskId: task.taskId,
+        mediaKind: 'audio'
+      });
+    }
   }
 
   _forgetTask(task) {
@@ -650,6 +746,7 @@ export class TaskController {
       taskId: createRandomId('task'),
       inputElement: record.input,
       uploaderId: record.context.uploaderId,
+      mediaKind: this._mediaKindForContext(record.context, file),
       label: record.context.label ?? '',
       originalFile: file,
       processedFile: null,
@@ -660,6 +757,7 @@ export class TaskController {
       status: 'ARMED',
       retryCount: 0,
       createdAt: Date.now(),
+      sequence: ++this.taskSequence,
       objectUrls: [],
       warnings: [],
       result: null,
@@ -676,8 +774,11 @@ export class TaskController {
       rejectionStopper: null,
       cancelled: false,
       retryDispatched: false,
-      eventReleased: false
+      eventReleased: false,
+      progress: null,
+      handler: null
     };
+    task.handler = this._handlerForRecord(record, file);
     return task;
   }
 
@@ -691,12 +792,6 @@ export class TaskController {
     if (consumeInjectionGuard(input, event)) {
       return { ignored: 'INJECTION_GUARD' };
     }
-    if (record.context.mediaKind === 'audio' || uploaderContext?.mediaKind === 'audio') {
-      // S1 deliberately stops before the image pipeline.  S2/S3 will route
-      // this context through the independent audio handler and confirmation UI.
-      this._notify({ code: 'AUDIO_PIPELINE_NOT_READY', mediaKind: 'audio', uploaderId: record.context.uploaderId });
-      return { ignored: 'AUDIO_PIPELINE_NOT_READY' };
-    }
     if (!input?.files?.length) return { ignored: 'EMPTY_FILE_LIST' };
     if (input.multiple && input.files.length > 1) {
       this._notify({ code: 'MULTIPLE_FILES_UNSUPPORTED', uploaderId: record.context.uploaderId });
@@ -706,6 +801,10 @@ export class TaskController {
     const file = input.files[0];
     if (!isFileForInput(input, file)) {
       return { ignored: 'FILE_UNAVAILABLE' };
+    }
+    const handler = this._handlerForRecord(record, file);
+    if (!handler?.supports?.(file, { ...record.context, mediaKind: this._mediaKindForContext(record.context, file) })) {
+      return { ignored: 'MEDIA_KIND_UNSUPPORTED' };
     }
 
     if (record.currentTask) {
@@ -793,7 +892,16 @@ export class TaskController {
     }
 
     try {
-      const metadata = await this.inspectImage(task.originalFile, {
+      const handler = task.handler ?? this._handlerForTask(task);
+      if (!handler?.inspect || !handler?.validate || !handler?.plan) {
+        this._stopTask(task, 'MEDIA_KIND_UNSUPPORTED');
+        return;
+      }
+      this._audioLog(task, 'INSPECTION_STARTED', {
+        mime: task.originalFile?.type,
+        bytes: task.originalFile?.size
+      });
+      const metadata = await handler.inspect(task.originalFile, {
         signal: task.abortController.signal
       });
       if (task.abortController.signal.aborted || record.currentTask !== task) return;
@@ -802,7 +910,21 @@ export class TaskController {
         return;
       }
       task.metadata = metadata;
-      const validation = this.validateFile(metadata, task.rules);
+      this._audioLog(task, 'INSPECTION_COMPLETED', {
+        mime: metadata?.mime ?? metadata?.signatureMime,
+        container: metadata?.container,
+        codec: metadata?.codec,
+        bytes: metadata?.size,
+        durationMs: metadata?.durationMs,
+        bitrateKbps: Number.isFinite(metadata?.averageBitrate)
+          ? Math.round(metadata.averageBitrate / 1000)
+          : undefined,
+        sampleRate: metadata?.sampleRate,
+        channels: metadata?.channels
+      });
+      const validation = await handler.validate(metadata, task.rules, {
+        signal: task.abortController.signal
+      });
       task.validation = validation;
       this._logValidation(task, metadata, validation);
 
@@ -819,7 +941,9 @@ export class TaskController {
         return;
       }
 
-      const plan = this.createProcessingPlan(metadata, task.rules);
+      const plan = await handler.plan(metadata, task.rules, {
+        signal: task.abortController.signal
+      });
       task.policyConfirmation = null;
       if (task.rules.confidence >= CONFIRM_RULE_CONFIDENCE
         && task.rules.confidence < AUTO_RULE_CONFIDENCE) {
@@ -827,10 +951,22 @@ export class TaskController {
       }
       task.plan = plan;
 
-      if (plan.unfixable?.length) {
-        this._stopTask(task, plan.unfixable[0] === 'RULE_CONFLICT'
-          ? 'RULE_CONFLICT'
-          : plan.unfixable[0]);
+      this._audioLog(task, 'PLAN_CREATED', {
+        sourceContainer: plan?.sourceContainer,
+        sourceCodec: plan?.sourceCodec,
+        targetContainer: plan?.targetContainer,
+        targetCodec: plan?.targetCodec,
+        targetMaxBytes: plan?.targetMaxBytes,
+        safeTargetBytes: plan?.safeTargetBytes,
+        targetBitrateKbps: plan?.targetBitrateKbps,
+        targetSampleRate: plan?.targetSampleRate,
+        targetChannels: plan?.targetChannels,
+        encodePasses: plan?.encodePassLimit
+      });
+
+      const planErrorCode = planStopCode(task, plan);
+      if (planErrorCode) {
+        this._stopTask(task, planErrorCode);
         return;
       }
       if (task.policyConfirmation || hasRequiredConfirmation(plan)) {
@@ -971,6 +1107,13 @@ export class TaskController {
     this._transitionTask(task, 'NEEDS_CONFIRMATION');
     this._transitionSession('NEEDS_CONFIRMATION', { taskId: task.taskId });
     this.logger.emit('CONFIRMATION_REQUIRED', { taskId: task.taskId });
+    this._audioLog(task, 'CONFIRMATION_REQUIRED', {
+      targetContainer: task.plan?.targetContainer,
+      targetCodec: task.plan?.targetCodec,
+      targetMaxBytes: task.plan?.targetMaxBytes,
+      targetBitrateKbps: task.plan?.targetBitrateKbps,
+      targetChannels: task.plan?.targetChannels
+    });
     this._publish();
   }
 
@@ -1042,18 +1185,49 @@ export class TaskController {
     if (!this._transitionTask(task, 'PROCESSING')) return;
     this._transitionSession('PROCESSING');
     this.logger.emit('PROCESS_STARTED', { taskId: task.taskId });
+    this._audioLog(task, 'PROCESSING_STARTED', {
+      sourceContainer: task.plan?.sourceContainer,
+      sourceCodec: task.plan?.sourceCodec,
+      targetContainer: task.plan?.targetContainer,
+      targetCodec: task.plan?.targetCodec,
+      targetBitrateKbps: task.plan?.targetBitrateKbps,
+      targetChannels: task.plan?.targetChannels
+    });
     try {
-      const result = await this.processImage(
+      const handler = task.handler ?? this._handlerForTask(task);
+      if (!handler?.process) {
+        throw Object.assign(new Error('Media handler is unavailable.'), {
+          code: 'MEDIA_KIND_UNSUPPORTED'
+        });
+      }
+      const result = await handler.process(
         task.originalFile,
         task.plan,
-        (progress) => {
-          if (!isTaskCurrent(task, record)) return;
-          task.progress = {
-            stage: typeof progress?.stage === 'string' ? progress.stage : 'processing'
-          };
-          this._publish();
-        },
-        { signal: task.abortController.signal, taskId: task.taskId }
+        {
+          signal: task.abortController.signal,
+          taskId: task.taskId,
+          onProgress: (progress) => {
+            if (!isTaskCurrent(task, record)) return;
+            const ratio = Number.isFinite(progress?.ratio)
+              ? Math.max(0, Math.min(1, progress.ratio))
+              : null;
+            task.progress = {
+              phase: typeof progress?.phase === 'string'
+                ? progress.phase
+                : typeof progress?.stage === 'string' ? progress.stage : 'processing',
+              ratio,
+              processedMs: Number.isFinite(progress?.processedMs) ? progress.processedMs : null,
+              totalMs: Number.isFinite(progress?.totalMs) ? progress.totalMs : null
+            };
+            this._audioLog(task, 'PROCESSING_PROGRESS', {
+              phase: task.progress.phase,
+              ratio: task.progress.ratio,
+              processedMs: task.progress.processedMs,
+              totalMs: task.progress.totalMs
+            });
+            this._publish();
+          }
+        }
       );
       if (task.abortController.signal.aborted || record.currentTask !== task) return;
       if (!this._inputConnected(task)) {
@@ -1061,11 +1235,42 @@ export class TaskController {
         return;
       }
       const validFile = isFileForInput(task.inputElement, result?.file);
-      if (!validFile || result?.validation?.valid !== true) {
-        throw Object.assign(new Error('Processed output failed final validation.'), {
-          code: 'OUTPUT_VALIDATION_FAILED'
+      let outputValidation = result?.validation;
+      if (handler.kind === 'audio' && typeof handler.validateOutput === 'function') {
+        outputValidation = await handler.validateOutput(
+          result?.metadata,
+          task.rules,
+          task.plan,
+          task.metadata,
+          {
+            signal: task.abortController.signal,
+            // The audio pipeline has already performed bounded representative
+            // frame validation.  The controller's second check validates the
+            // safe metadata contract without rescanning the full output.
+            allowUninspectedFrames: true,
+            allowSingleFrame: true
+          }
+        );
+        task.outputValidation = outputValidation;
+        this._audioLog(task, 'OUTPUT_VALIDATED', {
+          mime: result?.metadata?.mime,
+          container: result?.metadata?.container,
+          codec: result?.metadata?.codec,
+          bytes: result?.metadata?.size,
+          durationMs: result?.metadata?.durationMs,
+          bitrateKbps: Number.isFinite(result?.metadata?.averageBitrate)
+            ? Math.round(result.metadata.averageBitrate / 1000)
+            : undefined,
+          sampleRate: result?.metadata?.sampleRate,
+          channels: result?.metadata?.channels
         });
       }
+      if (!validFile || outputValidation?.valid !== true) {
+        throw Object.assign(new Error('Processed output failed final validation.'), {
+          code: handler.kind === 'audio' ? 'AUDIO_OUTPUT_VALIDATION_FAILED' : 'OUTPUT_VALIDATION_FAILED'
+        });
+      }
+      result.validation = outputValidation;
       task.result = result;
       task.processedFile = result.file;
       this.logger.emit('PROCESS_COMPLETED', {
@@ -1075,6 +1280,20 @@ export class TaskController {
         width: result.metadata?.width,
         height: result.metadata?.height,
         durationMs: result.durationMs
+      });
+      this._audioLog(task, 'PROCESSING_COMPLETED', {
+        mime: result.metadata?.mime,
+        container: result.metadata?.container,
+        codec: result.metadata?.codec,
+        bytes: result.metadata?.size,
+        durationMs: result.metadata?.durationMs,
+        bitrateKbps: Number.isFinite(result.metadata?.averageBitrate)
+          ? Math.round(result.metadata.averageBitrate / 1000)
+          : undefined,
+        inputBytesRead: result.inputBytesRead,
+        outputBytes: result.outputBytes,
+        encodePasses: result.encodePasses,
+        workerUsed: result.workerUsed
       });
       if (task.source === 'manual-card') {
         // 真实公开说明页没有原上传框：处理成功后只提供结果与下载，不伪装回填。
@@ -1106,6 +1325,9 @@ export class TaskController {
       });
       task.injection = injection;
       if (!injection?.ok || !injection.inputFilesVerified) {
+        this._audioLog(task, 'INJECTION_FAILED', {
+          errorCode: injection?.errorCode ?? 'INJECTION_FAILED'
+        });
         throw Object.assign(new Error('File injection failed.'), {
           code: injection?.errorCode ?? 'INJECTION_FAILED'
         });
@@ -1116,6 +1338,12 @@ export class TaskController {
         bytes: result.metadata?.size,
         width: result.metadata?.width,
         height: result.metadata?.height
+      });
+      this._audioLog(task, 'INJECTION_SUCCEEDED', {
+        mime: result.metadata?.mime,
+        bytes: result.metadata?.size,
+        outputBytes: result.outputBytes,
+        workerUsed: result.workerUsed
       });
       record.adapter?.afterInjection?.(task);
       this._transitionTask(task, 'SUCCESS');
@@ -1307,7 +1535,12 @@ export class TaskController {
     this._transitionSession('INSPECTING');
 
     try {
-      const metadata = await this.inspectImage(task.originalFile, {
+      const handler = task.handler ?? this._handlerForTask(task);
+      if (!handler?.inspect || !handler?.validate || !handler?.plan) {
+        this._stopTask(task, 'MEDIA_KIND_UNSUPPORTED');
+        return;
+      }
+      const metadata = await handler.inspect(task.originalFile, {
         signal: task.abortController.signal
       });
       if (task.abortController.signal.aborted || record.currentTask !== task) return;
@@ -1316,9 +1549,13 @@ export class TaskController {
         return;
       }
       task.metadata = metadata;
-      task.validation = this.validateFile(metadata, task.rules);
+      task.validation = await handler.validate(metadata, task.rules, {
+        signal: task.abortController.signal
+      });
       this._logValidation(task, metadata, task.validation);
-      const plan = this.createProcessingPlan(metadata, task.rules);
+      const plan = await handler.plan(metadata, task.rules, {
+        signal: task.abortController.signal
+      });
       task.policyConfirmation = null;
       if (task.rules.confidence >= CONFIRM_RULE_CONFIDENCE
         && task.rules.confidence < AUTO_RULE_CONFIDENCE) {
@@ -1329,10 +1566,9 @@ export class TaskController {
         this._stopTask(task, 'PROCESSING_FAILED');
         return;
       }
-      if (plan.unfixable?.length) {
-        this._stopTask(task, plan.unfixable[0] === 'RULE_CONFLICT'
-          ? 'RULE_CONFLICT'
-          : plan.unfixable[0]);
+      const planErrorCode = planStopCode(task, plan);
+      if (planErrorCode) {
+        this._stopTask(task, planErrorCode);
         return;
       }
       if (task.policyConfirmation || hasRequiredConfirmation(plan)) {
@@ -1388,8 +1624,21 @@ export class TaskController {
             payload: this._normalizeCropConfirmation(task, confirmationPayload.payload)
           }
           : confirmationPayload;
-        task.plan = this.resolveProcessingConfirmation(task.plan, plannerConfirmation);
+        const handler = task.handler ?? this._handlerForTask(task);
+        task.plan = handler?.resolveConfirmation
+          ? handler.resolveConfirmation(task.plan, plannerConfirmation)
+          : this.resolveProcessingConfirmation(task.plan, plannerConfirmation);
       }
+      this._audioLog(
+        task,
+        accepted ? 'CONFIRMATION_ACCEPTED' : 'CONFIRMATION_DECLINED',
+        {
+          targetContainer: task.plan?.targetContainer,
+          targetCodec: task.plan?.targetCodec,
+          targetBitrateKbps: task.plan?.targetBitrateKbps,
+          targetChannels: task.plan?.targetChannels
+        }
+      );
       if (!accepted) {
         if (task.eventBlocked) {
           const rollback = this.injectFile(task.inputElement, task.originalFile, {
@@ -1643,6 +1892,7 @@ export class TaskController {
       context: {
         input: null,
         uploaderId: 'manual-card',
+        mediaKind: this._mediaKindForContext({}, file),
         label: options.label ?? '本页照片要求',
         nearbyTexts: [],
         alertTexts: [],
@@ -1708,6 +1958,8 @@ export class TaskController {
 
   _stopTask(task, errorCode = 'PROCESSING_FAILED', error = null) {
     if (!task || task.status === 'DISPOSED' || task.status === 'STOPPED') return false;
+    const wasAudio = task.mediaKind === 'audio';
+    const wasProcessing = ['PROCESSING', 'INJECTING', 'RETRYING'].includes(task.status);
     task.errorCode = errorCode;
     if (error?.message && task.warnings.length < 4) {
       task.warnings.push({ code: errorCode });
@@ -1725,6 +1977,10 @@ export class TaskController {
         errorCode
       });
       this._transitionSession('STOPPED', { taskId: task.taskId });
+      if (wasAudio && (wasProcessing
+        || ['AUDIO_PROCESSING_CANCELLED', 'USER_CANCELLED', 'INPUT_DETACHED'].includes(errorCode))) {
+        this._audioLog(task, 'PROCESSING_CANCELLED', { errorCode });
+      }
       this._pruneTasks();
       this._publish();
     }
@@ -1798,7 +2054,7 @@ export class TaskController {
 
   getSnapshot() {
     const tasks = [...this.tasks.values()]
-      .sort((left, right) => right.createdAt - left.createdAt);
+      .sort((left, right) => right.sequence - left.sequence || right.createdAt - left.createdAt);
     const task = tasks.find((candidate) => ACTIVE_TASK_STATES.has(candidate.status))
       ?? tasks[0]
       ?? null;
@@ -1811,6 +2067,7 @@ export class TaskController {
           status: task.status,
           label: task.label,
           source: task.source,
+          mediaKind: task.mediaKind ?? 'image',
           current: safeMetadata(task.metadata),
           rules: safeRuleSet(task.rules),
           policyConfirmation: safeConfirmation(task.policyConfirmation),
@@ -1818,6 +2075,14 @@ export class TaskController {
           result: safeResult(task.result),
           errorCode: task.errorCode ?? null,
           retryCount: task.retryCount,
+          progress: task.progress ? {
+            phase: task.progress.phase ?? 'processing',
+            ratio: Number.isFinite(task.progress.ratio)
+              ? Math.max(0, Math.min(1, task.progress.ratio))
+              : null,
+            processedMs: Number.isFinite(task.progress.processedMs) ? task.progress.processedMs : null,
+            totalMs: Number.isFinite(task.progress.totalMs) ? task.progress.totalMs : null
+          } : null,
           warnings: task.warnings.map((item) => ({ code: item.code }))
         }
         : null,
@@ -1868,6 +2133,7 @@ export class TaskController {
     this.uploaders.clear();
     this.queue.length = 0;
     this.processingTask = null;
+    try { this.mediaHandlers?.dispose?.(); } catch {}
     this.sessionMachine.transition('DISPOSED', { reason: 'SESSION_DISPOSED' });
     this.logger.emit('SESSION_DISPOSED');
     this.listeners.clear();

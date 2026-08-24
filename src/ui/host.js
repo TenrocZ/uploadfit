@@ -19,9 +19,16 @@ function viewKey(snapshot) {
       task.errorCode ?? null,
       task.retryCount ?? 0,
       task.source ?? null,
+      task.mediaKind ?? 'image',
       task.current ? [task.current.mime, task.current.size, task.current.width, task.current.height] : null,
-      task.plan ? [task.plan.targetWidth, task.plan.targetHeight, task.plan.proposedCrop] : null,
-      result ? [result.metadata?.mime ?? null, result.metadata?.size ?? null] : null,
+      task.current?.mediaKind === 'audio'
+        ? [task.current.durationMs, task.current.channels, task.current.bitrateKbps]
+        : null,
+      task.plan ? [task.plan.targetWidth, task.plan.targetHeight, task.plan.proposedCrop,
+        task.plan.targetBitrateKbps, task.plan.targetChannels] : null,
+      task.progress ? [task.progress.phase, task.progress.ratio, task.progress.processedMs] : null,
+      result ? [result.metadata?.mime ?? null, result.metadata?.size ?? null,
+        result.metadata?.durationMs ?? null, result.metadata?.channels ?? null] : null,
       (task.warnings ?? []).map((item) => item.code),
       pending ? [pending.id, pending.type] : null
     ] : null,
@@ -192,6 +199,7 @@ export function createUploadFitUi({
       uploaderCount: snapshot?.uploaderCount ?? 0,
       expanded: state.expanded,
       task,
+      mediaKind: task?.mediaKind ?? task?.current?.mediaKind ?? 'image',
       pageCard: snapshot?.pageCard ?? null,
       hasOutput: Boolean(task && controller.getTaskOutput?.(task.taskId)),
       downloadUrl: null,

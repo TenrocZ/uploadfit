@@ -24,7 +24,18 @@ function unsupportedHandler(kind) {
   });
 }
 
-function createImageAdapter(imageOptions = {}) {
+/**
+ * Wrap the already accepted image pipeline behind the shared media handler
+ * contract.  Keeping this adapter tiny lets TaskController route both media
+ * kinds without moving image policy into the controller.
+ */
+export function createImageHandler(imageOptions = {}) {
+  const inspect = imageOptions.inspect ?? inspectImage;
+  const validate = imageOptions.validate ?? validateFile;
+  const plan = imageOptions.plan ?? createProcessingPlan;
+  const resolveConfirmation = imageOptions.resolveConfirmation ?? resolveProcessingConfirmation;
+  const process = imageOptions.process ?? processImage;
+  const validateOutput = imageOptions.validateOutput ?? validate;
   return Object.freeze({
     kind: 'image',
     supports(file, context) {
@@ -33,12 +44,21 @@ function createImageAdapter(imageOptions = {}) {
       const type = typeof file?.type === 'string' ? file.type.toLowerCase() : '';
       return type.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp|avif)$/i.test(file?.name ?? '');
     },
-    inspect: (file, options) => inspectImage(file, options),
-    validate: (metadata, rules, options) => validateFile(metadata, rules, options),
-    plan: (metadata, rules, options) => createProcessingPlan(metadata, rules, options),
-    resolveConfirmation: (plan, confirmation) => resolveProcessingConfirmation(plan, confirmation),
-    process: (file, plan, options) => processImage(file, plan, options?.onProgress, options),
-    validateOutput: (metadata, rules) => validateFile(metadata, rules),
+    inspect: (file, options) => inspect(file, options),
+    validate: (metadata, rules, options) => validate(metadata, rules, options),
+    plan: (metadata, rules, options) => plan(metadata, rules, options),
+    resolveConfirmation: (currentPlan, confirmation) => resolveConfirmation(currentPlan, confirmation),
+    process: (file, currentPlan, options = {}) => process(
+      file,
+      currentPlan,
+      options?.onProgress,
+      options
+    ),
+    validateOutput: (metadata, rules, currentPlan, sourceMetadata, options) => validateOutput(
+      metadata,
+      rules,
+      options
+    ),
     dispose: () => {}
   });
 }
@@ -50,7 +70,7 @@ function createImageAdapter(imageOptions = {}) {
  */
 export function createMediaHandlerRegistry(options = {}) {
   const handlers = new Map();
-  const image = options.imageHandler ?? createImageAdapter(options.image);
+  const image = options.imageHandler ?? createImageHandler(options.image);
   const audio = options.audioHandler ?? createAudioHandler(options.audio);
   if (image?.kind === 'image') handlers.set('image', image);
   if (audio?.kind === 'audio') handlers.set('audio', audio);
@@ -80,4 +100,3 @@ export function createMediaHandlerRegistry(options = {}) {
 }
 
 export const createMediaHandlers = createMediaHandlerRegistry;
-

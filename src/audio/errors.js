@@ -23,7 +23,7 @@ export const AUDIO_ERROR_CODES = Object.freeze([
 ]);
 
 export const AUDIO_ERROR_MESSAGES = Object.freeze({
-  AUDIO_CODEC_UNSUPPORTED: '当前音频编码不在支持范围内，请使用 MP3、AAC 或 PCM WAV。',
+  AUDIO_CODEC_UNSUPPORTED: '当前音频编码不在本版本支持范围内；请使用合规 MP3，或选择 PCM WAV 让 UploadFit 转为 MP3。',
   AUDIO_METADATA_INVALID: '无法安全读取音频元数据，请检查源文件。',
   AUDIO_DECODE_FAILED: '音频文件损坏或无法解码，原文件未被修改。',
   AUDIO_ENCODE_FAILED: '音频处理失败，原文件未被修改。',

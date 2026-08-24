@@ -1,4 +1,5 @@
 import { createCropper } from './cropper.js';
+import { audioErrorMessage } from '../audio/errors.js';
 
 const ERROR_TEXTS = {
   USER_CANCELLED: '已取消，原文件保持不变。',
@@ -22,6 +23,22 @@ const ERROR_TEXTS = {
   PIXEL_LIMIT_EXCEEDED: '图片像素总数超出处理上限，因此没有修改文件。',
   CANVAS_LIMIT_EXCEEDED: '浏览器画布无法承载该尺寸，因此没有修改文件。',
   USER_CONFIRMATION_REQUIRED: '确认信息无效或已过期，因此没有修改文件。',
+  AUDIO_CODEC_UNSUPPORTED: audioErrorMessage('AUDIO_CODEC_UNSUPPORTED'),
+  AUDIO_METADATA_INVALID: audioErrorMessage('AUDIO_METADATA_INVALID'),
+  AUDIO_DECODE_FAILED: audioErrorMessage('AUDIO_DECODE_FAILED'),
+  AUDIO_ENCODE_FAILED: audioErrorMessage('AUDIO_ENCODE_FAILED'),
+  AUDIO_TARGET_UNSAFE: audioErrorMessage('AUDIO_TARGET_UNSAFE'),
+  AUDIO_OUTPUT_TOO_LARGE: audioErrorMessage('AUDIO_OUTPUT_TOO_LARGE'),
+  AUDIO_OUTPUT_FORMAT_NOT_ALLOWED: audioErrorMessage('AUDIO_OUTPUT_FORMAT_NOT_ALLOWED'),
+  AUDIO_DURATION_LIMIT_UNFIXABLE: audioErrorMessage('AUDIO_DURATION_LIMIT_UNFIXABLE'),
+  AUDIO_MEMORY_BUDGET_EXCEEDED: audioErrorMessage('AUDIO_MEMORY_BUDGET_EXCEEDED'),
+  AUDIO_WORKER_UNAVAILABLE: audioErrorMessage('AUDIO_WORKER_UNAVAILABLE'),
+  AUDIO_PROCESSING_CANCELLED: audioErrorMessage('AUDIO_PROCESSING_CANCELLED'),
+  AUDIO_CONFIRMATION_REQUIRED: audioErrorMessage('AUDIO_CONFIRMATION_REQUIRED'),
+  AUDIO_OUTPUT_VALIDATION_FAILED: audioErrorMessage('AUDIO_OUTPUT_VALIDATION_FAILED'),
+  AUDIO_ORIGINAL_REQUIRED: audioErrorMessage('AUDIO_ORIGINAL_REQUIRED'),
+  AUDIO_LOSSLESS_REQUIRED: audioErrorMessage('AUDIO_LOSSLESS_REQUIRED'),
+  RULES_INSUFFICIENT: audioErrorMessage('RULES_INSUFFICIENT'),
   SESSION_DISPOSED: 'UploadFit 已关闭。'
 };
 
@@ -34,6 +51,13 @@ const OPERATION_TEXTS = {
   UPSCALE: '放大像素尺寸',
   ENCODE: '重新编码',
   COMPRESS: '压缩文件大小'
+};
+
+const AUDIO_OPERATION_TEXTS = {
+  TRANSCODE_AUDIO: '将 PCM WAV 转为 MP3',
+  REENCODE_AUDIO: '重新编码音频',
+  RESAMPLE_AUDIO: '调整采样率',
+  DOWNMIX_MONO: '改为单声道'
 };
 
 const SOURCE_LABELS = Object.freeze({
@@ -62,6 +86,20 @@ export function formatDimension(rule) {
   if (Number.isFinite(min)) return `≥${min} 像素`;
   if (Number.isFinite(max)) return `≤${max} 像素`;
   return null;
+}
+
+function formatDuration(value) {
+  if (!Number.isFinite(value) || value <= 0) return '未知';
+  const seconds = Math.round(value / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  if (hours) return `${hours} 小时 ${minutes % 60} 分钟`;
+  if (minutes) return `${minutes} 分 ${seconds % 60} 秒`;
+  return `${seconds} 秒`;
+}
+
+function formatBitrate(value) {
+  return Number.isFinite(value) && value > 0 ? `${Math.round(value)} kbps` : '未知';
 }
 
 function pendingConfirmationOf(task) {
@@ -184,6 +222,19 @@ export function createTaskCardView({ documentRef, callbacks }) {
 
   function fileSection(card, current) {
     if (!current) return;
+    if (current.mediaKind === 'audio') {
+      const section = el('div', 'uf-section');
+      section.append(el('div', 'uf-label', '当前音频：'));
+      section.append(list([
+        ['格式', current.mime ?? '未知'],
+        ['大小', formatBytes(current.size)],
+        ['时长', formatDuration(current.durationMs)],
+        ['码率', formatBitrate(current.bitrateKbps)],
+        ['声道', current.channels === 1 ? '单声道' : current.channels === 2 ? '双声道' : '未知']
+      ]));
+      card.append(section);
+      return;
+    }
     const width = Number.isFinite(current.displayWidth) ? current.displayWidth : current.width;
     const height = Number.isFinite(current.displayHeight) ? current.displayHeight : current.height;
     const section = el('div', 'uf-section');
@@ -203,7 +254,7 @@ export function createTaskCardView({ documentRef, callbacks }) {
     section.append(el('div', 'uf-label', '将执行的动作：'));
     const items = el('ul', 'uf-rule-list');
     for (const operation of operations) {
-      items.append(el('li', null, `· ${OPERATION_TEXTS[operation] ?? operation}`));
+      items.append(el('li', null, `· ${AUDIO_OPERATION_TEXTS[operation] ?? OPERATION_TEXTS[operation] ?? operation}`));
     }
     section.append(items);
     card.append(section);
@@ -224,6 +275,54 @@ export function createTaskCardView({ documentRef, callbacks }) {
     card.append(actions(accept, useOriginal));
     return accept;
   };
+
+  const renderAudioConfirm = (card, task, pending) => {
+    const current = task.current ?? {};
+    const plan = task.plan ?? {};
+    const mono = plan.targetChannels === 1 && current.channels === 2;
+    const targetBytes = plan.estimatedOutputBytes ?? {};
+    card.append(el('div', 'uf-card-title', '确认处理音频'));
+    card.append(fileSectionFragment(current));
+    const output = el('div', 'uf-section');
+    output.append(el('div', 'uf-label', '处理后（预计）：'));
+    output.append(list([
+      ['格式', 'MP3 (audio/mpeg)'],
+      ['大小', `${formatBytes(targetBytes.min)} – ${formatBytes(targetBytes.max)}`],
+      ['目标码率', formatBitrate(plan.targetBitrateKbps)],
+      ['声道', mono ? '单声道（会改变声道数）' : plan.targetChannels === 2 ? '双声道' : '单声道']
+    ]));
+    card.append(output);
+    operationsSection(card, plan);
+    card.append(hint('有损处理，可能影响音质；原文件不会被修改。'));
+    if (mono) card.append(hint('本次方案会把双声道改为单声道，需单独确认。'));
+    const accept = btn('开始处理', 'confirm-audio', true);
+    accept.addEventListener('click', () => confirm(task.taskId, {
+      id: pending.id,
+      type: pending.type,
+      accepted: true,
+      payload: pending.suggestedPayload ?? null
+    }));
+    const cancel = btn('取消', 'decline-audio');
+    cancel.addEventListener('click', () => decline(task, pending));
+    card.append(actions(accept, cancel));
+    return accept;
+  };
+
+  // Return a detached section so audio confirmation can reuse the safe file
+  // metadata renderer without duplicating DOM construction or introducing
+  // filename/content into the view model.
+  function fileSectionFragment(current) {
+    const section = el('div', 'uf-section');
+    section.append(el('div', 'uf-label', '原始音频：'));
+    section.append(list([
+      ['格式', current?.mime ?? '未知'],
+      ['大小', formatBytes(current?.size)],
+      ['时长', formatDuration(current?.durationMs)],
+      ['码率', formatBitrate(current?.bitrateKbps)],
+      ['声道', current?.channels === 1 ? '单声道' : current?.channels === 2 ? '双声道' : '未知']
+    ]));
+    return section;
+  }
 
   const renderFlattenConfirm = (card, task, pending) => {
     const color = pending.suggestedPayload?.color
@@ -329,29 +428,62 @@ export function createTaskCardView({ documentRef, callbacks }) {
   };
 
   const renderProcessing = (card, task) => {
-    card.append(el('div', 'uf-card-title', '正在适配图片'));
+    const audio = task.mediaKind === 'audio';
+    card.append(el('div', 'uf-card-title', audio ? '正在处理音频' : '正在适配图片'));
     fileSection(card, task.current);
     operationsSection(card, task.plan);
     const progress = el('div', 'uf-progress');
-    progress.append(el('div', 'uf-progress-bar'));
-    card.append(progress, hint('处理在本地完成，图片不会离开浏览器。'));
+    const bar = el('div', 'uf-progress-bar');
+    if (Number.isFinite(task.progress?.ratio)) {
+      bar.style.width = `${Math.round(task.progress.ratio * 100)}%`;
+      bar.setAttribute('aria-valuenow', String(Math.round(task.progress.ratio * 100)));
+    }
+    bar.setAttribute('role', 'progressbar');
+    bar.setAttribute('aria-valuemin', '0');
+    bar.setAttribute('aria-valuemax', '100');
+    progress.append(bar);
+    const phaseLabels = {
+      inspect: '读取音频信息', read: '读取音频', decode: '解码音频',
+      encode: '编码 MP3', finalize: '复检输出', complete: '即将完成'
+    };
+    const phase = task.progress?.phase;
+    card.append(
+      progress,
+      hint(audio
+        ? `${phaseLabels[phase] ?? '正在处理'}${Number.isFinite(task.progress?.ratio) ? `（${Math.round(task.progress.ratio * 100)}%）` : ''}，音频只在本地处理。`
+        : '处理在本地完成，图片不会离开浏览器。')
+    );
+    if (audio) {
+      const stop = btn('停止处理', 'cancel-audio');
+      stop.addEventListener('click', () => callbacks.onCancelTask(task.taskId));
+      card.append(actions(stop));
+      return stop;
+    }
     return null;
   };
 
   const renderSuccess = (card, task, viewModel) => {
     const manual = task.source === 'manual-card';
-    card.append(el('div', 'uf-card-title', manual ? '已按本页要求生成文件' : '已适配并放回上传框'));
-    const metadata = task.result?.metadata ?? {};
+    const audio = task.mediaKind === 'audio';
+    card.append(el('div', 'uf-card-title', manual
+      ? '已按本页要求生成文件'
+      : audio
+        ? (task.status === 'PASSTHROUGH' ? '音频原样放行' : '音频已处理并放回上传框')
+        : '已适配并放回上传框'));
+    const metadata = task.result?.metadata ?? task.current ?? {};
     const operations = (task.result?.operations ?? [])
-      .map((operation) => OPERATION_TEXTS[operation] ?? operation).join('、');
+      .map((operation) => AUDIO_OPERATION_TEXTS[operation] ?? OPERATION_TEXTS[operation] ?? operation).join('、');
     const section = el('div', 'uf-section');
     section.append(list([
       ['输出格式', metadata.mime ?? '未知'],
       ['输出大小', formatBytes(metadata.size)],
+      audio ? ['时长', formatDuration(metadata.durationMs)] : null,
+      audio ? ['码率', formatBitrate(metadata.bitrateKbps)] : null,
+      audio ? ['声道', metadata.channels === 1 ? '单声道' : metadata.channels === 2 ? '双声道' : '未知'] : null,
       Number.isFinite(metadata.width) && Number.isFinite(metadata.height)
         ? ['输出宽高', `${metadata.width} × ${metadata.height} 像素`]
         : null,
-      ['执行动作', operations || '无']
+      ['执行动作', operations || (audio ? '原文件原样放行' : '无')]
     ]));
     card.append(section);
     const buttons = [];
@@ -482,7 +614,10 @@ export function createTaskCardView({ documentRef, callbacks }) {
     if (task) {
       const pending = pendingConfirmationOf(task);
       if (task.status === 'NEEDS_CONFIRMATION' && pending) {
-        if (pending.type === 'RULE_CONFIDENCE') focusTarget = renderRuleConfirm(card, task, pending);
+        if (task.mediaKind === 'audio'
+          && (pending.type === 'AUDIO_LOSSY_TRANSCODE' || pending.type === 'AUDIO_DOWNMIX_MONO')) {
+          focusTarget = renderAudioConfirm(card, task, pending);
+        } else if (pending.type === 'RULE_CONFIDENCE') focusTarget = renderRuleConfirm(card, task, pending);
         else if (pending.type === 'CROP' && viewModel.expanded) {
           focusTarget = renderCropConfirm(card, task, pending);
         } else if (pending.type === 'CROP') {

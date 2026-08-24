@@ -104,4 +104,38 @@ describe('diagnostic logger', () => {
     expect(Object.isFrozen(entry.rules.formats)).toBe(true);
     expect(Object.isFrozen(entry.rules.width)).toBe(true);
   });
+
+  it('keeps bounded audio diagnostics without admitting names or raw content', () => {
+    const logger = createLogger({ enabled: true });
+    logger.emit('AUDIO_PROCESSING_PROGRESS', {
+      taskId: 'task-00000000-0000-4000-8000-000000000005',
+      mediaKind: 'audio',
+      mime: 'audio/mpeg',
+      container: 'mp3',
+      codec: 'mp3',
+      phase: 'encode',
+      ratio: 0.5,
+      processedMs: 250,
+      totalMs: 500,
+      fileName: 'private-recording.mp3',
+      pcm: 'raw-audio'
+    });
+
+    const [entry] = logger.getEntries();
+    expect(entry).toMatchObject({
+      event: 'AUDIO_PROCESSING_PROGRESS',
+      mediaKind: 'audio',
+      mime: 'audio/mpeg',
+      container: 'mp3',
+      codec: 'mp3',
+      phase: 'encode',
+      ratio: 0.5,
+      processedMs: 250,
+      totalMs: 500
+    });
+    expect(entry).not.toHaveProperty('fileName');
+    expect(entry).not.toHaveProperty('pcm');
+    expect(JSON.stringify(entry)).not.toContain('private-recording.mp3');
+    expect(JSON.stringify(entry)).not.toContain('raw-audio');
+  });
 });

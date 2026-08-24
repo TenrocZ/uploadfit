@@ -1,10 +1,34 @@
 const SAFE_SCALAR_FIELDS = new Set([
   'taskId',
+  'mediaKind',
   'mime',
+  'container',
+  'codec',
+  'sourceContainer',
+  'sourceCodec',
+  'targetContainer',
+  'targetCodec',
   'bytes',
+  'inputBytesRead',
+  'outputBytes',
   'width',
   'height',
   'durationMs',
+  'bitrateKbps',
+  'sampleRate',
+  'channels',
+  'targetChannels',
+  'targetSampleRate',
+  'targetMaxBytes',
+  'safeTargetBytes',
+  'targetBitrateKbps',
+  'ratio',
+  'processedMs',
+  'totalMs',
+  'phase',
+  'workerUsed',
+  'encodePasses',
+  'retryCount',
   'errorCode'
 ]);
 
@@ -27,6 +51,20 @@ const SAFE_EVENTS = new Set([
   'RETRY_TRIGGERED',
   'TASK_SUCCEEDED',
   'TASK_STOPPED',
+  'AUDIO_INSPECTION_STARTED',
+  'AUDIO_INSPECTION_COMPLETED',
+  'AUDIO_PLAN_CREATED',
+  'AUDIO_CONFIRMATION_REQUIRED',
+  'AUDIO_CONFIRMATION_ACCEPTED',
+  'AUDIO_CONFIRMATION_DECLINED',
+  'AUDIO_PROCESSING_STARTED',
+  'AUDIO_PROCESSING_PROGRESS',
+  'AUDIO_PROCESSING_COMPLETED',
+  'AUDIO_PROCESSING_CANCELLED',
+  'AUDIO_OUTPUT_VALIDATED',
+  'AUDIO_INJECTION_SUCCEEDED',
+  'AUDIO_INJECTION_FAILED',
+  'AUDIO_RESOURCES_CLEANED',
   'SESSION_DISPOSED'
 ]);
 
@@ -38,6 +76,26 @@ const SAFE_FORMATS = new Set([
   'image/jpeg',
   'image/png',
   'image/webp'
+]);
+
+const SAFE_AUDIO_MIMES = new Set([
+  'audio/mpeg',
+  'audio/wav',
+  'audio/x-wav',
+  'audio/mp4',
+  'audio/aac'
+]);
+
+const SAFE_AUDIO_CONTAINERS = new Set(['mp3', 'wav', 'mp4', 'm4a', 'aac', 'pcm']);
+const SAFE_AUDIO_CODECS = new Set(['mp3', 'pcm', 'aac-lc', 'aac', 'unknown']);
+const SAFE_PROGRESS_PHASES = new Set([
+  'inspect',
+  'read',
+  'decode',
+  'encode',
+  'finalize',
+  'processing',
+  'complete'
 ]);
 
 const SAFE_SIZE_UNITS = new Set(['B', 'KB', 'MB']);
@@ -68,12 +126,68 @@ function sanitizeScalar(key, value) {
       : undefined;
   }
   if (key === 'mime') {
-    return typeof value === 'string' && /^image\/(?:jpeg|png|webp)$/.test(value)
+    return typeof value === 'string'
+      && (/^image\/(?:jpeg|png|webp)$/.test(value) || SAFE_AUDIO_MIMES.has(value))
       ? value
       : undefined;
   }
-  if (['bytes', 'width', 'height', 'durationMs'].includes(key)) {
+  if (key === 'mediaKind') {
+    return value === 'image' || value === 'audio' ? value : undefined;
+  }
+  if (key === 'container') {
+    return typeof value === 'string' && SAFE_AUDIO_CONTAINERS.has(value.toLowerCase())
+      ? value.toLowerCase()
+      : undefined;
+  }
+  if (key === 'codec') {
+    return typeof value === 'string' && SAFE_AUDIO_CODECS.has(value.toLowerCase())
+      ? value.toLowerCase()
+      : undefined;
+  }
+  if (['sourceContainer', 'targetContainer'].includes(key)) {
+    return typeof value === 'string' && SAFE_AUDIO_CONTAINERS.has(value.toLowerCase())
+      ? value.toLowerCase()
+      : undefined;
+  }
+  if (['sourceCodec', 'targetCodec'].includes(key)) {
+    return typeof value === 'string' && SAFE_AUDIO_CODECS.has(value.toLowerCase())
+      ? value.toLowerCase()
+      : undefined;
+  }
+  if (['bytes', 'inputBytesRead', 'outputBytes', 'width', 'height', 'durationMs', 'sampleRate',
+    'processedMs', 'totalMs']
+    .includes(key)) {
     return finiteNumber(value) ? value : undefined;
+  }
+  if (key === 'bitrateKbps') {
+    return finiteNumber(value, 0, 10_000) ? value : undefined;
+  }
+  if (['targetBitrateKbps'].includes(key)) {
+    return finiteNumber(value, 0, 10_000) ? value : undefined;
+  }
+  if (['targetMaxBytes', 'safeTargetBytes'].includes(key)) {
+    return finiteNumber(value, 0, 10 * 1024 * 1024 * 1024) ? value : undefined;
+  }
+  if (['targetSampleRate'].includes(key)) {
+    return finiteNumber(value, 0, 384_000) ? Math.round(value) : undefined;
+  }
+  if (['targetChannels'].includes(key)) {
+    return finiteNumber(value, 1, 2) ? Math.round(value) : undefined;
+  }
+  if (key === 'channels') {
+    return finiteNumber(value, 1, 2) ? Math.round(value) : undefined;
+  }
+  if (key === 'ratio') {
+    return finiteNumber(value, 0, 1) ? value : undefined;
+  }
+  if (key === 'phase') {
+    return typeof value === 'string' && SAFE_PROGRESS_PHASES.has(value) ? value : undefined;
+  }
+  if (key === 'workerUsed') {
+    return typeof value === 'boolean' ? value : undefined;
+  }
+  if (['encodePasses', 'retryCount'].includes(key)) {
+    return finiteNumber(value, 0, 100) ? Math.round(value) : undefined;
   }
   return SAFE_SCALAR_FIELDS.has(key) ? undefined : undefined;
 }

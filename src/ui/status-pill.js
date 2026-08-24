@@ -20,7 +20,12 @@ const EXTRA_STATE_TEXTS = Object.freeze({
   DISPOSED: 'UploadFit已关闭'
 });
 
-export function statusText(sessionState, uploaderCount) {
+export function statusText(sessionState, uploaderCount, mediaKind = 'image') {
+  if (mediaKind === 'audio') {
+    if (sessionState === 'PROCESSING' || sessionState === 'INJECTING') return '正在处理音频';
+    if (sessionState === 'SUCCESS' || sessionState === 'PASSTHROUGH') return '音频已处理';
+    if (sessionState === 'NEEDS_CONFIRMATION') return '等待确认音频处理';
+  }
   if (sessionState === 'ARMED') {
     if (!uploaderCount) return STATUS_TEXTS.ARMED_ZERO;
     if (uploaderCount === 1) return STATUS_TEXTS.ARMED_ONE;
@@ -84,8 +89,8 @@ export function createStatusPill({ documentRef, onToggle, onClose }) {
     focus() {
       toggle.focus();
     },
-    update({ sessionState, uploaderCount, expanded, suppressLive = false }) {
-      const value = statusText(sessionState, uploaderCount);
+    update({ sessionState, uploaderCount, mediaKind = 'image', expanded, suppressLive = false }) {
+      const value = statusText(sessionState, uploaderCount, mediaKind);
       const changed = announce(value);
       text.textContent = value;
       toggle.setAttribute('aria-expanded', String(Boolean(expanded)));
