@@ -40,40 +40,125 @@ async function open(page) {
 }
 
 test.describe('V2-S4 security and adversarial matrix', () => {
-  test('S01 local audio planning produces zero external or persistent side effects', async ({ page }) => {
+  test('S01 [DEBUG_CONTROLLER_REAL_WORKER] local small-WAV processing derives external/storage measurements', async ({ page }) => {
     await open(page);
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate(async () => {
       const api = __uploadfit_debug_bundle__;
-      const source = {
-        mediaKind: 'audio', signatureMime: 'audio/wav', container: 'wav', codec: 'pcm',
-        size: 1_000_000, durationMs: 60_000, sampleRate: 44_100, channels: 1,
-        bitDepth: 16, inspectedBytes: 64, errorCode: null, warnings: []
+      const makeWav = () => {
+        const sampleRate = 44_100;
+        const frames = Math.round(sampleRate * 0.25);
+        const dataBytes = frames * 2;
+        const bytes = new Uint8Array(44 + dataBytes);
+        const view = new DataView(bytes.buffer);
+        const put = (offset, text) => [...text].forEach((char, index) => {
+          bytes[offset + index] = char.charCodeAt(0);
+        });
+        put(0, 'RIFF'); view.setUint32(4, bytes.length - 8, true); put(8, 'WAVE');
+        put(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true);
+        view.setUint16(22, 1, true); view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * 2, true); view.setUint16(32, 2, true);
+        view.setUint16(34, 16, true); put(36, 'data'); view.setUint32(40, dataBytes, true);
+        return new File([bytes], 'security-small.wav', { type: 'audio/wav' });
       };
-      let plan = api.createAudioProcessingPlan(source, {
-        mediaKind: 'audio', formats: ['audio/mpeg'], extensions: ['.mp3'], maxBytes: 100_000_000
-      });
+      const snapshotStorage = () => {
+        const read = (key) => {
+          try {
+            const value = window[key];
+            if (!value || typeof value.length !== 'number' || typeof value.key !== 'function') {
+              return { available: false, keys: [] };
+            }
+            const keys = [];
+            for (let index = 0; index < value.length; index += 1) keys.push(value.key(index));
+            return { available: true, keys: keys.sort() };
+          } catch (error) {
+            return { available: false, reason: String(error?.name ?? 'unavailable'), keys: [] };
+          }
+        };
+        return { localStorage: read('localStorage'), sessionStorage: read('sessionStorage') };
+      };
+      const storageBefore = snapshotStorage();
+      const counterBefore = { ...window.__v2S4SecurityCounters };
+      const file = makeWav();
+      const rules = {
+        mediaKind: 'audio', formats: ['audio/mpeg'], extensions: ['.mp3'], maxBytes: 1_000_000
+      };
+      const inspectStarted = performance.now();
+      const metadata = await api.inspectAudio(file);
+      const inspectMs = performance.now() - inspectStarted;
+      const planStarted = performance.now();
+      let plan = api.createAudioProcessingPlan(metadata, rules);
+      const planMs = performance.now() - planStarted;
+      const confirmStarted = performance.now();
       for (const confirmation of plan.confirmations) {
         plan = api.resolveAudioConfirmation(plan, { ...confirmation, accepted: true, payload: null });
       }
+      const confirmMs = performance.now() - confirmStarted;
+      const processStarted = performance.now();
+      const processed = await api.processAudio(file, plan, {
+        rules,
+        metadata,
+        timeoutMs: 30_000
+      });
+      const processMs = performance.now() - processStarted;
+      const validateStarted = performance.now();
+      const validation = await api.validateAudioOutputFile(
+        processed.file,
+        rules,
+        plan,
+        metadata,
+        { allowSingleFrame: true }
+      );
+      const validateMs = performance.now() - validateStarted;
+      const storageAfter = snapshotStorage();
+      const counters = { ...window.__v2S4SecurityCounters };
+      const delta = Object.fromEntries(Object.entries(counters).map(([key, value]) => [
+        key,
+        value - (counterBefore[key] ?? 0)
+      ]));
+      const externalAudioRequests = delta.fetch + delta.xhr + delta.websocket
+        + delta.eventSource + delta.beacon;
+      const storageReliable = storageBefore.localStorage.available
+        && storageAfter.localStorage.available
+        && storageBefore.sessionStorage.available
+        && storageAfter.sessionStorage.available;
+      const persistedAudio = storageReliable
+        ? JSON.stringify(storageBefore) !== JSON.stringify(storageAfter)
+        : 'NOT_MEASURED_PHASE_1';
       return {
         executable: plan.executable,
-        counters: { ...window.__v2S4SecurityCounters },
-        persistedAudio: false,
-        externalAudioRequests: 0
+        outputBytes: processed.outputBytes,
+        workerUsed: processed.workerUsed,
+        validationValid: validation.valid,
+        encodePasses: processed.encodePasses,
+        stages: { inspectMs, planMs, confirmMs, processMs, validateMs },
+        counters: delta,
+        storageBefore,
+        storageAfter,
+        storageReliable,
+        persistedAudio,
+        externalAudioRequests,
+        cleanup: processed.cleanup
       };
     });
+    console.log(`V2-S4 S01 measured ${JSON.stringify({ outputBytes: result.outputBytes, workerUsed: result.workerUsed, encodePasses: result.encodePasses, externalAudioRequests: result.externalAudioRequests, persistedAudio: result.persistedAudio, counters: result.counters, storageBefore: result.storageBefore, storageAfter: result.storageAfter, stages: result.stages })}`);
     expect(result.executable).toBe(true);
+    expect(result.workerUsed).toBe(true);
+    expect(result.outputBytes).toBeGreaterThan(0);
+    expect(result.validationValid).toBe(true);
+    expect(result.encodePasses).toBeLessThanOrEqual(2);
     expect(result.counters.fetch).toBe(0);
     expect(result.counters.xhr).toBe(0);
     expect(result.counters.websocket).toBe(0);
     expect(result.counters.eventSource).toBe(0);
     expect(result.counters.beacon).toBe(0);
-    expect(result.counters.storage).toBe(0);
-    expect(result.persistedAudio).toBe(false);
     expect(result.externalAudioRequests).toBe(0);
+    expect(result.storageReliable).toBe(true);
+    expect(result.persistedAudio).toBe(false);
+    expect(result.cleanup).toMatchObject({ workerTerminated: true, objectUrlRevoked: true, queueCleared: true });
+    expect(Object.values(result.stages).every((value) => Number.isFinite(value) && value >= 0)).toBe(true);
   });
 
-  test('S02 malicious rule/tag evidence is data, not executable markup', async ({ page }) => {
+  test('S02 [DEBUG_PURE_PLAN] malicious rule/tag evidence is data, not executable markup', async ({ page }) => {
     await open(page);
     const result = await page.evaluate(() => {
       const api = __uploadfit_debug_bundle__;
@@ -94,39 +179,81 @@ test.describe('V2-S4 security and adversarial matrix', () => {
     expect(result.literal).toContain('<img');
   });
 
-  test('S03 forged Worker task IDs are ignored and cleanup remains bounded', async ({ page }) => {
+  test('S03 [DEBUG_FAKE_RUNTIME_BRANCH] forged Worker task IDs stay unsettled until legal task messages', async ({ page }) => {
     await open(page);
     const result = await page.evaluate(async () => {
       const api = __uploadfit_debug_bundle__;
       const NativeWorker = window.Worker;
       class ForgedWorker {
-        constructor() { this.messages = []; this.terminated = false; }
+        constructor() {
+          this.messages = [];
+          this.terminated = false;
+          this.taskId = null;
+          this.legalRelease = null;
+          ForgedWorker.last = this;
+        }
         postMessage(message) {
           this.messages.push(message);
           if (message.type !== 'START') return;
-          queueMicrotask(() => {
-            this.onmessage?.({ data: { type: 'RESULT', taskId: 'task-forged', blob: new Blob([new Uint8Array([1])], { type: 'audio/mpeg' }) } });
-            this.onmessage?.({ data: { type: 'READY', taskId: message.taskId, capabilities: {} } });
-            this.onmessage?.({
-              data: {
-                type: 'RESULT', taskId: message.taskId,
-                blob: new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/mpeg' }),
-                stats: { workerUsed: true, peakBufferedBytes: 3 }
-              }
-            });
+          this.taskId = message.taskId;
+          queueMicrotask(() => this.onmessage?.({
+            data: {
+              type: 'PROGRESS', taskId: 'task-forged', phase: 'encode', ratio: 1,
+              processedMs: 1, totalMs: 1
+            }
+          }));
+          queueMicrotask(() => this.onmessage?.({
+            data: {
+              type: 'RESULT', taskId: 'task-forged',
+              blob: new Blob([new Uint8Array([1])], { type: 'audio/mpeg' })
+            }
+          }));
+        }
+        releaseLegal() {
+          this.onmessage?.({ data: { type: 'READY', taskId: this.taskId, capabilities: {} } });
+          this.onmessage?.({
+            data: {
+              type: 'RESULT', taskId: this.taskId,
+              blob: new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/mpeg' }),
+              stats: { workerUsed: true, peakBufferedBytes: 3 }
+            }
           });
         }
         terminate() { this.terminated = true; }
       }
       window.Worker = ForgedWorker;
       const runtime = api.createAudioWorkerRuntime({ globalRef: window, workerSource: 'self.onmessage = () => {};' });
-      const outcome = await runtime.run({ size: 1 }, { targetMaxBytes: 100, safeTargetBytes: 90 });
+      let settled = false;
+      let acceptedResult = null;
+      let injected = 0;
+      const outcomePromise = runtime.run({ size: 1 }, { targetMaxBytes: 100, safeTargetBytes: 90 })
+        .then((value) => { settled = true; acceptedResult = value; return value; });
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      const forgedWindow = {
+        settled,
+        acceptedResult: acceptedResult === null,
+        injected,
+        forgedWorkerMessages: ForgedWorker.last.messages.length
+      };
+      ForgedWorker.last.releaseLegal();
+      const outcome = await outcomePromise;
       runtime.dispose();
       window.Worker = NativeWorker;
-      return { size: outcome.blob.size, workerUsed: outcome.workerUsed, cleanup: outcome.cleanup };
+      return {
+        forgedWindow,
+        size: outcome.blob.size,
+        workerUsed: outcome.workerUsed,
+        cleanup: outcome.cleanup,
+        finalSettled: settled
+      };
     });
+    expect(result.forgedWindow.settled).toBe(false);
+    expect(result.forgedWindow.acceptedResult).toBe(true);
+    expect(result.forgedWindow.injected).toBe(0);
+    expect(result.forgedWindow.forgedWorkerMessages).toBeGreaterThanOrEqual(1);
     expect(result.size).toBe(3);
     expect(result.workerUsed).toBe(true);
+    expect(result.finalSettled).toBe(true);
     expect(result.cleanup).toMatchObject({ workerTerminated: true, objectUrlRevoked: true, queueCleared: true });
   });
 
@@ -157,7 +284,9 @@ test.describe('V2-S4 security and adversarial matrix', () => {
     expect(result.mp4.inspectedBytes).toBeLessThanOrEqual(1_048_576);
   });
 
-  test('S05 AI bridge receives only bounded rule text and sensitive input is blocked', async ({ page }) => {
+  // This is a local redaction/schema harness only. Real Tabbit MAIN-world
+  // LLMBridge input/call-count evidence is Phase-2 LR8.
+  test('S05 [FAKE_BRIDGE_REDACTION_HARNESS] AI bridge receives bounded rule text and blocks sensitive input', async ({ page }) => {
     await open(page);
     const result = await page.evaluate(async () => {
       const api = __uploadfit_debug_bundle__;
