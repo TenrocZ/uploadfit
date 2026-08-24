@@ -1,0 +1,65 @@
+{
+  "stage": "V2-S4",
+  "classification": "CORE_FUNCTION_GATE",
+  "status": "PASS",
+  "executedAt": "2026-08-24T09:44:54.006Z",
+  "wallClockMs": 44468,
+  "runner": "production-equivalent current audio handler plus frozen lamejs Worker in local Chromium",
+  "tabbitLr4Claimed": false,
+  "fixture": {
+    "semanticContent": "synthetic-only",
+    "bytes": 200000044,
+    "container": "wav",
+    "codec": "pcm",
+    "bitDepth": 32,
+    "removedAfterCapture": true
+  },
+  "success": {
+    "ok": true,
+    "pageMaxBytes": 100000000,
+    "safeTargetBytes": 95000000,
+    "inputBytesRead": 201048576,
+    "outputBytes": 20834880,
+    "outputType": "audio/mpeg",
+    "outputSha256": "9394F96A5CDBD87823BB3223F584BB844471A74C6AA73DAB2B0EB44C39F16FBC",
+    "inputDurationMs": 520833.3333333334,
+    "outputDurationMs": 520868.8,
+    "outputSampleRate": 48000,
+    "outputChannels": 2,
+    "processingElapsedMs": 36967,
+    "encodePasses": 1,
+    "workerUsed": true,
+    "peakBufferedBytes": 26825856,
+    "maxHeartbeatGapMs": 112.09999990463257,
+    "progressEvents": 51,
+    "progressNonMonotonic": 0,
+    "outputValidationValid": true,
+    "independentMp3FramesValidated": 203,
+    "cleanup": {
+      "workerTerminated": true,
+      "objectUrlRevoked": true,
+      "queueCleared": true,
+      "disposed": true
+    }
+  },
+  "cancel": {
+    "errorCode": "AUDIO_PROCESSING_CANCELLED",
+    "cancelLatencyMs": 8.200000047683716,
+    "deadlineMs": 1000,
+    "partialOutputPersisted": false,
+    "maxHeartbeatGapMs": 111.20000004768372,
+    "cleanup": {
+      "workerTerminated": true,
+      "objectUrlRevoked": true,
+      "queueCleared": true,
+      "disposed": true
+    }
+  },
+  "postCancelReuse": {
+    "ok": true,
+    "outputBytes": 81502,
+    "workerUsed": true,
+    "outputValidationValid": true
+  },
+  "scopeNote": "The same production bundle's Tabbit integration is independently proven by LR1 and LR3. This gate proves current large-file encoder, responsiveness, cancellation and cleanup; it is not mislabeled as the exact Tabbit LR4 run."
+}

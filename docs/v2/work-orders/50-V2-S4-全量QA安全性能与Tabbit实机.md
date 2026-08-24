@@ -9,6 +9,12 @@
 
 冻结范围：S4 只验证 S2 已验收的“合规 MP3 passthrough + PCM WAV 16/24/32-bit mono/stereo→MP3”。超限 MP3 与所有 M4A/AAC 输入必须以 `AUDIO_CODEC_UNSUPPORTED` 停止、Worker 调用数为 0；不得在 QA 阶段补解码器或把 S0 的原始目标文字当成已实现能力。相关扩展归 V2.1 和新 ADR。
 
+### 资源分级执行原则（2026-08-24 补充）
+
+S4 优先回答产品能否跨过真实上传墙。以下为阻塞性核心：官方 Tabbit 纯 JS 保存/auto-run、合规 MP3 直通、PCM WAV→受限 MP3、不支持输入安全停止、大文件响应/取消、不自动提交、不外传/不持久化，以及图片主线不回归。
+
+以下只作为辅助观测，不得因测试工具自身盲区长时间阻塞施工：CDP 是否枚举到短生命周期 Blob Worker target、DataTransfer 后 JavaScript `File` 引用是否严格同一（最终签名/字节/类型/注入仍必须正确）、为每条已由真实 controller/Worker 自动化覆盖的分支重复开发 Tabbit 专用驱动。辅助项缺失必须诚实标记 `NOT_MEASURED`/pending，不得伪写 PASS；若核心结果或安全边界失败，仍按第 9 节返修。
+
 ## 2. 必须验证的候选产物
 
 - 先运行 `npm run build`，测试和实机均使用同一份 `dist/uploadfit.js`。

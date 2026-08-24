@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import * as esbuild from 'esbuild';
@@ -33,7 +33,7 @@ const audioImplementationSource = (await buildS2WorkerImplementation())
   .replace(/[ \t]+$/gm, '');
 
 try {
-  const result = await esbuild.build({
+  await esbuild.build({
     entryPoints: [path.join(rootDir, entryPoint)],
     outfile: path.join(rootDir, outputFile),
     bundle: true,
@@ -54,10 +54,19 @@ try {
     logLevel: 'silent'
   });
 
-  const outputBytes = result.metafile
-    ? Object.values(result.metafile.outputs)[0]?.bytes ?? 0
-    : readFileSync(path.join(rootDir, outputFile)).byteLength;
-  const outputSource = readFileSync(path.join(rootDir, outputFile), 'utf8');
+  const outputPath = path.join(rootDir, outputFile);
+  let outputSource = readFileSync(outputPath, 'utf8');
+  // Tabbit's official private-script editor removes a single terminal line
+  // break on save.  Normalize the generated paste artifact the same way so
+  // the raw bytes/SHA recorded locally remain identical after official save.
+  // This changes no executable token and applies reproducibly to production
+  // and debug IIFEs.
+  const pasteNormalizedSource = outputSource.replace(/\r?\n$/, '');
+  if (pasteNormalizedSource !== outputSource) {
+    writeFileSync(outputPath, pasteNormalizedSource, 'utf8');
+    outputSource = pasteNormalizedSource;
+  }
+  const outputBytes = Buffer.byteLength(outputSource, 'utf8');
   if (!outputSource.startsWith(AUDIO_LICENSE_BANNER_PREFIX)) {
     throw new Error(`Missing required audio license banner in ${outputFile}`);
   }

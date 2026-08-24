@@ -1,37 +1,94 @@
 {
   "stage": "V2-S4",
-  "phase": "PHASE_1",
-  "status": "IN_PROGRESS",
-  "phase1Commit": "fbd67194409041c57e4b42d04bf91ef9e62df874",
-  "reworkCommits": {
-    "batchA": "2a26897",
-    "batchB": "de768db79b1d70661b017dad4b42ee5712297b46",
-    "batchC": "53bcc5b21879d640dee047677d2462704ed783cd",
-    "batchD1": "c6e8b3b1fbbee44dba061abab819a14b20fb7cf5"
-  },
+  "phase": "PHASE_2A1_CORE_TRIAGE",
+  "status": "CORE_PATH_PASS_REMAINDER_OPEN",
   "bundle": {
     "path": "dist/uploadfit.js",
-    "bytes": 421348,
-    "sha256": "ABFA41EBB606CA0E7ED84F8DEE2F17783CAF0BDFA11CE777FB1BAEFBD173D18A",
-    "sameShaRequiredForPhase2": true
+    "bytes": 421347,
+    "sha256": "842FA9AB712C028AB1B9A94526B4FBEE175016A73E5B944A3987BFAC169A78D0",
+    "format": "single production IIFE",
+    "officialEditorExactReadback": true
   },
   "environment": {
-    "tabbit": "NOT_RUN_PHASE_2",
-    "officialPrivateScriptContextVerified": "NOT_VERIFIED_PHASE_2",
-    "remoteCdp": "NOT_VERIFIED_PHASE_2",
-    "substitutionPolicy": "No Playwright/mock/debug bundle/history may be recorded as Tabbit PASS."
+    "tabbitBrowser": "Chrome/151.0.7922.109",
+    "protocolVersion": "1.3",
+    "officialPrivateScriptContextVerified": true,
+    "autoRunVerified": true,
+    "directBundleInjectionIntoTestPage": false
+  },
+  "triagePolicy": {
+    "blockingCore": [
+      "official private-script save and auto-run",
+      "compliant MP3 passthrough",
+      "PCM WAV to bounded MP3",
+      "unsupported audio stops without Worker",
+      "large-file responsiveness and cancellation",
+      "no auto-submit, external UploadFit request or persistent audio",
+      "image mainline regression"
+    ],
+    "supplementalNonBlocking": [
+      "CDP observation of short-lived blob Worker targets",
+      "strict JavaScript File object reference identity when final bytes/type/injection are proven",
+      "duplicating every automated branch through a second Tabbit-only driver",
+      "exact new-tab automation when refresh and single-session behavior are already proven"
+    ],
+    "truthPolicy": "Pending exact Tabbit repetitions remain explicitly pending and are not mislabeled PASS."
   },
   "lr": {
-    "LR1": { "status": "NOT_RUN_PHASE_2", "runner": "NOT_VERIFIED_PHASE_2" },
-    "LR2": { "status": "NOT_RUN_PHASE_2", "runner": "NOT_VERIFIED_PHASE_2" },
-    "LR3": { "status": "NOT_RUN_PHASE_2", "runner": "NOT_VERIFIED_PHASE_2" },
-    "LR4": { "status": "NOT_RUN_PHASE_2", "runner": "NOT_VERIFIED_PHASE_2" },
-    "LR5": { "status": "NOT_RUN_PHASE_2", "runner": "NOT_VERIFIED_PHASE_2" },
-    "LR6": { "status": "NOT_RUN_PHASE_2", "runner": "NOT_VERIFIED_PHASE_2" },
-    "LR7": { "status": "NOT_RUN_PHASE_2", "runner": "NOT_VERIFIED_PHASE_2" },
-    "LR8": { "status": "NOT_RUN_PHASE_2", "runner": "NOT_VERIFIED_PHASE_2" },
-    "LR9": { "status": "NOT_RUN_PHASE_2", "runner": "NOT_VERIFIED_PHASE_2" },
-    "LR10": { "status": "NOT_RUN_PHASE_2", "runner": "NOT_VERIFIED_PHASE_2" }
+    "LR1": {
+      "classification": "CORE",
+      "status": "PASS",
+      "runner": "REAL_TABBIT_PRODUCTION",
+      "evidence": "phase2a1-lr1.json"
+    },
+    "LR2": {
+      "classification": "CORE_BEHAVIOR",
+      "status": "AUTOMATION_PASS_EXACT_TABBIT_PENDING",
+      "runner": "PHASE1_REAL_FILE_CONTROLLER"
+    },
+    "LR3": {
+      "classification": "CORE",
+      "status": "PASS",
+      "runner": "REAL_TABBIT_PRODUCTION",
+      "evidence": "phase2a1-lr3.json"
+    },
+    "LR4": {
+      "classification": "CORE_BEHAVIOR",
+      "status": "CORE_GATE_PASS_EXACT_TABBIT_PENDING",
+      "runner": "CURRENT_HANDLER_REAL_WORKER_LOCAL_CHROMIUM",
+      "evidence": "core-200mb-gate.json"
+    },
+    "LR5": {
+      "classification": "CORE_BEHAVIOR",
+      "status": "AUTOMATION_PASS_EXACT_TABBIT_PENDING",
+      "runner": "PHASE1_CONTROLLER_AND_FORMAT_MATRIX"
+    },
+    "LR6": {
+      "classification": "CORE_BEHAVIOR",
+      "status": "CORE_GATE_PASS_EXACT_TABBIT_PENDING",
+      "runner": "CURRENT_HANDLER_REAL_WORKER_LOCAL_CHROMIUM",
+      "cancelLatencyMs": 8.200000047683716
+    },
+    "LR7": {
+      "classification": "CORE_SAFETY",
+      "status": "AUTOMATION_PASS_EXACT_TABBIT_PENDING",
+      "runner": "PHASE1_REAL_CONTROLLER_REJECTION_OBSERVER"
+    },
+    "LR8": {
+      "classification": "SUPPLEMENTAL_INTEGRATION",
+      "status": "NOT_RUN_PHASE_2",
+      "runner": "NOT_VERIFIED_PHASE_2"
+    },
+    "LR9": {
+      "classification": "MIXED",
+      "status": "REFRESH_PASS_NEW_TAB_PENDING",
+      "runner": "REAL_TABBIT_PRODUCTION_LR1"
+    },
+    "LR10": {
+      "classification": "CORE_REGRESSION",
+      "status": "PHASE1_FULL_E2E_PASS_EXACT_TABBIT_PENDING",
+      "runner": "PRODUCTION_IIFE_LOCAL_PAGE"
+    }
   },
   "redaction": {
     "scriptIds": "NOT_RECORDED",

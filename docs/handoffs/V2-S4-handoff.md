@@ -1,6 +1,6 @@
-# V2-S4 Phase 1 handoff
+# V2-S4 Phase 1 + Phase 2A1 handoff
 
-状态：`IN_PROGRESS`。本 handoff 交接 Phase 1 自动化 QA、安全、格式对抗、快速性能和证据收口；不申请 `READY_FOR_ACCEPTANCE`，不写 `ACCEPTED`，不启动 V2-S5（`HOLD`）。
+状态：`CORE_PATH_PASS_REMAINDER_OPEN`。本 handoff 交接 Phase 1 自动化 QA、安全、格式对抗、快速性能，以及 Phase 2A1 的核心实机/大文件结果；尚未完成的精确 Tabbit 重复项不写成 PASS。
 
 ## 基线、提交与产物
 
@@ -47,3 +47,13 @@ A01–A18、S01–S06、P01–P03/Q-S4-P06/P07 及格式 fixture 的逐项映射
 2. 真实生成 `>200000000` bytes 可解码非敏感 WAV，在页面 max=`100000000` 下成功一次、处理中取消一次；记录输入/输出 bytes/SHA、codec、duration、bitrate、channels、耗时、encodePasses、heartbeat、peakBufferedBytes、external/persistence/submit、cleanup，并清理文件/profile。
 3. LR1–LR10 按同一 SHA 形成脱敏 JSON/PNG；不记录脚本 ID、完整 prompt/response、文件名、路径、账号。
 4. 若生产源码导致 bundle SHA 变化，必须重做受影响证据；主 Agent `/root` 独立复核后再决定阶段状态。
+
+## Phase 2A1 核心验收增量（2026-08-24）
+
+- 当前 production：421,347 bytes，SHA-256 `842FA9AB712C028AB1B9A94526B4FBEE175016A73E5B944A3987BFAC169A78D0`。构建只去除 Tabbit 官方编辑器保存时会剥离的末尾换行，确保本地产物和官方 reload 后回读逐字节一致；没有改变生产业务 token。
+- Tabbit Chrome `151.0.7922.109` 官方私有脚本保存/auto-run 通过；LR1 安装与刷新通过；LR3 小 PCM WAV 经真实 UploadFit UI 确认后转 MP3、回填成功，UploadFit external=0、submit=0、storage unchanged、runtime error=0。
+- LR3 首轮唯一失败是 CDP 未发现短生命周期 Blob Worker target；同轮 `workerUsed=true`、输出独立复检、active Worker=0 和完整 cleanup 均通过。该观测已降为辅助项，生产代码未因此改动。
+- 200,000,044-byte 合成 PCM32 WAV 使用当前 handler/真实 Worker 在 Chromium 中成功转为 20,834,880-byte MP3；独立帧校验通过、单次编码、heartbeat 最大 112.1ms。第二轮处理中取消耗时 8.2ms，无部分输出，随后小任务复用成功；临时大文件已删除。
+- 本轮 `npm run check`：25 files / 229 tests、production build、static-check 全通过。Phase 1 全量 E2E 193/193 的生产逻辑未变化，未为单个末尾换行重复消耗约 142 秒。
+
+核心与非必要项的边界、LR 逐项真实状态见 [`../evidence/V2-S4/tabbit-matrix.json`](../evidence/V2-S4/tabbit-matrix.json)。当前不伪称精确 Tabbit LR4/LR8/LR9-new-tab/LR10 已通过；这些属于剩余环境复测/证据收口，只有发现真实产品缺陷才触发生产返修。

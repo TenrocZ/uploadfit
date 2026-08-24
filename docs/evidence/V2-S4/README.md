@@ -1,6 +1,8 @@
-# V2-S4 证据索引（Phase 1）
+# V2-S4 证据索引（Phase 1 + Phase 2A1 核心验收）
 
-状态：`IN_PROGRESS`。本目录只记录 Phase 1 自动化 QA、安全、格式对抗和快速性能；200MB 慢门禁、Tabbit LR1–LR10、真实 MAIN-world AI 和关闭/刷新/新标签生命周期均保持 `NOT_VERIFIED_PHASE_2`。本 Agent 不写 `ACCEPTED`，V2-S5 保持 `HOLD`。
+状态：`CORE_PATH_PASS_REMAINDER_OPEN`。Phase 1 自动化 QA、安全、格式对抗和快速性能已通过；Phase 2A1 已完成 Tabbit 官方私有脚本精确保存、LR1 和 LR3，并完成当前音频 handler/真实 Worker 的 200MB 成功与取消核心门禁。尚未执行的精确 Tabbit 重复项继续明确标为 pending，不冒充 PASS。
+
+资源分级遵循“先证明能否跨过上传墙”：官方纯 JS 加载、MP3 直通、PCM WAV→受限 MP3、不支持输入安全停止、大文件响应/取消、不自动提交/不外传/不持久化、图片主线回归为核心；CDP 是否捕获到短生命周期 Blob Worker target、严格 JS 对象引用同一性、为每个已自动化分支重复建 Tabbit 专用驱动等仅是辅助观测，不再阻塞核心判断。
 
 ## 产物、环境与 provenance
 
@@ -8,7 +10,8 @@
 - Phase 1 基线施工提交：`fbd67194409041c57e4b42d04bf91ef9e62df874`。
 - 返工批次：Batch A `2a26897`；Batch B `de768db79b1d70661b017dad4b42ee5712297b46`；Batch C `53bcc5b21879d640dee047677d2462704ed783cd`；Batch D1 `c6e8b3b1fbbee44dba061abab819a14b20fb7cf5`；Batch D2 本轮文档提交在 Phase 2 最终交接时记录。
 - Windows，Node `v22.20.0`，npm `10.9.3`；本地测试服务 `http://127.0.0.1:8765`。
-- 当前 production `dist/uploadfit.js`：421,348 bytes，SHA-256 `ABFA41EBB606CA0E7ED84F8DEE2F17783CAF0BDFA11CE777FB1BAEFBD173D18A`，单 IIFE；runtime remote dependencies=0。
+- Phase 1 历史 production：421,348 bytes，SHA-256 `ABFA41EBB606CA0E7ED84F8DEE2F17783CAF0BDFA11CE777FB1BAEFBD173D18A`。
+- 当前 production `dist/uploadfit.js`：421,347 bytes，SHA-256 `842FA9AB712C028AB1B9A94526B4FBEE175016A73E5B944A3987BFAC169A78D0`，单 IIFE；runtime remote dependencies=0。唯一构建差异是去掉官方 Tabbit 编辑器保存时必然剥离的末尾换行，以保证本地产物与官方保存回读逐字节一致，不改变可执行 token。
 
 Runner 约定：
 
@@ -107,6 +110,16 @@ Runner 约定：
 - fake AI：S05 只记录本地 fake bridge safe/blocked calls；真实 AI calls/input boundary 为 `NOT_MEASURED_PHASE_1`。
 - `maliciousMarkupExecution=0`：S02 script node delta=0；仅限本地 debug page。
 
-## Phase 2 留痕
+## Phase 2A1 核心留痕
 
-`tabbit-matrix.json` 的 LR1–LR10 全部为 `NOT_RUN_PHASE_2`。`v2-s4-result.json` 的 slow gate 同样未运行；不得引用历史 S0/S2 200MB 文件。Phase 2 必须在同一 production SHA 上证明 Tabbit Browser.getVersion/UA、官方私有脚本 MAIN-world、部分网址匹配，再执行真实 >200,000,000-byte WAV 成功和处理中取消，并记录 SHA/bytes/codec/duration/bitrate/channels/耗时/encodePasses/heartbeat/peakBufferedBytes/cleanup。
+| 证据 | 结果 |
+|---|---|
+| `phase2a1-install.json` | 官方私有脚本保存、reload 后 421,347 bytes / 当前 SHA 精确回读，auto-run 开启 |
+| `phase2a1-lr1.json` | Tabbit 自动运行、刷新后新 session、始终 1 host/1 session、UploadFit external=0、runtime error=0 |
+| `phase2a1-lr3.json` | 800,044-byte PCM WAV 经真实 UI 确认后转为 117,600-byte MP3；Worker、回填、无提交、无外传、无持久化、cleanup 全通过 |
+| `core-200mb-gate.json` | 当前 handler/真实 Worker：200,000,044-byte PCM32 WAV→20,834,880-byte MP3；取消 8.2ms；临时 fixture 自动删除 |
+| `npm run check` | 25 files / 229 tests、production build、static-check 全通过 |
+
+LR3 唯一未出现的辅助信号是 CDP 未枚举到短生命周期 Blob Worker target；产品结果中的 `workerUsed=true`、独立 MP3 复检和 runtime cleanup 均为强制通过项，因此该信号记录为 `SUPPLEMENTAL_NON_BLOCKING`，不修改生产编码逻辑。
+
+`tabbit-matrix.json` 精确列出剩余项。200MB 门禁使用当前真实 handler/Worker，但没有伪称为 Tabbit LR4；LR8 和新标签页等精确环境重复仍保持 pending。后续只在这些项暴露产品行为缺陷时修改生产代码，不再为了辅助观测扩建测试框架。

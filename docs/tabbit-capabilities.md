@@ -2,11 +2,11 @@
 
 本文件是 S0 能力探针的持续记录。只有完成实际复现并保留证据后，能力才可标记为 `PASS`；当前未测试项目保持 `UNKNOWN`。
 
-## V2-S4 Phase 1 状态
+## V2-S4 Phase 2A1 状态
 
-本阶段只完成本地自动化 QA、安全和快速性能，状态 `IN_PROGRESS`。当前 production `dist/uploadfit.js` 为 421,348 bytes，SHA-256 `ABFA41EBB606CA0E7ED84F8DEE2F17783CAF0BDFA11CE777FB1BAEFBD173D18A`。Tabbit LR1–LR10 与实际 200MB 门禁均为 `NOT_RUN_PHASE_2`；本阶段不把 `127.0.0.1:9222` 监听、Playwright、debug bundle 或历史 S0/S2/S4 证据写成 V2-S4 实机 PASS。Phase 2 必须验证官方私有脚本上下文、部分网址匹配和同一 production SHA，并按 `docs/evidence/V2-S4/tabbit-matrix.json` 补齐结构化证据。
+状态 `CORE_PATH_PASS_REMAINDER_OPEN`。当前 production `dist/uploadfit.js` 为 421,347 bytes，SHA-256 `842FA9AB712C028AB1B9A94526B4FBEE175016A73E5B944A3987BFAC169A78D0`。Chrome/151.0.7922.109 的 Tabbit 官方私有脚本 exact save/reload、部分网址匹配、auto-run、LR1 刷新生命周期和 LR3 PCM WAV→MP3 已实测通过；测试页未直接注入 bundle。精确 LR4/LR8/LR9-new-tab/LR10 等剩余项见 `docs/evidence/V2-S4/tabbit-matrix.json`，保持 pending。
 
-以下“环境/能力矩阵/当前 bundle 实机证据”段落是 S0/S2 及既往平台记录，不是本轮 V2-S4 Phase 1 的 LR1–LR10 结果；本轮统一以 `NOT_RUN_PHASE_2` 交接，不从历史记录推导通过。
+以下“历史环境与平台记录”是 S0/S2 及既往平台记录；本轮 V2-S4 只引用 `docs/evidence/V2-S4/phase2a1-*.json`，不从历史记录推导通过。
 
 ## 历史环境与平台记录（非 V2-S4 Phase 1 证据）
 

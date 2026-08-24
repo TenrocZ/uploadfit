@@ -1,0 +1,80 @@
+{
+  "stage": "V2-S4",
+  "phase": "PHASE_2A1",
+  "check": "LR3",
+  "status": "PASS",
+  "runId": "s4lr3-20260824094201-475d45e6",
+  "startedAt": "2026-08-24T09:42:00.999Z",
+  "completedAt": "2026-08-24T09:42:07.477Z",
+  "browser": {
+    "product": "Chrome/151.0.7922.109",
+    "protocolVersion": "1.3"
+  },
+  "officialPrivateScript": {
+    "autoRun": true,
+    "directBundleInjectionIntoAudioPage": false,
+    "pageOwnBundleScript": false,
+    "bundleBytes": 421347,
+    "bundleSha256": "842FA9AB712C028AB1B9A94526B4FBEE175016A73E5B944A3987BFAC169A78D0"
+  },
+  "input": {
+    "container": "wav",
+    "codec": "pcm",
+    "bytes": 800044,
+    "durationMs": 4166.666666666667,
+    "channels": 2,
+    "sampleRate": 48000,
+    "bitDepth": 16,
+    "sha256": "CCB3A7D16EC40C7BD064DBD188BD175120FF94B13CE598CB6A7417FDA2999949",
+    "semanticContent": "synthetic-only",
+    "filenameRecorded": false,
+    "pathRecorded": false
+  },
+  "confirmations": {
+    "count": 1,
+    "types": ["AUDIO_LOSSY_TRANSCODE"],
+    "realClosedShadowUiClicks": 1
+  },
+  "processing": {
+    "workerUsed": true,
+    "encodePasses": 1,
+    "peakBufferedBytes": 1600000,
+    "activeWorkersAfter": 0,
+    "heartbeatSamples": 15,
+    "maxHeartbeatGapMs": 111,
+    "totalMs": 1476,
+    "workerTargetObservedByCdp": false,
+    "workerTargetObservationClassification": "SUPPLEMENTAL_NON_BLOCKING"
+  },
+  "output": {
+    "container": "mp3",
+    "codec": "mp3",
+    "mime": "audio/mpeg",
+    "bytes": 117600,
+    "frames": 175,
+    "durationMs": 4200,
+    "durationDeltaMs": 33.33333333333303,
+    "durationToleranceMs": 250,
+    "sha256": "74672AA2DEF60E5FDCF204F1098648436A7B44F618C21A78C9368DD689B444C9"
+  },
+  "dataTransfer": {
+    "finalFileEqualsProcessedFile": true,
+    "injectionStarts": 1,
+    "businessSubmitClicks": 0,
+    "controllerBusinessClickCount": 0
+  },
+  "privacyAndCleanup": {
+    "uploadFitExternalRequests": 0,
+    "sensitiveRequestMarkers": false,
+    "storageUnchanged": true,
+    "audioPersisted": false,
+    "runtimeErrors": 0,
+    "workerTerminated": true,
+    "objectUrlRevoked": true,
+    "queueCleared": true,
+    "testPageRestoredToOfficialEditor": true,
+    "audioBytesRecordedInEvidence": false,
+    "privateScriptIdRecorded": false,
+    "localAbsolutePathRecorded": false
+  }
+}

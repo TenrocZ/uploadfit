@@ -1,8 +1,8 @@
-# UploadFit V2-S4 测试结果（Phase 1）
+# UploadFit V2-S4 测试结果（Phase 1 + Phase 2A1）
 
 ## 当前施工状态
 
-本阶段状态为 `IN_PROGRESS`，不是 `READY_FOR_ACCEPTANCE` 或 `ACCEPTED`；V2-S5 为 `HOLD`。当前 production `dist/uploadfit.js` 为 421,348 bytes，SHA-256 为 `ABFA41EBB606CA0E7ED84F8DEE2F17783CAF0BDFA11CE777FB1BAEFBD173D18A`。Phase 1 基线提交为 `fbd67194409041c57e4b42d04bf91ef9e62df874`，返工 Batch A=`2a26897`、Batch B=`de768db79b1d70661b017dad4b42ee5712297b46`、Batch C=`53bcc5b21879d640dee047677d2462704ed783cd`、Batch D1=`c6e8b3b1fbbee44dba061abab819a14b20fb7cf5`；Batch D2 本轮文档提交在 Phase 2 最终交接时记录。
+本阶段状态为 `CORE_PATH_PASS_REMAINDER_OPEN`，不是最终 `ACCEPTED`。当前 production `dist/uploadfit.js` 为 421,347 bytes，SHA-256 为 `842FA9AB712C028AB1B9A94526B4FBEE175016A73E5B944A3987BFAC169A78D0`；相对 Phase 1 历史产物只去除 Tabbit 官方编辑器会剥离的末尾换行，可执行 token 未变。Phase 1 基线提交为 `fbd67194409041c57e4b42d04bf91ef9e62df874`，返工 Batch A=`2a26897`、Batch B=`de768db79b1d70661b017dad4b42ee5712297b46`、Batch C=`53bcc5b21879d640dee047677d2462704ed783cd`、Batch D1=`c6e8b3b1fbbee44dba061abab819a14b20fb7cf5`。
 
 四文件定向 runner 实测 `31/31`，`npm run check` 实测 25 个 Vitest 文件 / 229 个测试，一次最终全量 E2E 实测 `193/193`（workers=1，约 142s）；旧 V1 `docs/evidence/S4/*.png` 的自动覆盖已按白名单恢复，不能复用旧的 24/24 或 186/186。
 
@@ -10,7 +10,7 @@
 
 `node scripts/run-e2e.js tests/e2e/v2-audio-scenarios.spec.js tests/e2e/v2-audio-security.spec.js tests/e2e/v2-audio-performance.spec.js tests/integration/v2-media-regression.test.js --reporter=line --workers=1`
 
-Runner 证据强度严格区分：`DEBUG_CONTROLLER_REAL_WORKER`、`DEBUG_CONTROLLER_REAL_FILE`、`DEBUG_DIRECT_PIPELINE_REAL_WORKER`、`DEBUG_PURE_PLAN`、`DEBUG_FAKE_RUNTIME_BRANCH`、`PRODUCTION_IIFE_STATIC_ARTIFACT + DEBUG_REGISTRY`、`PRODUCTION_IIFE_LOCAL_PAGE`、`REAL_TABBIT_PRODUCTION`、`NOT_VERIFIED_PHASE_2`。plan-only 不填写 Worker=0，fake runtime 不宣称 production encoder；A18、真实 AI、200MB、Tabbit LR1–LR10 仍为 `NOT_VERIFIED_PHASE_2`。
+Phase 2A1：官方 Tabbit 私有脚本 exact save/auto-run、LR1 与 LR3 通过；当前 handler/真实 Worker 的 200,000,044-byte WAV→20,834,880-byte MP3 成功，取消延迟 8.2ms。`npm run check` 再次通过 25 files / 229 tests、build/static-check。精确 LR4/LR8/LR9-new-tab/LR10 仍按 `tabbit-matrix.json` 标记 pending，不以组合证据冒充实机 PASS。
 
 ## 历史 S5 测试结果
 

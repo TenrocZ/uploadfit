@@ -1,4 +1,4 @@
-# UploadFit V2-S4 性能记录（Phase 1）
+# UploadFit V2-S4 性能记录（Phase 1 + Phase 2A1）
 
 ## 快速自动化
 
@@ -8,9 +8,9 @@
 - P02 `[DEBUG_DIRECT_PIPELINE_REAL_WORKER]`：直接 pipeline 收到 encode progress 后取消，`AUDIO_PROCESSING_CANCELLED` 在 ≤1,000ms 返回，无迟到 progress/result，Worker/object URL/queue 清理通过。
 - P03：连续两个任务分别完成，Worker/object URL 清理字段完整，无 stale state；该项是顺序清理补充，不冒充队列并发测量。
 
-这是浏览器 debug harness 的快速门禁，不是 Tabbit 结果；生产页音频/图片回归已进入本轮一次最终全量 E2E（193/193 PASS）。`npm run check` 已完成（25 个 Vitest 文件/229 个测试 PASS）；实际 >200,000,000-byte 成功/取消门禁属于 Phase 2，当前 `NOT_RUN_PHASE_2`，不得引用 S0/S2 历史慢门禁冒充本轮。
+Phase 2A1 复用现有真实门禁对当前 handler/Worker 重新实测：200,000,044-byte PCM32 WAV 在 36,967ms 内输出 20,834,880-byte MP3，单次编码、独立帧校验通过、peakBufferedBytes=26,825,856、最大 heartbeat gap=112.1ms；处理中取消延迟 8.2ms，无部分输出，随后小任务复用成功。它证明大文件核心性能，但不冒充精确 Tabbit LR4。
 
-production `dist/uploadfit.js`：421,348 bytes，SHA-256 `ABFA41EBB606CA0E7ED84F8DEE2F17783CAF0BDFA11CE777FB1BAEFBD173D18A`。
+production `dist/uploadfit.js`：421,347 bytes，SHA-256 `842FA9AB712C028AB1B9A94526B4FBEE175016A73E5B944A3987BFAC169A78D0`。
 
 ## 历史 S5 性能记录（非 V2-S4 证据）
 

@@ -1,10 +1,10 @@
-# UploadFit V2-S4 安全复核（Phase 1）
+# UploadFit V2-S4 安全复核（Phase 1 + Phase 2A1）
 
 ## 当前施工状态
 
-状态为 `IN_PROGRESS`。四文件 Phase 1 定向 runner 本轮实测 `31/31` 通过（workers=1），最终全量 E2E 实测 `193/193`；其中 S01 使用真实小 WAV Worker/controller 路径，从页面初始化后计数和 storage before/after 快照测得 external audio requests=0、local/session persistence 未变化，不能外推为 Tabbit 全平台结论。最终全量中的 S01 样本为 outputBytes=11,493、workerUsed=true、encodePasses=1，阶段耗时 inspect=2.5ms、plan=1.3ms、confirm=0.3ms、process=105.5ms、validate=1.2ms；fetch/XHR/WebSocket/EventSource/sendBeacon/storage counter delta 均为 0。S02–S04 覆盖恶意标签、伪 taskId、异常格式和有界停止；S05 明确为 `FAKE_BRIDGE_REDACTION_HARNESS`，真实 Tabbit MAIN-world AI 仍未测量。生产产物 bytes/SHA 为 421,348 / `ABFA41EBB606CA0E7ED84F8DEE2F17783CAF0BDFA11CE777FB1BAEFBD173D18A`。
+状态为 `CORE_PATH_PASS_REMAINDER_OPEN`。Phase 1 定向 runner `31/31`、最终全量 E2E `193/193`；Phase 2A1 的 Tabbit LR3 实测 UploadFit external requests=0、敏感 payload marker=0、business submit click=0、local/session/IndexedDB/cache/OPFS 前后无变化、runtime error=0，并完成 Worker/object URL/queue cleanup。真实 MAIN-world AI LR8 仍未测量。当前生产产物 bytes/SHA 为 421,347 / `842FA9AB712C028AB1B9A94526B4FBEE175016A73E5B944A3987BFAC169A78D0`。
 
-新测试文件使用本地 `dist/uploadfit.test.js` debug harness 做确定性 API/Worker 断言，不能写成 Tabbit 或 production IIFE 实机证据；四文件定向中的 A18 production-IIFE 约束和最终全量 E2E 负责生产回归。本轮 `npm run check` 为 25 个 Vitest 文件/229 个测试 PASS，最终全量 E2E 为 193/193 PASS；实际 200MB 与 Tabbit LR1–LR10 是 Phase 2，当前未运行。
+新测试文件使用本地 `dist/uploadfit.test.js` debug harness 做确定性 API/Worker 断言，不能写成 Tabbit 或 production IIFE 实机证据；Tabbit 仅以 `phase2a1-lr1.json`/`phase2a1-lr3.json` 声明实测。实际 200MB 当前 handler/Worker 核心门禁已通过且临时音频已删除，但未冒充精确 Tabbit LR4。
 
 ## Phase 1 结论
 

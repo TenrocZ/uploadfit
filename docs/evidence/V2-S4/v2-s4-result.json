@@ -1,7 +1,7 @@
 {
   "stage": "V2-S4",
-  "phase": "PHASE_1",
-  "status": "IN_PROGRESS",
+  "phase": "PHASE_2A1_CORE_TRIAGE",
+  "status": "CORE_PATH_PASS_REMAINDER_OPEN",
   "baseCommit": "e9fea4c06f9602125df7434434fc6bbc1fd9f7c4",
   "phase1Commit": "fbd67194409041c57e4b42d04bf91ef9e62df874",
   "rework": {
@@ -17,12 +17,12 @@
     "npm": "10.9.3",
     "testServer": "http://127.0.0.1:8765",
     "browserRunner": "Playwright via scripts/run-e2e.js",
-    "tabbit": "NOT_RUN_PHASE_2"
+    "tabbit": "Chrome/151.0.7922.109 official private-script editor and auto-run"
   },
   "bundle": {
     "path": "dist/uploadfit.js",
-    "bytes": 421348,
-    "sha256": "ABFA41EBB606CA0E7ED84F8DEE2F17783CAF0BDFA11CE777FB1BAEFBD173D18A",
+    "bytes": 421347,
+    "sha256": "842FA9AB712C028AB1B9A94526B4FBEE175016A73E5B944A3987BFAC169A78D0",
     "format": "single IIFE",
     "runtimeRemoteDependencies": 0
   },
@@ -33,7 +33,7 @@
     "DEBUG_PURE_PLAN": "bounded metadata/plan/predicate evidence only; no Worker count inferred",
     "DEBUG_FAKE_RUNTIME_BRANCH": "fake runtime/bridge protocol or two-pass algorithm branch only",
     "PRODUCTION_IIFE_LOCAL_PAGE": "local page/full E2E production artifact regression",
-    "REAL_TABBIT_PRODUCTION": "NOT_RUN_PHASE_2",
+    "REAL_TABBIT_PRODUCTION": "official private script saved with exact readback; LR1 and LR3 passed",
     "NOT_VERIFIED_PHASE_2": "real Tabbit MAIN-world, real AI, 200MB, refresh/new-tab lifecycle"
   },
   "commands": {
@@ -138,37 +138,49 @@
     "maliciousMarkupExecution": { "value": 0, "source": "S02 script node count delta", "scope": "local debug page" }
   },
   "slow200MbGate": {
-    "status": "NOT_RUN_PHASE_2",
-    "success": null,
-    "cancel": null,
-    "fixtureBytes": null,
-    "fixtureSha256": null,
-    "outputBytes": null,
-    "outputSha256": null,
-    "cleanup": "NOT_RUN_PHASE_2"
+    "status": "CORE_GATE_PASS_EXACT_TABBIT_LR4_PENDING",
+    "runner": "current audio handler plus real frozen Worker in local Chromium",
+    "tabbitLr4Claimed": false,
+    "fixtureBytes": 200000044,
+    "fixtureKind": "synthetic PCM32 WAV",
+    "success": true,
+    "outputBytes": 20834880,
+    "outputSha256": "9394F96A5CDBD87823BB3223F584BB844471A74C6AA73DAB2B0EB44C39F16FBC",
+    "outputValidationValid": true,
+    "encodePasses": 1,
+    "workerUsed": true,
+    "maxHeartbeatGapMs": 112.09999990463257,
+    "cancelErrorCode": "AUDIO_PROCESSING_CANCELLED",
+    "cancelLatencyMs": 8.200000047683716,
+    "cleanup": "PASS_TEMP_FIXTURE_REMOVED_WORKER_URL_QUEUE_DISPOSED",
+    "evidence": "core-200mb-gate.json"
   },
   "tabbit": {
-    "status": "NOT_RUN_PHASE_2",
+    "status": "LR1_LR3_PASS_REMAINDER_OPEN",
     "sameProductionShaRequired": true,
-    "browser": "NOT_VERIFIED_PHASE_2",
-    "officialPrivateScriptContextVerified": "NOT_VERIFIED_PHASE_2",
+    "browser": "Chrome/151.0.7922.109",
+    "officialPrivateScriptContextVerified": true,
+    "bundleExactReadback": true,
+    "uploadFitExternalRequestsInLr3": 0,
+    "businessSubmitClicksInLr3": 0,
+    "persistentAudioInLr3": false,
     "lr": {
-      "LR1": "NOT_RUN_PHASE_2",
-      "LR2": "NOT_RUN_PHASE_2",
-      "LR3": "NOT_RUN_PHASE_2",
-      "LR4": "NOT_RUN_PHASE_2",
-      "LR5": "NOT_RUN_PHASE_2",
-      "LR6": "NOT_RUN_PHASE_2",
-      "LR7": "NOT_RUN_PHASE_2",
+      "LR1": "PASS",
+      "LR2": "AUTOMATION_PASS_EXACT_TABBIT_PENDING",
+      "LR3": "PASS",
+      "LR4": "CORE_GATE_PASS_EXACT_TABBIT_PENDING",
+      "LR5": "AUTOMATION_PASS_EXACT_TABBIT_PENDING",
+      "LR6": "CORE_GATE_PASS_EXACT_TABBIT_PENDING",
+      "LR7": "AUTOMATION_PASS_EXACT_TABBIT_PENDING",
       "LR8": "NOT_RUN_PHASE_2",
-      "LR9": "NOT_RUN_PHASE_2",
-      "LR10": "NOT_RUN_PHASE_2"
+      "LR9": "REFRESH_PASS_NEW_TAB_PENDING",
+      "LR10": "PHASE1_FULL_E2E_PASS_EXACT_TABBIT_PENDING"
     }
   },
   "knownLimitations": [
-    "Phase 1 does not execute the >200000000-byte real slow gate.",
-    "Phase 1 does not execute Tabbit LR1-LR10 or real MAIN-world LLMBridge.",
-    "A18 full close/refresh/new-tab lifecycle remains NOT_VERIFIED_PHASE_2.",
+    "The >200000000-byte success/cancel core gate passed in current-handler local Chromium, but is not mislabeled as exact Tabbit LR4.",
+    "Tabbit LR1 and LR3 passed; exact Tabbit repetitions LR2 and LR4-LR10 remain open as listed in tabbit-matrix.json.",
+    "A18 refresh passed in LR1; close/new-tab lifecycle remains NOT_VERIFIED_PHASE_2.",
     "Format adversary gaps remain for >1MiB ID3, complete Xing/VBRI index variants, more MPEG versions/layers and extreme BMFF layouts.",
     "Debug runner results are not production-IIFE/Tabbit evidence; full E2E production regressions are reported separately."
   ]
