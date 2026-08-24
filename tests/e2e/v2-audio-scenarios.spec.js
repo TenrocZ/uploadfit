@@ -34,7 +34,7 @@ async function open(page) {
 }
 
 async function install(page, ruleSet = rules(), options = {}) {
-  await page.evaluate(({ configuredRules, forceMono, failProcessedInjection, observeRejections }) => {
+  await page.evaluate(({ configuredRules, forceMono }) => {
     const api = globalThis.__uploadfit_debug_bundle__;
     const input = document.createElement('input');
     input.type = 'file';
@@ -77,15 +77,6 @@ async function install(page, ruleSet = rules(), options = {}) {
     const injectFileFn = (inputElement, file, injectOptions = {}) => {
       injectionCalls += 1;
       injectionReasons.push(injectOptions.reason ?? null);
-      if (failProcessedInjection && injectOptions.reason === 'processed') {
-        return {
-          ok: false,
-          inputFilesVerified: false,
-          eventsDispatched: [],
-          fallback: 'download',
-          errorCode: 'DATATRANSFER_UNAVAILABLE'
-        };
-      }
       return nativeInject(inputElement, file, injectOptions);
     };
 
@@ -105,9 +96,6 @@ async function install(page, ruleSet = rules(), options = {}) {
       validateOutput: (...args) => nativeAudio.validateOutput(...args),
       dispose: () => nativeAudio.dispose()
     } : undefined;
-    const rejectionHooks = [];
-    let rejectionSignals = 0;
-
     const controller = api.createTaskController({
       documentRef: document,
       globalRef: window,
@@ -117,20 +105,6 @@ async function install(page, ruleSet = rules(), options = {}) {
       injectFileFn,
       ...(audioHandler ? { audioHandler } : {})
     });
-    if (observeRejections) {
-      controller.observeRejection = (task, context, callbacks) => {
-        const wrappedCallbacks = {
-          ...callbacks,
-          onRejection: (detail) => {
-            rejectionSignals += 1;
-            return callbacks.onRejection(detail);
-          }
-        };
-        const hook = { task, context, callbacks: wrappedCallbacks, stopped: false };
-        rejectionHooks.push(hook);
-        return () => { hook.stopped = true; };
-      };
-    }
     controller.registerUploader({
       input,
       uploaderId: 'v2-s4-audio-uploader',
@@ -153,15 +127,11 @@ async function install(page, ruleSet = rules(), options = {}) {
       injectionReasons,
       logger,
       configuredRules,
-      rejectionHooks,
-      get rejectionSignals() { return rejectionSignals; },
       NativeWorker
     };
   }, {
     configuredRules: ruleSet,
     forceMono: options.forceMono === true,
-    failProcessedInjection: options.failProcessedInjection === true,
-    observeRejections: options.observeRejections === true
   });
 }
 
@@ -357,28 +327,30 @@ test.describe('V2-S4 A01-A18 audio QA matrix', () => {
     await dispose(page);
   });
 
-  test('Q-S4-P03 [DEBUG_CONTROLLER_REAL_WORKER] A15 retries one strict rejection and refuses a second retry', async ({ page }) => {
+  test('Q-S4-P03 [DEBUG_CONTROLLER_REAL_WORKER] A15 uses the real DOM rejection observer for one strict retry only', async ({ page }) => {
     await open(page);
-    await install(page, rules({ maxBytes: 500_000 }), { observeRejections: true });
+    await install(page, rules({ maxBytes: 500_000 }));
+    await page.evaluate(() => {
+      const scope = document.createElement('form');
+      scope.id = 'v2-s4-rejection-scope';
+      const error = document.createElement('div');
+      error.className = 'error';
+      error.setAttribute('role', 'alert');
+      scope.append(__v2S4.input, error);
+      document.body.append(scope);
+      __v2S4.rejectionNode = error;
+    });
     await select(page, 'wav', { seconds: 0.6, channels: 1, bitDepth: 16 });
     await waitFor(page, () => __v2S4.controller.getSnapshot().activeTask?.status === 'NEEDS_CONFIRMATION');
     await confirm(page, true);
     await waitFor(page, () => __v2S4.controller.getSnapshot().activeTask?.status === 'SUCCESS');
-    await waitFor(page, () => __v2S4.rejectionHooks.some((hook) => !hook.stopped));
-
     await page.evaluate(() => {
       __v2S4.controller.resolveRules = () => ({
         ...__v2S4.configuredRules,
         maxBytes: 250_000,
         sources: [{ type: 'nearby-text', priority: 500, confidence: 0.99, evidence: ['MP3 最大 250KB'] }]
       });
-      const hook = __v2S4.rejectionHooks.find((item) => !item.stopped);
-      hook.callbacks.onRejection({
-        kind: 'explicit',
-        related: true,
-        errorCode: 'REVIEW_REJECTED',
-        candidates: [{ sourceType: 'nearby-text', sourcePriority: 500, confidence: 0.99 }]
-      });
+      __v2S4.rejectionNode.textContent = '文件大小不超过250KB';
     });
     await waitFor(page, () => __v2S4.controller.getSnapshot().activeTask?.status === 'NEEDS_CONFIRMATION');
     await confirm(page, true);
@@ -386,16 +358,8 @@ test.describe('V2-S4 A01-A18 audio QA matrix', () => {
       const task = __v2S4.controller.getSnapshot().activeTask;
       return task?.status === 'SUCCESS' && task.retryCount === 1;
     });
-    await waitFor(page, () => __v2S4.rejectionHooks.filter((hook) => !hook.stopped).length > 0);
-
     await page.evaluate(() => {
-      const hook = __v2S4.rejectionHooks.find((item) => !item.stopped);
-      hook.callbacks.onRejection({
-        kind: 'explicit',
-        related: true,
-        errorCode: 'REVIEW_REJECTED',
-        candidates: [{ sourceType: 'nearby-text', sourcePriority: 500, confidence: 0.99 }]
-      });
+      __v2S4.rejectionNode.textContent = '文件大小不超过250KB（第二次拒收）';
     });
     await waitFor(page, () => __v2S4.controller.getSnapshot().activeTask?.status === 'STOPPED');
     const result = await page.evaluate(() => {
@@ -410,7 +374,7 @@ test.describe('V2-S4 A01-A18 audio QA matrix', () => {
         workerStarts: __v2S4.workerStarts,
         retryEvents: entries.filter((entry) => entry.event === 'RETRY_TRIGGERED').length,
         rejectionEvents: entries.filter((entry) => entry.event === 'REJECTION_DETECTED').length,
-        rejectionSignals: __v2S4.rejectionSignals,
+        rejectionNodeText: __v2S4.rejectionNode?.textContent ?? null,
         businessClicks: internal?.businessClickCount ?? null,
         submitEvents: entries.filter((entry) => /SUBMIT|BUSINESS/.test(entry.event)).length
       };
@@ -422,7 +386,7 @@ test.describe('V2-S4 A01-A18 audio QA matrix', () => {
     expect(result.workerStarts).toBe(2);
     expect(result.retryEvents).toBe(1);
     expect(result.rejectionEvents).toBe(1);
-    expect(result.rejectionSignals).toBe(2);
+    expect(result.rejectionNodeText).toContain('第二次拒收');
     expect(result.businessClicks).toBe(0);
     expect(result.submitEvents).toBe(0);
     await dispose(page);
@@ -462,11 +426,29 @@ test.describe('V2-S4 A01-A18 audio QA matrix', () => {
     }
   });
 
-  test('Q-S4-P05 [DEBUG_CONTROLLER_REAL_WORKER] A17 rolls back after injection failure and exposes download fallback', async ({ page }) => {
+  test('Q-S4-P05 [DEBUG_CONTROLLER_REAL_WORKER] A17 real DataTransfer failure rolls back and exposes download fallback', async ({ page }) => {
     await open(page);
-    await install(page, rules({ maxBytes: 2_000_000 }), { failProcessedInjection: true });
+    await install(page, rules({ maxBytes: 2_000_000 }));
     await select(page, 'wav', { seconds: 0.6, channels: 1, bitDepth: 16 });
     await waitFor(page, () => __v2S4.controller.getSnapshot().activeTask?.status === 'NEEDS_CONFIRMATION');
+    await page.evaluate(() => {
+      const NativeDataTransfer = window.DataTransfer;
+      let calls = 0;
+      class FailOnceDataTransfer {
+        constructor(...args) {
+          calls += 1;
+          if (calls === 1) throw new TypeError('controlled DataTransfer constructor failure');
+          return new NativeDataTransfer(...args);
+        }
+      }
+      Object.defineProperty(window, 'DataTransfer', {
+        configurable: true,
+        writable: true,
+        value: FailOnceDataTransfer
+      });
+      __v2S4.NativeDataTransfer = NativeDataTransfer;
+      __v2S4.dataTransferCalls = () => calls;
+    });
     await confirm(page, true);
     await waitFor(page, () => __v2S4.controller.getSnapshot().activeTask?.status === 'STOPPED');
     const result = await page.evaluate(() => {
@@ -474,6 +456,12 @@ test.describe('V2-S4 A01-A18 audio QA matrix', () => {
       const task = snapshot.activeTask;
       const internal = task ? __v2S4.controller.tasks.get(task.taskId) : null;
       const entries = __v2S4.logger.getEntries();
+      const dataTransferCalls = __v2S4.dataTransferCalls();
+      Object.defineProperty(window, 'DataTransfer', {
+        configurable: true,
+        writable: true,
+        value: __v2S4.NativeDataTransfer
+      });
       return {
         status: task?.status,
         errorCode: task?.errorCode,
@@ -482,6 +470,7 @@ test.describe('V2-S4 A01-A18 audio QA matrix', () => {
         fileCount: __v2S4.input.files.length,
         injectionCalls: __v2S4.injectionCalls,
         injectionReasons: __v2S4.injectionReasons.slice(),
+        dataTransferCalls,
         workerStarts: __v2S4.workerStarts,
         activeWorkers: __v2S4.activeWorkers,
         processingStarts: entries.filter((entry) => entry.event === 'AUDIO_PROCESSING_STARTED').length,
@@ -497,6 +486,7 @@ test.describe('V2-S4 A01-A18 audio QA matrix', () => {
     expect(result.fileCount).toBe(1);
     expect(result.injectionCalls).toBe(2);
     expect(result.injectionReasons).toEqual(['processed', 'restore']);
+    expect(result.dataTransferCalls).toBe(2);
     expect(result.workerStarts).toBe(1);
     expect(result.activeWorkers).toBe(0);
     expect(result.processingStarts).toBe(1);

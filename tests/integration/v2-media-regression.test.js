@@ -34,7 +34,7 @@ test.describe('V2-S4 media regression and frozen contract', () => {
       return {
         compliant: { passthrough: compliant.passthrough, confirmations: compliant.confirmations.length },
         variants,
-        unsupported: unsupported.map((plan) => ({ executable: plan.executable, stops: plan.unfixable, workers: 0 }))
+        unsupported: unsupported.map((plan) => ({ executable: plan.executable, stops: plan.unfixable }))
       };
     });
     expect(result.compliant).toEqual({ passthrough: true, confirmations: 0 });
@@ -46,7 +46,6 @@ test.describe('V2-S4 media regression and frozen contract', () => {
     for (const stopped of result.unsupported) {
       expect(stopped.executable).toBe(false);
       expect(stopped.stops).toContain('AUDIO_CODEC_UNSUPPORTED');
-      expect(stopped.workers).toBe(0);
     }
   });
 
@@ -179,7 +178,7 @@ test.describe('V2-S4 media regression and frozen contract', () => {
     expect(result.originalRestored).toBe(true);
   });
 
-  test('A18 [PRODUCTION_IIFE_LOCAL_PAGE] registry keeps image/audio isolated and bundle is a single IIFE', async ({ page }) => {
+  test('A18 [PRODUCTION_IIFE_STATIC_ARTIFACT + DEBUG_REGISTRY] registry keeps image/audio isolated and bundle is a single IIFE', async ({ page }) => {
     await open(page);
     const response = await page.request.get('/dist/uploadfit.js');
     const artifact = await response.text();
