@@ -109,3 +109,16 @@ git diff --check
 - bundle 若未改源码，继续为 421348 bytes / `ABFA…D18A`；若改变，记录新 SHA 并以新 SHA 进入 Phase 2；
 - 工作区无旧 V1 截图、debug bundle、大 fixture、profile 或敏感信息漂移；
 - 提交聚焦本地 commit，状态保持 `IN_PROGRESS`，等待 `/root` 复核后再恢复 Phase 2。
+
+## 9. 第二次独立回扫残留（Batch D，2026-08-24）
+
+对返工提交 `2a26897`、`de768db`、`53bcc5b` 的只读复核确认大部分缺口已关闭，但以下 6 项仍须完成；在此之前 Phase 2 再次暂停：
+
+1. `tests/integration/v2-media-regression.test.js` 的 A01/A03/A04 `DEBUG_PURE_PLAN` 仍硬编码 `workers: 0` 并断言。删除该字段/断言或写为 `NOT_MEASURED`；plan-only 不能证明 Worker 构造次数。
+2. Q-S4-P03 用替换后的 `observeRejection` hook 直接回调，没有经过 `src/dom/rejection-observer.js` 的真实 DOM 观察。改为实际 observer + 关联错误 DOM 节点，验证 500KB→250KB 一次 retry 和第二次拒收不再处理；若保留 hook 用例，必须降级标记 `FAKE_REJECTION_HOOK` 且另补真实 observer 证据。
+3. Q-S4-P05 的 `failProcessedInjection` 直接返回伪造失败对象。必须在真实 controller 链中让生产 `injectFile/DataTransfer` 失败，例如在处理前受控移除 DataTransfer、让真实注入器返回失败，再恢复环境；验证事务恢复、download fallback、清理和 submit=0。直接 helper 测试只作底层补充。
+4. `v2-media-regression.test.js` 的 A18 标成 `PRODUCTION_IIFE_LOCAL_PAGE`，但实际 registry 来自 debug bundle，production 只被下载做静态检查。改为如实 runner（例如 `PRODUCTION_IIFE_STATIC_ARTIFACT + DEBUG_REGISTRY`），或真正加载 production IIFE 后再声明 production page。P01/P02 直接调用 `api.processAudio`，runner 也不得写 controller。
+5. 将 `v2-s4-result.json`、`tabbit-matrix.json`、S4 handoff 中的 `PENDING_FINAL_COMMIT_BACKFILL` 回填为 `53bcc5b21879d640dee047677d2462704ed783cd`；Batch D 提交可留到 Phase 2 最终文档统一记录，避免循环占位。
+6. Tabbit 未执行时，`officialPrivateScriptContextVerified` 不得写布尔 `false`，应写 `NOT_VERIFIED_PHASE_2`。`fakeBridgeSensitiveCalls` 必须写出 fake bridge 测量来源，或改为 `NOT_APPLICABLE_FAKE_BRIDGE_HARNESS`，不得表现为真实 Tabbit 测量值。
+
+Batch D 退出：相关 S4 定向用例全绿、JSON 可解析、`rg` 不再命中上述占位/硬编码、production bundle 未漂移、工作区 clean；不需要再次运行全量 E2E，也不运行 200MB/Tabbit。
