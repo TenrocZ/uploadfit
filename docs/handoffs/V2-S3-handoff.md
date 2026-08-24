@@ -1,80 +1,60 @@
 # V2-S3 Handoff：编排确认 UI 与音频回填闭环
 
-- Status: `READY_FOR_ACCEPTANCE`
+- Status: `ACCEPTED`
 - Date: 2026-08-24
-- Agent: `Codex /root/v2_s3_implementation`
+- Implementation agent: `Codex /root/v2_s3_implementation`
+- Independent acceptance: `Codex /root`
 - Start commit: `bf266484ee85d7deb30ea04584ee74e0c6e2d7a8`
-- End code commit: `dd4e35f54ebc0253df39cdc82dd3603b83ea7377`
-- Prerequisites: V2-S0、V2-S1、V2-S2 已验收；S2 第三轮交接和 ADR-005 为事实基线
-- Scope: 正式 `TaskController` 的 image/audio registry 路由、音频确认/进度/取消/成功/失败 UI、DataTransfer 回填与事务恢复、拒收一次 retry；不扩展 codec，不执行 S4 门禁
-- Acceptance: 仅提交给独立验收 Agent；本 handoff 不自我标记 `ACCEPTED`
+- Initial code baseline: `dd4e35f54ebc0253df39cdc82dd3603b83ea7377`
+- Accepted code commit: `a430d91fa406686a57d38e5321bfa420437c50d4`
+- Artifact commit: `092ac4815243f18c9acd81aa752e7db5e06660fd`
+- Scope: 正式 controller 的 image/audio registry 路由、音频确认/进度/取消 UI、DataTransfer 回填与事务恢复、严格收紧后的拒收一次 retry；不扩展 codec，不执行 S4 实机门禁
 
-## 交付摘要
+## 交付与冻结边界
 
-### Controller 与 handler
+`src/core/media-handlers.js` 统一 image/audio registry，`src/core/task-controller.js` 复用既有状态机、FIFO、确认、注入、回滚、拒收观察、下载/恢复和清理。合规 MP3 原 File passthrough；PCM WAV 16/24/32-bit mono/stereo 可在确认后转 MP3；超限 MP3 和 M4A/AAC 稳定返回 `AUDIO_CODEC_UNSUPPORTED`，不创建 Worker。仅 duration、无可信 maxBytes、目标不允许 MP3、官方工具、原始/无损语义均安全停止。
 
-`src/core/media-handlers.js` 增加 image adapter 并统一 registry；`src/core/task-controller.js` 按 `mediaKind` 路由 image/audio，保留原状态机、队列、确认、注入、回滚、拒收观察、下载/恢复、清理和任务隔离。音频分支在 process 前重新使用 canonical plan，process 后独立复检；不满足冻结子集时返回稳定停止码且不创建 Worker。
+拒收重试已增加严格门禁：相同规则、规则放宽、无关文字或停止语义不会重新处理；只有仍允许 MP3 且对可执行计划形成严格收紧的新规则才可重新规划，最多一次。二次拒收不再处理或派发业务事件。
 
-冻结矩阵：合规 MP3 原 File passthrough；PCM WAV 16/24/32-bit mono/stereo 转 MP3；超限 MP3 和全部 M4A/AAC（含 AAC-LC）为 `AUDIO_CODEC_UNSUPPORTED`，`process=0`、`Worker=0`；仅 duration、无可信 maxBytes、目标不允许 MP3 均安全停止。不新增 decoder，不自动裁剪/分段。
+音频 UI 展示原/目标格式、字节、duration、bitrate、channels/mono、有损警告及规则来源/有界原文。确定进度的视觉、文字和 ARIA 数值来自同一 ratio；只有未知进度使用不确定动画。所有外部文字用 `textContent`，按钮同级且不自动点击业务提交。
 
-### Production Worker 嵌入
-
-`src/audio/worker-runtime.js` 允许构建时注入 S2 implementation source，`esbuild.config.js` 将冻结 `lamejs@1.2.1` Worker 真正嵌入 production/test 单 IIFE；显著 ADR-005 约束和可替换构建路径保留。没有 runtime `import`/`export`、网络加载或新的 package dependency。上游源码中不执行的项目 URL 被标为 `embedded://lamejs`，只做静态扫描去歧义；构建同时移除历史尾随空格，不改变编码执行语义。
-
-最终 production artifact（本次仅 notice/build follow-up 更新）：
+production Worker 与冻结的 `lamejs@1.2.1` 嵌在单 IIFE 内，无 runtime import/export 或远程依赖。最终产物：
 
 ```text
 dist/uploadfit.js
-bytes: 419478
-SHA-256: 007D9DE412C98E02F9EE0EAE258A45268CFA5F27D1ACE8F32CD9EC23A39BA166
+bytes: 421348
+SHA-256: ABFA41EBB606CA0E7ED84F8DEE2F17783CAF0BDFA11CE777FB1BAEFBD173D18A
 ```
 
-Production 与 debug IIFE 首行均为稳定显著 notice：`UploadFit embeds lamejs 1.2.1 (package-declared LGPL-3.0)`，并指向 `docs/evidence/V2-S0/licenses/` 的 source/license/NOTICE/relinking 材料。`esbuild.config.js` 对两种 build 做 prefix assertion，`scripts/static-check.js` 对 production（及存在时的 test artifact）做静态断言。
+## 返工闭环
 
-### UI、生命周期与隐私
+首轮验收产生 [返工施工单](V2-S3-acceptance-rework-order.md)，Luna Max 分三项完成：
 
-`src/ui/task-card.js`、`src/ui/status-pill.js`、`src/ui/host.js` 增加 audio-safe 展示：原/目标格式、字节、duration、bitrate、channels/mono、lossy warning、限频单调进度、取消、成功/失败和错误码。按钮同级、使用 `textContent`；现有 closed Shadow DOM、键盘/焦点、`aria-live`、200% zoom、reduced-motion 约束继续生效。关闭、换文件、input detach、pagehide 均 abort；迟到消息在 taskId/生命周期校验后不能注入。
+- `c04e1a8`：严格拒收规则比较与 controller 回归；
+- `ab60dc3`：音频 UI、进度和 UI E2E；
+- `a430d91`：A–H 稳定页的真实 M4A、长 WAV 取消和 500KB→250KB retry。
 
-`src/utils/logger.js` 只保留稳定音频标量字段；单测和定向 E2E 覆盖 snapshot/log 不出现文件名或 File/Blob 内容。业务按钮不自动点击，定向和稳定页均断言 submit click 为 0。
-
-## 本地稳定页与测试
-
-稳定页：`test-pages/audio-s3.html?scenario=A` 至 `?scenario=H`，脚本和样式分别为 `test-pages/audio-s3.js`、`test-pages/audio-s3.css`；首页入口见 `test-pages/index.html`。页面只生成本地 fixture 或复用当前内存 MP3，不提交真实用户文件，不读取文件名、tags、PCM 或页面外文本。
-
-新增测试：
-
-- `tests/e2e/v2-audio-s3.spec.js`：production/debug bundle 的 PCM WAV 成功链、MP3 passthrough、A–H 页面入口/可访问快照、H 一次关联拒收 retry。
-- `tests/e2e/v2-audio-s3-controller.spec.js`：超限 MP3/M4A、无 maxBytes、目标格式不允许、duration stop、确认拒绝、cancel/detach、DataTransfer rollback/download、拒收一次 retry、image/audio 隔离、snapshot/log 脱敏和 submit click=0。
-- `tests/unit/logger.test.js`：音频进度日志安全投影。
+独立复验没有复用施工 Agent 的“通过”结论；主验收 Agent 重跑了 S3 定向和全量测试。最终裁决见 [V2-S3 最终验收报告](V2-S3-final-acceptance.md)。
 
 ## 验证结果
 
 环境：Windows PowerShell，Node `v22.20.0`，npm `10.9.3`，本地 Playwright Chromium。
 
-| 命令 | 实际结果 |
+| 命令 | 独立实测 |
 |---|---|
-| `npm run check` | 通过：25 个 Vitest 文件、229 个测试；production build 419478 bytes；static-check PASS；SHA 如上 |
-| `npm run test:e2e -- tests/e2e/v2-audio-s3-controller.spec.js tests/e2e/v2-audio-s3.spec.js --reporter=line --workers=1` | 通过：9/9 |
-| `npm run test:e2e -- --reporter=line --workers=1` | 通过：156/156（本阶段唯一一次全量 E2E） |
-| `git diff --check` | 通过 |
+| `npm run check` | PASS：25 个 Vitest 文件、229 项；production build/static-check PASS |
+| `npm run build:test` | PASS：debug IIFE 427067 bytes |
+| `node scripts/run-e2e.js tests/e2e/v2-audio-s3-controller.spec.js tests/e2e/v2-audio-s3-ui.spec.js tests/e2e/v2-audio-s3.spec.js --reporter=line --workers=1` | PASS：15/15 |
+| `node scripts/run-e2e.js --reporter=line --workers=1` | PASS：162/162（返工后全量一次） |
+| `git diff ee18af3..a430d91 --check` | PASS |
+| 调试标记扫描 | PASS：0 命中 |
 
-全量 E2E 中的既有 S4/S5 synthetic tests 仅作回归，不等同于 S4 实机验收。S4 真实 Tabbit、S4 200MB 慢速门禁和 S5 交付命令均未在本阶段执行。
+全量 E2E 中既有的 synthetic 测试只作回归，不等同于真实 Tabbit。S3 没有重跑 S2 的 200MB 慢速门禁，也没有执行 S4/S5 交付命令。
 
-## 追踪与证据
+## A–H 与证据入口
 
-- 结构化结果：`docs/evidence/V2-S3/result.json`
-- 证据说明：`docs/evidence/V2-S3/README.md`
-- 追踪矩阵：`docs/v2/work-orders/90-需求追踪矩阵.md`
-- 需求与冻结依据：[V2 S3 施工单](../v2/work-orders/40-V2-S3-编排确认UI与回填闭环.md)、[ADR-005](../decisions/ADR-005-V2-S0-音频编解码方案.md)
+本地稳定页为 `test-pages/audio-s3.html?scenario=A` 至 `?scenario=H`。C 使用实际 M4A fixture 和超限 MP3；G 使用足够长 WAV 在 processing 中验证取消和 input detach；H 从 500KB 规则严格收紧到 250KB。结构化结果见 `docs/evidence/V2-S3/result.json`，详细映射见 `docs/evidence/V2-S3/README.md`。
 
-## 资源、许可与复用边界
+## 后续授权
 
-- 没有新增 npm dependency；继续使用 S0/S2 已验收 `lamejs@1.2.1`、LGPL/NOTICE 和构建路径。
-- S2 `docs/evidence/V2-S2/audio-200-to-100.json`、PCM 六组合真实 Worker 和 cleanup 证据是复用证据，不记录为 S3 新执行。
-- S3 本轮实际执行的是 controller/UI/audio targeted E2E、生产 IIFE build/static-check 和一次 156/156 全量回归。
-
-## 已知限制与交接请求
-
-1. 超限 MP3 重编码与 M4A/AAC 转码仍稳定停止为 `AUDIO_CODEC_UNSUPPORTED`；解禁前必须按 ADR-005 条件 4 走新 ADR。
-2. 真实 Tabbit 和 200MB 慢速门禁留给 V2-S4，当前阶段明确 `HOLD`；V2-S5 也保持 `HOLD`。
-3. 请独立验收 Agent 按 S3 施工单复核 A–H 页面、production bundle SHA、controller E2E 和 rollback/privacy 证据后，再决定是否将矩阵 S3 行改为 `ACCEPTED`。
+V2-S3 已通过独立验收，V2-S4 可以启动。S4 必须对 artifact commit `092ac48` / 上述 SHA 执行真实 Tabbit LR、安全性能、当前 production IIFE 和 200MB 慢速门禁；通过前 V2-S5 保持 `HOLD`，且不得对外宣称 V2 已发布。

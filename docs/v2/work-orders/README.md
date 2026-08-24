@@ -4,10 +4,10 @@
 
 ## 1. 当前放行状态
 
-- 已验收：`V2-S0`、`V2-S1`、`V2-S2`
-- 当前可施工：`V2-S3`
-- 当前禁止施工：`V2-S4`、`V2-S5`（必须等待前序阶段独立验收）
-- 放行依据：V2-S2 第三轮验收为 `ACCEPTED`，见 `docs/handoffs/V2-S2-handoff.md` 与 `docs/handoffs/V2-S2-third-rework-report.md`
+- 已验收：`V2-S0`、`V2-S1`、`V2-S2`、`V2-S3`
+- 当前可施工：`V2-S4`
+- 当前禁止施工：`V2-S5`（必须等待 V2-S4 独立验收）
+- 放行依据：V2-S3 返工后独立验收为 `ACCEPTED`，见 `docs/handoffs/V2-S3-final-acceptance.md` 与 `docs/evidence/V2-S3/result.json`
 - 编码器边界：S3–S5 只接入/验证合规 MP3 passthrough 与 PCM WAV→MP3；超限 MP3、M4A/AAC 归 V2.1，不得在当前施工中扩写
 - 施工 Agent 只能写 `READY_FOR_ACCEPTANCE`，不得自行宣布阶段通过
 

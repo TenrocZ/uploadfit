@@ -1,9 +1,27 @@
 {
   "stage": "V2-S3",
-  "status": "READY_FOR_ACCEPTANCE",
-  "acceptance": "PENDING_INDEPENDENT_REVIEW",
+  "status": "ACCEPTED",
+  "acceptance": "INDEPENDENT_REVIEW_PASSED",
+  "acceptanceDate": "2026-08-24",
   "startCommit": "bf266484ee85d7deb30ea04584ee74e0c6e2d7a8",
-  "endCommit": "dd4e35f54ebc0253df39cdc82dd3603b83ea7377",
+  "initialImplementationCommit": "d65df7ee44d4baae558ed673a997838980ecb09c",
+  "initialAcceptanceBaseline": "dd4e35f54ebc0253df39cdc82dd3603b83ea7377",
+  "endCommit": "a430d91fa406686a57d38e5321bfa420437c50d4",
+  "artifactCommit": "092ac4815243f18c9acd81aa752e7db5e06660fd",
+  "rework": {
+    "order": "docs/handoffs/V2-S3-acceptance-rework-order.md",
+    "orderCommit": "ee18af3b3951a5a4632f802f18888cb27f094c79",
+    "fixCommits": {
+      "strictRejectionGate": "c04e1a88de21c378c6eba63a381d7116e76319ab",
+      "audioUi": "ab60dc384e225abc35259fca098bfe353cb5724f",
+      "stablePages": "a430d91fa406686a57d38e5321bfa420437c50d4"
+    },
+    "closedFindings": [
+      "R3-1: identical or looser rejection rules no longer trigger audio reprocessing; only a strictly tighter supported rule may retry",
+      "R3-2: audio confirmation exposes bounded rule evidence, audio-specific copy and truthful determinate progress",
+      "R3-3: stable scenarios use a real M4A fixture, a long cancellable WAV and a 500KB-to-250KB rejection tightening"
+    ]
+  },
   "frozenScope": {
     "compliantMp3": "passthrough",
     "pcmWav": "16/24/32-bit mono/stereo to MP3",
@@ -14,8 +32,8 @@
   },
   "bundle": {
     "path": "dist/uploadfit.js",
-    "bytes": 419478,
-    "sha256": "007D9DE412C98E02F9EE0EAE258A45268CFA5F27D1ACE8F32CD9EC23A39BA166",
+    "bytes": 421348,
+    "sha256": "ABFA41EBB606CA0E7ED84F8DEE2F17783CAF0BDFA11CE777FB1BAEFBD173D18A",
     "format": "single IIFE",
     "runtimeExternalAudioRequests": 0
   },
@@ -28,34 +46,44 @@
       "staticCheck": "PASS"
     },
     {
-      "command": "npm run test:e2e -- tests/e2e/v2-audio-s3-controller.spec.js tests/e2e/v2-audio-s3.spec.js --reporter=line --workers=1",
+      "command": "npm run build:test",
       "result": "PASS",
-      "passed": 9,
-      "total": 9
+      "debugBundleBytes": 427067
     },
     {
-      "command": "npm run test:e2e -- --reporter=line --workers=1",
+      "command": "node scripts/run-e2e.js tests/e2e/v2-audio-s3-controller.spec.js tests/e2e/v2-audio-s3-ui.spec.js tests/e2e/v2-audio-s3.spec.js --reporter=line --workers=1",
       "result": "PASS",
-      "passed": 156,
-      "total": 156,
+      "passed": 15,
+      "total": 15
+    },
+    {
+      "command": "node scripts/run-e2e.js --reporter=line --workers=1",
+      "result": "PASS",
+      "passed": 162,
+      "total": 162,
       "runs": 1,
       "s4TabbitGate": "NOT_RUN",
       "slow200MbGate": "NOT_RUN"
     },
     {
-      "command": "git diff --check",
+      "command": "git diff ee18af3..a430d91 --check",
       "result": "PASS"
+    },
+    {
+      "command": "debug marker scan",
+      "result": "PASS",
+      "matches": 0
     }
   ],
   "scenarios": {
     "A": "compliant MP3 passthrough",
     "B": "PCM WAV confirmation, Worker processing, final validation and injection",
-    "C": "over-limit MP3 and M4A stable stop",
+    "C": "actual over-limit MP3 and M4A production-flow stable stop",
     "D": "missing maxBytes stable stop",
     "E": "MP3 output not allowed stable stop",
-    "F": "duration-only stable stop without trim/split",
-    "G": "cancel and input detach abort with late-message isolation",
-    "H": "associated rejection retry at most once"
+    "F": "duration-only stable stop without trim or split",
+    "G": "long WAV cancellation and input detach abort with late-message isolation",
+    "H": "500KB initial rule tightened to 250KB, associated rejection retry at most once"
   },
   "privacy": {
     "snapshotContainsFile": false,
@@ -65,11 +93,12 @@
     "externalAudioRequests": 0
   },
   "evidenceProvenance": {
-    "executedInS3": [
-      "controller registry and lifecycle integration",
-      "A-H local page and targeted audio E2E",
-      "production IIFE build and static check",
-      "full regression E2E 156/156"
+    "executedInFinalAcceptance": [
+      "25-file/229-test unit and integration suite plus production build/static check",
+      "15-case S3 controller, UI and stable-page E2E",
+      "one 162-case full Chromium E2E regression",
+      "production and debug single-IIFE builds",
+      "rework diff and debug-marker checks"
     ],
     "reusedFromAcceptedS2": [
       "frozen lamejs Worker implementation and license",
@@ -80,6 +109,6 @@
   },
   "knownLimitations": [
     "No M4A/AAC decoder or over-limit MP3 re-encoder is provided under ADR-005.",
-    "Real Tabbit and 200MB slow gate were not run for S3; V2-S4 remains HOLD."
+    "Real Tabbit and the 200MB slow gate were not run for S3; they remain mandatory V2-S4 gates."
   ]
 }

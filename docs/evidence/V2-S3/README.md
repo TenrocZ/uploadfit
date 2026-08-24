@@ -1,63 +1,62 @@
 # V2-S3 证据目录
 
-状态：`READY_FOR_ACCEPTANCE`。本目录记录 S3 接入正式 `TaskController`、media handler registry、音频确认/进度 UI、回填闭环和拒收一次重试的本地证据；独立验收仍待主验收 Agent 执行。V2-S4、V2-S5 继续 `HOLD`。
+状态：`ACCEPTED`。2026-08-24 由 `/root` 在 Luna Max 完成返工后独立复验通过。V2-S4 前置条件已满足、可以开工；V2-S5 继续 `HOLD`。
 
-## 范围与冻结裁决
+## 验收范围
 
-本阶段基线为 `bf266484ee85d7deb30ea04584ee74e0c6e2d7a8`。实现严格遵守 [ADR-005](../../decisions/ADR-005-V2-S0-音频编解码方案.md)：
+S3 把冻结的音频 handler 接入正式 `TaskController`、closed Shadow DOM UI、DataTransfer 回填、拒收观察和生命周期清理。功能边界仍遵守 [ADR-005](../../decisions/ADR-005-V2-S0-音频编解码方案.md)：
 
-| 输入 | S3 行为 | process/Worker |
+| 输入 | 已验收行为 | process/Worker |
 |---|---|---:|
-| 合规 MP3（签名、MIME、帧、字节和页面规则均通过） | 原 `File` passthrough，不替换 input | 0/0 |
-| PCM WAV，16/24/32-bit，mono/stereo | 先确认，再用冻结 `lamejs@1.2.1` 编码为 MP3，独立复检后回填 | 1/1 |
+| 合规 MP3 | 原 `File` passthrough，不替换 input | 0/0 |
+| PCM WAV，16/24/32-bit，mono/stereo | 先确认，再由冻结 `lamejs@1.2.1` 编码 MP3，独立复检后回填 | 1/1 |
 | 超限 MP3 | `AUDIO_CODEC_UNSUPPORTED`，保留原文件 | 0/0 |
-| M4A/AAC（含 AAC-LC） | `AUDIO_CODEC_UNSUPPORTED`，保留原文件 | 0/0 |
-| 仅 duration 上限、无可信 `maxBytes`、目标不允许 MP3 | 稳定安全停止，不裁剪、不分段、不扩 codec | 0/0 |
+| M4A/AAC | `AUDIO_CODEC_UNSUPPORTED`，保留原文件 | 0/0 |
+| 仅 duration、无可信 maxBytes、目标不允许 MP3 | 稳定安全停止，不裁剪、不分段 | 0/0 |
 
-没有新增 decoder、M4A/AAC 路径、远程 runtime 依赖或第二套 controller。S2 已验收的生产等价 200MB 门禁和真实编码器证据只作为上游复用，未冒充本阶段新执行；真实 Tabbit 及 200MB 慢速门禁归 S4。
+没有新增 decoder、远程 runtime 依赖、第二套 controller 或业务自动提交。真实 Tabbit 与 200MB 慢速门禁属于 S4，不以 S2/S3 自动化冒充。
 
-## 交付路径
+## 首轮验收与返工闭环
 
-- `src/core/media-handlers.js`：image/audio registry；image 保留既有 pipeline，audio 接入 S2 handler。
-- `src/core/task-controller.js`：最小化按 `mediaKind` 路由，复用既有状态、FIFO、确认、注入、回滚、拒收观察、清理、下载/恢复和 pagehide/input detach abort。
-- `src/audio/worker-runtime.js`、`esbuild.config.js`：将 S2 冻结 Worker implementation 真正嵌入 production 单 IIFE；无 runtime `import`/`export`/外联，构建时仍可替换源码。
-- `src/ui/task-card.js`、`src/ui/status-pill.js`、`src/ui/host.js`：音频原/目标格式、字节、duration、bitrate、channels/mono、有损警告、进度、取消、成功/失败和可访问性呈现。
-- `src/utils/logger.js`：仅记录稳定码和安全标量；不记录文件名、File/Blob、tags、PCM、Base64 或原始异常。
-- `test-pages/audio-s3.html`、`audio-s3.css`、`audio-s3.js`：本地稳定页 A–H；无外部资源，页面快照不含文件名。
+首轮独立验收未放行，并形成 [V2-S3 验收返工单](../../handoffs/V2-S3-acceptance-rework-order.md)（`ee18af3`）。最终关闭三项 Must：
+
+| 项目 | 修复提交 | 独立复验结论 |
+|---|---|---|
+| R3-1 拒收 retry 缺少“严格收紧”门禁 | `c04e1a8` | 相同、放宽、无关、仅 duration、官方/原始/无损及不允许 MP3 的新规则均不再处理；只有支持范围内严格收紧才允许至多一次 retry |
+| R3-2 音频 UI 证据、文案与进度不完整 | `ab60dc3` | 规则来源/有界原文可见，音频等待文案正确，数值进度不再滑动，双确认和安全文本渲染有真实 UI E2E |
+| R3-3 A–H 稳定页证据不足 | `a430d91` | C 使用实际 M4A 和超限 MP3，G 使用足够长 WAV 验证取消/脱离，H 使用 500KB→250KB 的严格收紧规则 |
 
 ## A–H 覆盖
 
-| 场景 | 本地页面 | 定向执行证据 |
+| 场景 | 入口 | 最终证据 |
 |---|---|---|
-| A 合规 MP3 直通 | `audio-s3.html?scenario=A` | `v2-audio-s3.spec.js`：真实 MP3 passthrough，process/injection=0 |
-| B PCM WAV→MP3 | `audio-s3.html?scenario=B` | 真实 production page + probe：确认、Worker、最终复检、DataTransfer 回填 |
-| C 超限 MP3/M4A 停止 | `audio-s3.html?scenario=C` | `v2-audio-s3-controller.spec.js`：两种输入均稳定码、process/Worker=0 |
-| D 无 maxBytes 停止 | `audio-s3.html?scenario=D` | controller matrix：规则不足安全停止 |
-| E MP3 不允许停止 | `audio-s3.html?scenario=E` | controller matrix：`AUDIO_OUTPUT_FORMAT_NOT_ALLOWED`，不处理 |
-| F 仅 duration 停止 | `audio-s3.html?scenario=F` | controller matrix：`AUDIO_DURATION_LIMIT_UNFIXABLE`，不裁剪/分段 |
-| G 取消/脱离 | `audio-s3.html?scenario=G` | controller：Abort、detach、迟到结果隔离、原文件保持 |
-| H 拒收最多一次 retry | `audio-s3.html?scenario=H` | controller + production page：一次关联拒收、最多一次重试、submit click=0 |
+| A 合规 MP3 直通 | `audio-s3.html?scenario=A` | production flow，process/injection=0 |
+| B PCM WAV→MP3 | `audio-s3.html?scenario=B` | 确认、Worker、最终复检、DataTransfer 回填 |
+| C 超限 MP3/M4A 停止 | `audio-s3.html?scenario=C` | 实际 M4A fixture 与超限 MP3 均稳定停止，process/Worker=0 |
+| D 无 maxBytes 停止 | `audio-s3.html?scenario=D` | 规则不足安全停止 |
+| E MP3 不允许停止 | `audio-s3.html?scenario=E` | `AUDIO_OUTPUT_FORMAT_NOT_ALLOWED`，不处理 |
+| F 仅 duration 停止 | `audio-s3.html?scenario=F` | `AUDIO_DURATION_LIMIT_UNFIXABLE`，不裁剪/分段 |
+| G 取消/脱离 | `audio-s3.html?scenario=G` | 长 WAV processing 中 abort，迟到结果隔离、原文件保持 |
+| H 严格收紧 retry | `audio-s3.html?scenario=H` | 500KB→250KB，至多一次关联 retry，submit click=0 |
 
-## 实际验证
+## 独立验证
 
 | 范围 | 命令 | 结果 |
 |---|---|---|
-| Unit/集成/静态 | `npm run check` | 通过：25 个 Vitest 文件、229 个测试；production `419478` bytes；static-check 通过 |
-| S3 定向 | `npm run test:e2e -- tests/e2e/v2-audio-s3-controller.spec.js tests/e2e/v2-audio-s3.spec.js --reporter=line --workers=1` | 通过：9/9 |
-| 全量 E2E（唯一一次） | `npm run test:e2e -- --reporter=line --workers=1` | 通过：156/156；未运行 S4 真实 Tabbit/200MB 慢速门禁 |
-| 空白检查 | `git diff --check` | 通过 |
+| Unit/集成/production 静态检查 | `npm run check` | PASS：25 个 Vitest 文件、229 项；production 421348 bytes；static-check PASS |
+| Debug IIFE | `npm run build:test` | PASS：427067 bytes |
+| S3 定向 | `node scripts/run-e2e.js tests/e2e/v2-audio-s3-controller.spec.js tests/e2e/v2-audio-s3-ui.spec.js tests/e2e/v2-audio-s3.spec.js --reporter=line --workers=1` | PASS：15/15 |
+| 全量 E2E（返工后一次） | `node scripts/run-e2e.js --reporter=line --workers=1` | PASS：162/162 |
+| 返工 diff | `git diff ee18af3..a430d91 --check` | PASS |
+| 调试残留扫描 | debug marker scan | PASS：0 命中 |
 
-最终 production artifact：`dist/uploadfit.js`，419478 bytes，SHA-256 `007D9DE412C98E02F9EE0EAE258A45268CFA5F27D1ACE8F32CD9EC23A39BA166`。本次 follow-up 仅为 production/test IIFE 增加显著 LGPL banner，并在构建/静态检查中锁定 banner；冻结上游源码、encoder 版本/API/算法均未改变。构建仍移除历史尾随空格并将不执行的上游信息 URL 标为 `embedded://lamejs`。
+最终 production artifact 为 `dist/uploadfit.js`，421348 bytes，SHA-256 `ABFA41EBB606CA0E7ED84F8DEE2F17783CAF0BDFA11CE777FB1BAEFBD173D18A`，提交 `092ac48`。它仍是可直接粘贴的单 IIFE，首行保留 `lamejs 1.2.1` LGPL notice。
 
-## 隐私与回填审计
+## 隐私、回填与限制
 
-- 安全 snapshot 只含 `mediaKind`、MIME/container/codec、尺寸、duration、bitrate、channels、进度、稳定错误码和有限计划数值。
-- logger 单测覆盖音频 progress 的文件名/私有字段脱敏；E2E 断言 snapshot/log 不含测试私有文件名。
-- 成功路径只使用 `DataTransfer` 注入；注入异常验证事务回滚、原文件恢复和可下载处理结果；不自动点击业务提交按钮。
-- 关闭、input detach、pagehide 和取消均触发 abort/清理；迟到 Worker 消息不能再次注入。
-
-## 复用与已知限制
-
-- S2 `docs/evidence/V2-S2/audio-200-to-100.json`、真实 `lamejs@1.2.1` 六组合和清理证据为已验收上游复用，不计作 S3 新慢速门禁。
-- S3 没有执行真实 Tabbit、200MB 慢速门禁或 S4/S5 交付；这些保持 `HOLD`，由后续阶段负责。
-- 超限 MP3 重编码、M4A/AAC 转码仍稳定停止为 `AUDIO_CODEC_UNSUPPORTED`，除非按 ADR-005 条件 4 验证解码路径并新增 ADR。
+- snapshot/logger 不保存文件名、File/Blob、tags、PCM、Base64 或原始异常；恶意 evidence 只作为文本呈现。
+- 最终复检后才使用 `DataTransfer` 注入；注入异常回滚到原文件，并提供下载/人工降级。
+- 关闭、换文件、input detach、pagehide 和取消均清理；迟到 Worker 消息不能再次注入。
+- 业务提交按钮自动点击次数固定为 0。
+- 超限 MP3 重编码与 M4A/AAC 转码仍是明确限制；解禁必须按 ADR-005 条件 4 新开 ADR。
+- S4 仍须执行当前 SHA 的真实 Tabbit LR 门禁和 200MB 慢速门禁。

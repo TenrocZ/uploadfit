@@ -878,3 +878,13 @@ V2 产品范围已收缩为唯一音频场景：长语音录音上传转写时�
 最终代码提交 `3967a45` 修复三项：canonical safety stop 无法再被外部 plan 的 `executable/unfixable` 篡改绕过；runtime/pipeline/handler 的 active dispose 立即结算并完整清理；真实 `lamejs` Blob Worker 快速套件覆盖 PCM16/24/32 × mono/stereo 六组合。
 
 本轮实际执行 S2 定向 E2E 29/29、Node/Vitest 25 files / 228 tests、production build、static-check、adapter build 和 diff check，均通过。按用户节约资源要求，已通过且未受修复影响的 141 项全量 E2E、200MB 慢速门禁和真实 Tabbit 证据未重复执行；复用边界和依据见 `docs/handoffs/V2-S2-third-rework-report.md`。production 包仍不含音频接线，S3 之前不宣传音频功能。
+
+## 2026-08-24：V2-S3 返工后独立验收通过
+
+状态：`V2-S3 ACCEPTED`，V2-S4 前置已满足、可以启动；V2-S5 继续 `HOLD`。
+
+首轮独立验收发现三个 Must：拒收 retry 没有验证规则严格收紧，音频确认 UI 缺规则证据且确定进度仍使用滑动动画，A–H 稳定页未用实际 M4A/足够长 WAV/严格收紧规则证明 C、G、H。已生成 `docs/handoffs/V2-S3-acceptance-rework-order.md`，并由 Luna Max 分别在 `c04e1a8`、`ab60dc3`、`a430d91` 完成返工。
+
+主验收 Agent 随后独立执行：`npm run check` 25 文件 / 229 项通过；S3 controller/UI/stable-page 定向 E2E 15/15；返工后全量 E2E 162/162（一次）；production/debug IIFE 构建、static-check、diff check 和调试残留扫描均通过。最终 production 为 421348 bytes，SHA-256 `ABFA41EBB606CA0E7ED84F8DEE2F17783CAF0BDFA11CE777FB1BAEFBD173D18A`，产物提交 `092ac48`。
+
+最终报告：`docs/handoffs/V2-S3-final-acceptance.md`；结构化证据：`docs/evidence/V2-S3/result.json`。S3 未执行真实 Tabbit 或 200MB 慢速门禁，两项仍是 S4 强制门禁，不能用本次 Chromium 或 S2 旧证据替代。
