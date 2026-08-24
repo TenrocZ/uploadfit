@@ -283,6 +283,7 @@ export function createTaskCardView({ documentRef, callbacks }) {
     const targetBytes = plan.estimatedOutputBytes ?? {};
     card.append(el('div', 'uf-card-title', '确认处理音频'));
     card.append(fileSectionFragment(current));
+    rulesSection(card, task.rules);
     const output = el('div', 'uf-section');
     output.append(el('div', 'uf-label', '处理后（预计）：'));
     output.append(list([
@@ -434,9 +435,16 @@ export function createTaskCardView({ documentRef, callbacks }) {
     operationsSection(card, task.plan);
     const progress = el('div', 'uf-progress');
     const bar = el('div', 'uf-progress-bar');
-    if (Number.isFinite(task.progress?.ratio)) {
-      bar.style.width = `${Math.round(task.progress.ratio * 100)}%`;
-      bar.setAttribute('aria-valuenow', String(Math.round(task.progress.ratio * 100)));
+    const rawRatio = task.progress?.ratio;
+    const hasRatio = Number.isFinite(rawRatio);
+    const ratio = hasRatio ? Math.max(0, Math.min(1, rawRatio)) : null;
+    if (hasRatio) {
+      const percentage = Math.round(ratio * 100);
+      bar.classList.add('uf-progress-bar-determinate');
+      bar.style.width = `${percentage}%`;
+      bar.setAttribute('aria-valuenow', String(percentage));
+    } else {
+      bar.classList.add('uf-progress-bar-indeterminate');
     }
     bar.setAttribute('role', 'progressbar');
     bar.setAttribute('aria-valuemin', '0');
@@ -450,7 +458,7 @@ export function createTaskCardView({ documentRef, callbacks }) {
     card.append(
       progress,
       hint(audio
-        ? `${phaseLabels[phase] ?? '正在处理'}${Number.isFinite(task.progress?.ratio) ? `（${Math.round(task.progress.ratio * 100)}%）` : ''}，音频只在本地处理。`
+        ? `${phaseLabels[phase] ?? '正在处理'}${hasRatio ? `（${Math.round(ratio * 100)}%）` : ''}，音频只在本地处理。`
         : '处理在本地完成，图片不会离开浏览器。')
     );
     if (audio) {
@@ -559,12 +567,15 @@ export function createTaskCardView({ documentRef, callbacks }) {
 
   const renderWaiting = (card, task) => {
     const waiting = task.status === 'WAITING_REJECTION';
-    card.append(el('div', 'uf-card-title', waiting ? '已放行原文件，等待网页反馈' : '正在检查图片'));
+    const audio = task.mediaKind === 'audio' || task.current?.mediaKind === 'audio';
+    card.append(el('div', 'uf-card-title', waiting
+      ? '已放行原文件，等待网页反馈'
+      : audio ? '正在检查音频' : '正在检查图片'));
     fileSection(card, task.current);
     rulesSection(card, task.rules);
     card.append(hint(waiting
       ? '尚未发现明确规则。若网页报错，UploadFit 会读取错误信息后再决定是否适配。'
-      : '正在读取图片信息。'));
+      : audio ? '正在读取音频信息。' : '正在读取图片信息。'));
     return null;
   };
 

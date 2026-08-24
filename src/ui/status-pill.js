@@ -22,6 +22,7 @@ const EXTRA_STATE_TEXTS = Object.freeze({
 
 export function statusText(sessionState, uploaderCount, mediaKind = 'image') {
   if (mediaKind === 'audio') {
+    if (sessionState === 'INSPECTING') return '正在检查音频';
     if (sessionState === 'PROCESSING' || sessionState === 'INJECTING') return '正在处理音频';
     if (sessionState === 'SUCCESS' || sessionState === 'PASSTHROUGH') return '音频已处理';
     if (sessionState === 'NEEDS_CONFIRMATION') return '等待确认音频处理';
