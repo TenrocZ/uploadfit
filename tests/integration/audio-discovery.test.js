@@ -23,6 +23,10 @@ test('S1 audio discovery classifies explicit audio controls and rejects mixed/vi
     const audio = make('audio/*', '上传音频文件');
     const list = make('.mp3,.m4a,.wav', '选择录音');
     list.multiple = true;
+    const vocatext = make(
+      '.mp3,.mp4,.mpeg,.mpga,.m4a,.wav,.webm,.ogg,.opus,.flac,audio/*',
+      'Drag and drop your audio file here or click to select a file'
+    );
     const mixed = make('image/*,audio/*', '上传文件');
     const video = make('video/mp4', '上传视频');
     const pdf = make('application/pdf', '上传材料');
@@ -41,7 +45,8 @@ test('S1 audio discovery classifies explicit audio controls and rejects mixed/vi
   expect(result.pdf).toBe(null);
   expect(result.contexts).toEqual([
     { mediaKind: 'audio', multiple: false, autoProcessable: true },
-    { mediaKind: 'audio', multiple: true, autoProcessable: false }
+    { mediaKind: 'audio', multiple: true, autoProcessable: false },
+    { mediaKind: 'audio', multiple: false, autoProcessable: true }
   ]);
 });
 

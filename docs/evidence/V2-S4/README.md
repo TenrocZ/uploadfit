@@ -11,7 +11,7 @@
 - 返工批次：Batch A `2a26897`；Batch B `de768db79b1d70661b017dad4b42ee5712297b46`；Batch C `53bcc5b21879d640dee047677d2462704ed783cd`；Batch D1 `c6e8b3b1fbbee44dba061abab819a14b20fb7cf5`；Batch D2 本轮文档提交在 Phase 2 最终交接时记录。
 - Windows，Node `v22.20.0`，npm `10.9.3`；本地测试服务 `http://127.0.0.1:8765`。
 - Phase 1 历史 production：421,348 bytes，SHA-256 `ABFA41EBB606CA0E7ED84F8DEE2F17783CAF0BDFA11CE777FB1BAEFBD173D18A`。
-- 当前 production `dist/uploadfit.js`：421,347 bytes，SHA-256 `842FA9AB712C028AB1B9A94526B4FBEE175016A73E5B944A3987BFAC169A78D0`，单 IIFE；runtime remote dependencies=0。唯一构建差异是去掉官方 Tabbit 编辑器保存时必然剥离的末尾换行，以保证本地产物与官方保存回读逐字节一致，不改变可执行 token。
+- 当前 production `dist/uploadfit.js`：421,333 bytes，SHA-256 `98BD12C651C2801E2E2E8BC9C2A006057024AA26E2D916B33899487B9A0F1A68`，单 IIFE；runtime remote dependencies=0。VocaText/Zent 核心修复见 `live-site-core-fixes.json`；此前官方保存、LR1/LR3 的 421,347-byte SHA 继续作为历史实测，不能外推为当前 SHA。
 
 Runner 约定：
 
@@ -118,6 +118,7 @@ Runner 约定：
 | `phase2a1-lr1.json` | Tabbit 自动运行、刷新后新 session、始终 1 host/1 session、UploadFit external=0、runtime error=0 |
 | `phase2a1-lr3.json` | 800,044-byte PCM WAV 经真实 UI 确认后转为 117,600-byte MP3；Worker、回填、无提交、无外传、无持久化、cleanup 全通过 |
 | `core-200mb-gate.json` | 当前 handler/真实 Worker：200,000,044-byte PCM32 WAV→20,834,880-byte MP3；取消 8.2ms；临时 fixture 自动删除 |
+| `live-site-core-fixes.json` | 当前 SHA：VocaText 上传器 0→1；Zent 4,944,335-byte JPEG→890,624-byte JPEG；官方编辑器重装仍待执行 |
 | `npm run check` | 25 files / 229 tests、production build、static-check 全通过 |
 
 LR3 唯一未出现的辅助信号是 CDP 未枚举到短生命周期 Blob Worker target；产品结果中的 `workerUsed=true`、独立 MP3 复检和 runtime cleanup 均为强制通过项，因此该信号记录为 `SUPPLEMENTAL_NON_BLOCKING`，不修改生产编码逻辑。

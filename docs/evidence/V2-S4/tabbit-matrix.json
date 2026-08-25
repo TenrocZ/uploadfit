@@ -1,20 +1,26 @@
 {
   "stage": "V2-S4",
   "phase": "PHASE_2A1_CORE_TRIAGE",
-  "status": "CORE_PATH_PASS_REMAINDER_OPEN",
+  "status": "CORE_FIX_PASS_OFFICIAL_REINSTALL_REQUIRED",
   "bundle": {
     "path": "dist/uploadfit.js",
+    "bytes": 421333,
+    "sha256": "98BD12C651C2801E2E2E8BC9C2A006057024AA26E2D916B33899487B9A0F1A68",
+    "format": "single production IIFE",
+    "officialEditorExactReadback": false,
+    "officialReinstallRequired": true
+  },
+  "lastOfficiallyVerifiedBundle": {
     "bytes": 421347,
     "sha256": "842FA9AB712C028AB1B9A94526B4FBEE175016A73E5B944A3987BFAC169A78D0",
-    "format": "single production IIFE",
-    "officialEditorExactReadback": true
+    "evidence": ["phase2a1-install.json", "phase2a1-lr1.json", "phase2a1-lr3.json"]
   },
   "environment": {
     "tabbitBrowser": "Chrome/151.0.7922.109",
     "protocolVersion": "1.3",
-    "officialPrivateScriptContextVerified": true,
-    "autoRunVerified": true,
-    "directBundleInjectionIntoTestPage": false
+    "officialPrivateScriptContextVerifiedForCurrentBundle": false,
+    "autoRunVerifiedForCurrentBundle": false,
+    "liveCoreFixDiagnostic": "PASS_TEMPORARY_CURRENT_BUNDLE_IN_EXISTING_TABBIT_TABS"
   },
   "triagePolicy": {
     "blockingCore": [

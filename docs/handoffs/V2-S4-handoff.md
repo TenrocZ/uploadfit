@@ -50,7 +50,7 @@ A01–A18、S01–S06、P01–P03/Q-S4-P06/P07 及格式 fixture 的逐项映射
 
 ## Phase 2A1 核心验收增量（2026-08-24）
 
-- 当前 production：421,347 bytes，SHA-256 `842FA9AB712C028AB1B9A94526B4FBEE175016A73E5B944A3987BFAC169A78D0`。构建只去除 Tabbit 官方编辑器保存时会剥离的末尾换行，确保本地产物和官方 reload 后回读逐字节一致；没有改变生产业务 token。
+- Phase 2A1 当时 production：421,347 bytes，SHA-256 `842FA9AB712C028AB1B9A94526B4FBEE175016A73E5B944A3987BFAC169A78D0`，对应本节官方保存/LR1/LR3 历史证据。2026-08-25 真实站点核心修复后的当前产物见 `V2-S4-live-site-core-fix.md`，必须重新安装后再声明当前 SHA 的官方实机状态。
 - Tabbit Chrome `151.0.7922.109` 官方私有脚本保存/auto-run 通过；LR1 安装与刷新通过；LR3 小 PCM WAV 经真实 UploadFit UI 确认后转 MP3、回填成功，UploadFit external=0、submit=0、storage unchanged、runtime error=0。
 - LR3 首轮唯一失败是 CDP 未发现短生命周期 Blob Worker target；同轮 `workerUsed=true`、输出独立复检、active Worker=0 和完整 cleanup 均通过。该观测已降为辅助项，生产代码未因此改动。
 - 200,000,044-byte 合成 PCM32 WAV 使用当前 handler/真实 Worker 在 Chromium 中成功转为 20,834,880-byte MP3；独立帧校验通过、单次编码、heartbeat 最大 112.1ms。第二轮处理中取消耗时 8.2ms，无部分输出，随后小任务复用成功；临时大文件已删除。

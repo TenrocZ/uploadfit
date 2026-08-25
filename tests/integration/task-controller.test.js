@@ -57,7 +57,7 @@ test('C01/C02/L02: compliant file passes through without reinjection', async ({ 
   await page.evaluate(() => globalThis.__s3Controller.dispose());
 });
 
-test('C03/C07/L01: explicit invalid image is processed, revalidated and injected', async ({ page }) => {
+test('C03/C07/L01: one invalid image on a multiple-capable input is processed and injected', async ({ page }) => {
   await openController(page);
   await page.evaluate(() => {
     const api = globalThis.__uploadfit_debug_bundle__;
@@ -68,6 +68,7 @@ test('C03/C07/L01: explicit invalid image is processed, revalidated and injected
     label.textContent = 'JPG格式，10KB—120KB，390×567像素';
     const input = document.createElement('input');
     input.type = 'file';
+    input.multiple = true;
     input.accept = 'image/jpeg';
     label.append(input);
     wrapper.append(label);

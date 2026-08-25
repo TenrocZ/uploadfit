@@ -2,7 +2,7 @@
 
 ## 当前施工状态
 
-状态为 `CORE_PATH_PASS_REMAINDER_OPEN`。Phase 1 定向 runner `31/31`、最终全量 E2E `193/193`；Phase 2A1 的 Tabbit LR3 实测 UploadFit external requests=0、敏感 payload marker=0、business submit click=0、local/session/IndexedDB/cache/OPFS 前后无变化、runtime error=0，并完成 Worker/object URL/queue cleanup。真实 MAIN-world AI LR8 仍未测量。当前生产产物 bytes/SHA 为 421,347 / `842FA9AB712C028AB1B9A94526B4FBEE175016A73E5B944A3987BFAC169A78D0`。
+状态为 `CORE_FIX_PASS_OFFICIAL_REINSTALL_REQUIRED`。Phase 1 定向 runner `31/31`、最终全量 E2E `193/193`；Phase 2A1 的 Tabbit LR3 实测 UploadFit external requests=0、敏感 payload marker=0、business submit click=0、持久化前后无变化。2026-08-25 两项修复未增加网络 API：VocaText 只调整上传器分类，Zent 只让 multiple-capable input 的单文件进入既有 controller；实际多文件仍在 controller 前置停止。当前生产产物 bytes/SHA 为 421,333 / `98BD12C651C2801E2E2E8BC9C2A006057024AA26E2D916B33899487B9A0F1A68`。
 
 新测试文件使用本地 `dist/uploadfit.test.js` debug harness 做确定性 API/Worker 断言，不能写成 Tabbit 或 production IIFE 实机证据；Tabbit 仅以 `phase2a1-lr1.json`/`phase2a1-lr3.json` 声明实测。实际 200MB 当前 handler/Worker 核心门禁已通过且临时音频已删除，但未冒充精确 Tabbit LR4。
 

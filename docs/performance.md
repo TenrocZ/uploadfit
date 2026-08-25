@@ -10,7 +10,7 @@
 
 Phase 2A1 复用现有真实门禁对当前 handler/Worker 重新实测：200,000,044-byte PCM32 WAV 在 36,967ms 内输出 20,834,880-byte MP3，单次编码、独立帧校验通过、peakBufferedBytes=26,825,856、最大 heartbeat gap=112.1ms；处理中取消延迟 8.2ms，无部分输出，随后小任务复用成功。它证明大文件核心性能，但不冒充精确 Tabbit LR4。
 
-production `dist/uploadfit.js`：421,347 bytes，SHA-256 `842FA9AB712C028AB1B9A94526B4FBEE175016A73E5B944A3987BFAC169A78D0`。
+production `dist/uploadfit.js`：421,333 bytes，SHA-256 `98BD12C651C2801E2E2E8BC9C2A006057024AA26E2D916B33899487B9A0F1A68`。2026-08-25 的上传器分类/单文件门禁修复不改变图片或音频处理算法，未重复消耗 200MB 慢门禁。
 
 ## 历史 S5 性能记录（非 V2-S4 证据）
 

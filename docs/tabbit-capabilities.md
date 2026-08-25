@@ -4,7 +4,7 @@
 
 ## V2-S4 Phase 2A1 状态
 
-状态 `CORE_PATH_PASS_REMAINDER_OPEN`。当前 production `dist/uploadfit.js` 为 421,347 bytes，SHA-256 `842FA9AB712C028AB1B9A94526B4FBEE175016A73E5B944A3987BFAC169A78D0`。Chrome/151.0.7922.109 的 Tabbit 官方私有脚本 exact save/reload、部分网址匹配、auto-run、LR1 刷新生命周期和 LR3 PCM WAV→MP3 已实测通过；测试页未直接注入 bundle。精确 LR4/LR8/LR9-new-tab/LR10 等剩余项见 `docs/evidence/V2-S4/tabbit-matrix.json`，保持 pending。
+状态 `CORE_FIX_PASS_OFFICIAL_REINSTALL_REQUIRED`。当前 production `dist/uploadfit.js` 为 421,333 bytes，SHA-256 `98BD12C651C2801E2E2E8BC9C2A006057024AA26E2D916B33899487B9A0F1A68`。Chrome/151.0.7922.109 的 VocaText/Zent 真实 DOM 修复诊断通过，但本轮使用当前 bundle 临时验证，没有冒充官方私有脚本保存；此前 421,347-byte SHA 的 exact save/LR1/LR3 继续作为历史证据。当前 SHA 重新粘贴后需补保存/刷新检查。
 
 以下“历史环境与平台记录”是 S0/S2 及既往平台记录；本轮 V2-S4 只引用 `docs/evidence/V2-S4/phase2a1-*.json`，不从历史记录推导通过。
 

@@ -22,8 +22,8 @@ import { fileURLToPath } from 'node:url';
 
 const OFFICIAL_ORIGIN = 'https://web.tabbit.com';
 const ROOT_DIR = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
-const EXPECTED_BUNDLE_BYTES = 421_347;
-const EXPECTED_BUNDLE_SHA256 = '842FA9AB712C028AB1B9A94526B4FBEE175016A73E5B944A3987BFAC169A78D0';
+const EXPECTED_BUNDLE_BYTES = 421_333;
+const EXPECTED_BUNDLE_SHA256 = '98BD12C651C2801E2E2E8BC9C2A006057024AA26E2D916B33899487B9A0F1A68';
 const EXPECTED_MATCH_PATTERN = 'http://127.0.0.1:8765/test-pages/*';
 const TARGET_NAME = 'UploadFit V2 S4 验收脚本';
 const TARGET_DESCRIPTION = 'UploadFit V2 S4 当前生产包私有实机验收';

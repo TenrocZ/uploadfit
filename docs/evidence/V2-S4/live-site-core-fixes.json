@@ -1,0 +1,53 @@
+{
+  "stage": "V2-S4",
+  "date": "2026-08-25",
+  "status": "CORE_FIX_PASS_OFFICIAL_REINSTALL_REQUIRED",
+  "browser": "Tabbit Browser Chrome/151.0.7922.109",
+  "bundle": {
+    "bytes": 421333,
+    "sha256": "98BD12C651C2801E2E2E8BC9C2A006057024AA26E2D916B33899487B9A0F1A68",
+    "format": "single production IIFE"
+  },
+  "vocatext": {
+    "url": "https://vocatext.com/",
+    "rootCause": "An explicit audio accept signal was discarded when the same input also listed an MP4 video/container token.",
+    "beforeUploaderCount": 0,
+    "afterUploaderCount": 1,
+    "selectedFileMetadataRecorded": false,
+    "fileContentRead": false
+  },
+  "zentV7": {
+    "url": "https://youzan.github.io/zent-v7/zh/component/upload",
+    "rootCause": "The image handler rejected multiple-capable inputs before the controller could apply its existing actual-file-count guard.",
+    "uploaderCount": 1,
+    "inputMultiple": true,
+    "rules": {
+      "formats": ["image/jpeg", "image/png"],
+      "maxBytes": 1000000,
+      "actionable": true,
+      "safetyFlags": [],
+      "conflicts": []
+    },
+    "syntheticInputBytes": 4944335,
+    "outputBytes": 890624,
+    "outputMime": "image/jpeg",
+    "outputValidationValid": true,
+    "finalStatus": "SUCCESS"
+  },
+  "verification": {
+    "targetedBrowserTests": "16/16 PASS",
+    "vitest": "25 files / 229 tests PASS",
+    "productionBuild": "PASS",
+    "staticCheck": "PASS",
+    "liveMethod": "Current production bundle evaluated temporarily in the two existing Tabbit tabs after cleaning the prior session.",
+    "officialEditorInstallClaimed": false,
+    "officialReinstallRequired": true
+  },
+  "privacy": {
+    "privateScriptIdRecorded": false,
+    "userFilenameRecorded": false,
+    "userPathRecorded": false,
+    "userFileBytesRecorded": false,
+    "accountIdentifierRecorded": false
+  }
+}

@@ -151,12 +151,18 @@ export function isAudioMime(mime) {
 export function isAudioUploader(input) {
   if (!isFileInput(input) || isUploadFitUiInput(input)) return false;
   const accept = input.getAttribute('accept');
-  if (acceptContainsMixedMedia(accept) || acceptContainsImage(accept) || acceptContainsVideo(accept)) return false;
+  if (acceptContainsMixedMedia(accept) || acceptContainsImage(accept)) return false;
   const associatedTexts = getAssociatedTexts(input);
-  if (acceptContainsAudio(accept)
+  const hasAudioAccept = acceptContainsAudio(accept);
+  if (hasAudioAccept
     && associatedTexts.some((text) => IMAGE_TEXT_PATTERN.test(text))
     && !associatedTexts.some((text) => AUDIO_TEXT_PATTERN.test(text))) return false;
-  return acceptContainsAudio(accept) || associatedTexts.some((text) => AUDIO_TEXT_PATTERN.test(text));
+  // Transcription sites commonly accept audio plus MP4/WebM containers in the
+  // same control.  A video token must not erase an explicit audio accept
+  // signal; the audio handler still rejects a selected video MIME/file.
+  if (hasAudioAccept) return true;
+  if (acceptContainsVideo(accept)) return false;
+  return associatedTexts.some((text) => AUDIO_TEXT_PATTERN.test(text));
 }
 
 /** Determine exactly one media kind, preserving the V1 image boundary. */

@@ -1,7 +1,7 @@
 {
   "stage": "V2-S4",
   "phase": "PHASE_2A1_CORE_TRIAGE",
-  "status": "CORE_PATH_PASS_REMAINDER_OPEN",
+  "status": "CORE_FIX_PASS_OFFICIAL_REINSTALL_REQUIRED",
   "baseCommit": "e9fea4c06f9602125df7434434fc6bbc1fd9f7c4",
   "phase1Commit": "fbd67194409041c57e4b42d04bf91ef9e62df874",
   "rework": {
@@ -17,14 +17,19 @@
     "npm": "10.9.3",
     "testServer": "http://127.0.0.1:8765",
     "browserRunner": "Playwright via scripts/run-e2e.js",
-    "tabbit": "Chrome/151.0.7922.109 official private-script editor and auto-run"
+    "tabbit": "Chrome/151.0.7922.109; current bundle live diagnostic passed, official reinstall required"
   },
   "bundle": {
     "path": "dist/uploadfit.js",
-    "bytes": 421347,
-    "sha256": "842FA9AB712C028AB1B9A94526B4FBEE175016A73E5B944A3987BFAC169A78D0",
+    "bytes": 421333,
+    "sha256": "98BD12C651C2801E2E2E8BC9C2A006057024AA26E2D916B33899487B9A0F1A68",
     "format": "single IIFE",
     "runtimeRemoteDependencies": 0
+  },
+  "lastOfficiallyVerifiedBundle": {
+    "bytes": 421347,
+    "sha256": "842FA9AB712C028AB1B9A94526B4FBEE175016A73E5B944A3987BFAC169A78D0",
+    "checks": ["INSTALL", "LR1", "LR3"]
   },
   "runnerProvenance": {
     "DEBUG_CONTROLLER_REAL_WORKER": "local dist/uploadfit.test.js with actual audio Worker/controller paths; not production-IIFE or Tabbit evidence",
@@ -156,18 +161,19 @@
     "evidence": "core-200mb-gate.json"
   },
   "tabbit": {
-    "status": "LR1_LR3_PASS_REMAINDER_OPEN",
+    "status": "CURRENT_BUNDLE_OFFICIAL_REINSTALL_REQUIRED",
     "sameProductionShaRequired": true,
     "browser": "Chrome/151.0.7922.109",
-    "officialPrivateScriptContextVerified": true,
-    "bundleExactReadback": true,
+    "officialPrivateScriptContextVerified": false,
+    "bundleExactReadback": false,
+    "lastExactReadbackBundleSha256": "842FA9AB712C028AB1B9A94526B4FBEE175016A73E5B944A3987BFAC169A78D0",
     "uploadFitExternalRequestsInLr3": 0,
     "businessSubmitClicksInLr3": 0,
     "persistentAudioInLr3": false,
     "lr": {
-      "LR1": "PASS",
+      "LR1": "PASS_PREVIOUS_SHA_RETEST_CURRENT_SHA",
       "LR2": "AUTOMATION_PASS_EXACT_TABBIT_PENDING",
-      "LR3": "PASS",
+      "LR3": "PASS_PREVIOUS_SHA_RETEST_CURRENT_SHA",
       "LR4": "CORE_GATE_PASS_EXACT_TABBIT_PENDING",
       "LR5": "AUTOMATION_PASS_EXACT_TABBIT_PENDING",
       "LR6": "CORE_GATE_PASS_EXACT_TABBIT_PENDING",

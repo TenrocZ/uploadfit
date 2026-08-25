@@ -40,7 +40,6 @@ export function createImageHandler(imageOptions = {}) {
     kind: 'image',
     supports(file, context) {
       if (context?.mediaKind && context.mediaKind !== 'image') return false;
-      if (context?.multiple === true) return false;
       const type = typeof file?.type === 'string' ? file.type.toLowerCase() : '';
       return type.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp|avif)$/i.test(file?.name ?? '');
     },

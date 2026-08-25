@@ -13,6 +13,7 @@ test(`Zent v7 fixture copied from ${LIVE_SITE} does not treat 网络图片 as a 
     const rules = api.resolveRules(api.parseRulesDeterministically(context));
     return {
       accept: context.attributes.accept,
+      multiple: context.attributes.multiple,
       formats: rules.formats,
       maxBytes: rules.maxBytes,
       safetyFlags: rules.safetyFlags,
@@ -22,6 +23,7 @@ test(`Zent v7 fixture copied from ${LIVE_SITE} does not treat 网络图片 as a 
 
   expect(result).toEqual({
     accept: 'image/gif, image/jpeg, image/png, image/bmp',
+    multiple: true,
     formats: ['image/jpeg', 'image/png'],
     maxBytes: 1_000_000,
     safetyFlags: [],
