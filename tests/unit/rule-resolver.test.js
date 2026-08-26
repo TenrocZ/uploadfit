@@ -137,6 +137,39 @@ describe('rule resolver', () => {
     expect(result.sources.map((source) => source.type)).toEqual(['rejection', 'html-attribute']);
   });
 
+  it('keeps accept formats when a higher-priority rejection only supplies a size limit', () => {
+    const result = resolveRules([
+      createRuleCandidate({
+        sourceType: 'html-attribute',
+        evidence: ['accept: audio/mpeg,.mp3,.wav'],
+        confidence: 0.95,
+        rules: {
+          mediaKind: 'audio',
+          formats: ['audio/mpeg', 'audio/wav'],
+          extensions: ['.mp3', '.wav']
+        }
+      }),
+      createRuleCandidate({
+        sourceType: 'rejection',
+        evidence: ['File exceeds 25 MB limit.'],
+        confidence: 0.95,
+        rules: {
+          maxBytes: 25_000_000,
+          formats: [],
+          extensions: []
+        }
+      })
+    ]);
+
+    expect(result.maxBytes).toBe(25_000_000);
+    expect(result.mediaKind).toBe('audio');
+    expect(result.formats).toEqual(['audio/mpeg', 'audio/wav']);
+    expect(result.extensions).toEqual(['.mp3', '.wav']);
+    expect(result.actionable).toBe(true);
+    expect(result.conflicts).not.toContainEqual(expect.objectContaining({ field: 'formats' }));
+    expect(result.conflicts).not.toContainEqual(expect.objectContaining({ field: 'extensions' }));
+  });
+
   it('blocks network or official-tool semantics even when an executable value exists', () => {
     const result = resolveRules([createRuleCandidate({
       sourceType: 'rejection',

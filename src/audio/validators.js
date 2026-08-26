@@ -70,6 +70,13 @@ function sourceAllowed(metadata, rules) {
   return extensions.some((item) => String(item).toLowerCase().replace(/^\./, '') === extension);
 }
 
+function supportedAudioSource(metadata) {
+  const mime = metadata?.signatureMime ?? metadata?.mime;
+  return (MP3_MIMES.has(mime) && metadata?.container === 'mp3' && metadata?.codec === 'mp3')
+    || (mime === 'audio/mp4' && metadata?.container === 'mp4' && metadata?.codec === 'aac-lc')
+    || (mime === 'audio/wav' && metadata?.container === 'wav' && metadata?.codec === 'pcm');
+}
+
 function safetyRequirements(rules) {
   const flags = new Set(Array.isArray(rules?.safetyFlags) ? rules.safetyFlags : []);
   const semantics = Array.isArray(rules?.semanticRequirements) ? rules.semanticRequirements : [];
@@ -117,9 +124,7 @@ export function validateAudioMetadata(metadata, rules, options = {}) {
     unfixable(result, errorCode === 'AUDIO_METADATA_INVALID' ? 'AUDIO_DECODE_FAILED' : errorCode);
     return result;
   }
-  if (!SUPPORTED_MIMES.includes(signatureMime)
-    || !SUPPORTED_CONTAINERS.includes(metadata.container)
-    || !metadata.codec) {
+  if (!supportedAudioSource(metadata)) {
     violation(result, 'AUDIO_CODEC_UNSUPPORTED', SUPPORTED_MIMES, signatureMime);
     unfixable(result, 'AUDIO_CODEC_UNSUPPORTED');
     return result;
@@ -149,11 +154,13 @@ export function validateAudioMetadata(metadata, rules, options = {}) {
     violation(result, 'RULES_INSUFFICIENT');
     unfixable(result, 'RULES_INSUFFICIENT');
   }
-  if (!mp3Allowed) {
+  // Preserve the accepted WAV contract: WAV is only in the product path when
+  // the page also allows the MP3 output format.  S4.1's no-MP3 passthrough
+  // exception is intentionally limited to an already-compliant AAC-LC M4A.
+  if (!mp3Allowed && signatureMime === 'audio/wav') {
     violation(result, 'AUDIO_OUTPUT_FORMAT_NOT_ALLOWED', ['audio/mpeg', '.mp3'], formats);
     unfixable(result, 'AUDIO_OUTPUT_FORMAT_NOT_ALLOWED');
   }
-
   const semantics = safetyRequirements(rules);
   for (const flag of semantics) {
     if (flag === 'OFFICIAL_TOOL_REQUIRED') unfixable(result, 'OFFICIAL_TOOL_REQUIRED');
@@ -175,22 +182,23 @@ export function validateAudioMetadata(metadata, rules, options = {}) {
 
   const formatMismatch = !sourceAllowed(metadata, rules);
   const sizeMismatch = Number.isFinite(maxBytes) && metadata.size > maxBytes;
-  // ADR-005 froze an encode-only lamejs: only PCM WAV can be transcoded.  An
-  // over-limit MP3 or an M4A source needs a decoder that was never validated,
-  // so it stops as unsupported instead of advertising an impossible auto-fix.
-  const encodableSource = signatureMime === 'audio/wav'
-    && metadata.container === 'wav'
-    && metadata.codec === 'pcm';
+  const encodableSource = supportedAudioSource(metadata);
   if (formatMismatch) {
     violation(result, 'AUDIO_FORMAT_NOT_ALLOWED', formats, signatureMime);
     if (!mp3Allowed) unfixable(result, 'AUDIO_OUTPUT_FORMAT_NOT_ALLOWED');
-    else if (encodableSource) addUnique(result.safeAutoFixes, 'TRANSCODE_AUDIO');
+    else if (encodableSource) {
+      addUnique(result.safeAutoFixes,
+        signatureMime === 'audio/mpeg' ? 'REENCODE_AUDIO' : 'TRANSCODE_AUDIO');
+    }
     else unfixable(result, 'AUDIO_CODEC_UNSUPPORTED');
   }
   if (sizeMismatch) {
     violation(result, 'AUDIO_FILE_TOO_LARGE', maxBytes, metadata.size);
     if (!mp3Allowed) unfixable(result, 'AUDIO_OUTPUT_FORMAT_NOT_ALLOWED');
-    else if (encodableSource) addUnique(result.safeAutoFixes, 'REENCODE_AUDIO');
+    else if (encodableSource) {
+      addUnique(result.safeAutoFixes,
+        signatureMime === 'audio/mpeg' ? 'REENCODE_AUDIO' : 'TRANSCODE_AUDIO');
+    }
     else unfixable(result, 'AUDIO_CODEC_UNSUPPORTED');
   }
 
@@ -225,7 +233,7 @@ export function validateAudioMetadata(metadata, rules, options = {}) {
 
 export function isAudioPassthrough(metadata, rules, validation = validateAudioMetadata(metadata, rules)) {
   return Boolean(validation?.valid)
-    && metadata?.signatureMime === 'audio/mpeg'
+    && supportedAudioSource(metadata)
     && sourceAllowed(metadata, rules)
     && metadata.size <= rules.maxBytes;
 }
@@ -235,8 +243,7 @@ export function pageAllowsMp3(rules) {
 }
 
 export function isSupportedAudioMetadata(metadata) {
-  return Boolean(metadata && SUPPORTED_MIMES.includes(metadata.signatureMime)
-    && SUPPORTED_CONTAINERS.includes(metadata.container));
+  return supportedAudioSource(metadata);
 }
 
 export { SUPPORTED_MIMES as SUPPORTED_AUDIO_MIMES, SUPPORTED_CONTAINERS as SUPPORTED_AUDIO_CONTAINERS };
@@ -364,13 +371,142 @@ export function validateAudioOutput(metadata, rules, plan, sourceMetadata = null
   return result;
 }
 
+function representativeDecodeWorker() {
+  self.onmessage = async (event) => {
+    if (event.data?.type !== 'DECODE_MP3_WINDOWS') return;
+    const results = [];
+    let unclosedAudioData = 0;
+    try {
+      if (typeof AudioDecoder !== 'function' || typeof EncodedAudioChunk !== 'function') {
+        throw new Error('WORKER_WEBCODECS_UNAVAILABLE');
+      }
+      for (const window of event.data.windows ?? []) {
+        let decoder = null;
+        let decoded = 0;
+        try {
+          decoder = new AudioDecoder({
+            output(audioData) {
+              unclosedAudioData += 1;
+              decoded += 1;
+              audioData.close();
+              unclosedAudioData -= 1;
+            },
+            error() {}
+          });
+          const config = {
+            codec: 'mp3',
+            sampleRate: window.sampleRate,
+            numberOfChannels: window.channels
+          };
+          const support = await AudioDecoder.isConfigSupported(config);
+          if (!support?.supported) throw new Error('MP3_CONFIG_UNSUPPORTED');
+          decoder.configure(config);
+          const bytes = new Uint8Array(window.data);
+          let offset = 0;
+          let sampleOffset = 0;
+          for (const frame of window.frames) {
+            const data = bytes.subarray(offset, offset + frame.length);
+            decoder.decode(new EncodedAudioChunk({
+              type: 'key',
+              timestamp: Math.round(sampleOffset * 1_000_000 / window.sampleRate),
+              duration: Math.round(frame.samples * 1_000_000 / window.sampleRate),
+              data
+            }));
+            offset += frame.length;
+            sampleOffset += frame.samples;
+          }
+          await decoder.flush();
+          if (decoded === 0) throw new Error('MP3_ZERO_OUTPUT');
+          results.push({ decoded });
+        } finally {
+          if (decoder && decoder.state !== 'closed') decoder.close();
+        }
+      }
+      self.postMessage({
+        type: 'DECODE_RESULT',
+        valid: results.length === (event.data.windows ?? []).length && results.length > 0,
+        decodedWindows: results.length,
+        decodedAudioData: results.reduce((sum, item) => sum + item.decoded, 0),
+        unclosedAudioData
+      });
+    } catch {
+      self.postMessage({
+        type: 'DECODE_RESULT', valid: false,
+        decodedWindows: results.length, decodedAudioData: 0, unclosedAudioData
+      });
+    }
+  };
+}
+
+async function decodeRepresentativeWindows(windows, options = {}) {
+  if (!windows.length || typeof Worker !== 'function'
+    || typeof Blob !== 'function' || typeof URL?.createObjectURL !== 'function') {
+    return { valid: false, decodedWindows: 0, decodedAudioData: 0, unclosedAudioData: 0, workerUsed: false };
+  }
+  if (options.signal?.aborted) {
+    const error = new Error('Aborted');
+    error.code = 'AUDIO_PROCESSING_CANCELLED';
+    throw error;
+  }
+  const url = URL.createObjectURL(new Blob([
+    `(${representativeDecodeWorker.toString()})();`
+  ], { type: 'text/javascript' }));
+  const worker = new Worker(url);
+  try {
+    return await new Promise((resolve, reject) => {
+      let settled = false;
+      const timeoutMs = Math.max(1000, Math.min(
+        Number.isFinite(options.frameDecodeTimeoutMs) ? options.frameDecodeTimeoutMs : 5000,
+        10_000
+      ));
+      const finish = (callback, value) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        options.signal?.removeEventListener?.('abort', onAbort);
+        callback(value);
+      };
+      const onAbort = () => {
+        const error = new Error('Aborted');
+        error.code = 'AUDIO_PROCESSING_CANCELLED';
+        finish(reject, error);
+      };
+      const timer = setTimeout(() => finish(resolve, {
+        valid: false, decodedWindows: 0, decodedAudioData: 0,
+        unclosedAudioData: 0, workerUsed: true
+      }), timeoutMs);
+      worker.onmessage = (event) => {
+        if (event.data?.type !== 'DECODE_RESULT') return;
+        finish(resolve, {
+          valid: event.data.valid === true,
+          decodedWindows: Number.isFinite(event.data.decodedWindows) ? event.data.decodedWindows : 0,
+          decodedAudioData: Number.isFinite(event.data.decodedAudioData) ? event.data.decodedAudioData : 0,
+          unclosedAudioData: Number.isFinite(event.data.unclosedAudioData) ? event.data.unclosedAudioData : 0,
+          workerUsed: true
+        });
+      };
+      worker.onerror = () => finish(resolve, {
+        valid: false, decodedWindows: 0, decodedAudioData: 0,
+        unclosedAudioData: 0, workerUsed: true
+      });
+      options.signal?.addEventListener?.('abort', onAbort, { once: true });
+      const transfer = windows.map((window) => window.data);
+      worker.postMessage({ type: 'DECODE_MP3_WINDOWS', windows }, transfer);
+    });
+  } finally {
+    worker.terminate();
+    URL.revokeObjectURL(url);
+  }
+}
+
 async function inspectRepresentativeFrames(file, options = {}) {
   const size = Number.isFinite(file?.size) ? file.size : 0;
   if (!size || typeof file?.slice !== 'function') return { count: 0, valid: false };
-  const windowBytes = Math.max(4096, Math.min(
-    Number.isFinite(options.frameWindowBytes) ? options.frameWindowBytes : 64 * 1024,
+  const defaultWindowBytes = Math.min(64 * 1024, Math.max(4096, Math.floor(size / 5)));
+  const windowBytes = Math.min(size, Math.max(4096, Math.min(
+    Number.isFinite(options.frameWindowBytes) ? options.frameWindowBytes : defaultWindowBytes,
     256 * 1024
-  ));
+  )));
   const starts = [...new Set([
     0,
     Math.max(0, Math.floor((size - windowBytes) / 2)),
@@ -378,6 +514,7 @@ async function inspectRepresentativeFrames(file, options = {}) {
   ])];
   let count = 0;
   let valid = true;
+  const windows = [];
   for (const start of starts) {
     if (options.signal?.aborted) {
       const error = new Error('Aborted');
@@ -401,11 +538,22 @@ async function inspectRepresentativeFrames(file, options = {}) {
       if (!parsed || frame.offset + parsed.frameLength > bytes.length) valid = false;
       let offset = frame.offset;
       let localCount = 0;
-      while (offset + 4 <= bytes.length && localCount < 250000) {
+      const frames = [];
+      const windowStart = offset;
+      while (offset + 4 <= bytes.length && localCount < 8) {
         const candidate = parseMp3Header(bytes, offset);
         if (!candidate || offset + candidate.frameLength > bytes.length) break;
+        frames.push({ length: candidate.frameLength, samples: candidate.samplesPerFrame });
         localCount += 1;
         offset += candidate.frameLength;
+      }
+      if (frames.length) {
+        windows.push({
+          data: bytes.slice(windowStart, offset).buffer,
+          frames,
+          sampleRate: parsed.sampleRate,
+          channels: parsed.channels
+        });
       }
       count += Math.max(1, localCount);
     } catch (error) {
@@ -413,7 +561,20 @@ async function inspectRepresentativeFrames(file, options = {}) {
       valid = false;
     }
   }
-  return { count, valid };
+  const decoded = valid
+    ? await decodeRepresentativeWindows(windows, options)
+    : { valid: false, decodedWindows: 0, decodedAudioData: 0, unclosedAudioData: 0, workerUsed: false };
+  return {
+    count,
+    valid: valid && decoded.valid,
+    headerValid: valid,
+    decodeValid: decoded.valid,
+    representativeWindows: windows.length,
+    decodedWindows: decoded.decodedWindows,
+    decodedAudioData: decoded.decodedAudioData,
+    unclosedAudioData: decoded.unclosedAudioData,
+    workerUsed: decoded.workerUsed
+  };
 }
 
 /** Inspect a File/Blob and then run the independent final output validator. */

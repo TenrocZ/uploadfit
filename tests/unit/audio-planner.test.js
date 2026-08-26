@@ -193,20 +193,40 @@ describe('S2 audio planner', () => {
     })).toThrow(/stale or forged/);
   });
 
-  it('stops over-limit MP3 and M4A sources as codec-unsupported under the frozen encoder', () => {
+  it('plans verified compressed inputs and preserves compliant M4A identity passthrough', () => {
     const overLimitMp3 = createAudioProcessingPlan(metadata({
       signatureMime: 'audio/mpeg', container: 'mp3', codec: 'mp3', size: 150_000_000
     }), rules());
-    expect(overLimitMp3.unfixable).toContain('AUDIO_CODEC_UNSUPPORTED');
-    expect(overLimitMp3.confirmations).toEqual([]);
+    expect(overLimitMp3.unfixable).toEqual([]);
+    expect(overLimitMp3.operations).toContain('REENCODE_AUDIO');
+    expect(overLimitMp3.confirmations.map((item) => item.type)).toEqual(['AUDIO_LOSSY_TRANSCODE']);
     expect(overLimitMp3.executable).toBe(false);
     expect(overLimitMp3.passthrough).toBe(false);
     const m4a = createAudioProcessingPlan(metadata({
       signatureMime: 'audio/mp4', container: 'mp4', codec: 'aac-lc', size: 50_000_000
     }), rules());
-    expect(m4a.unfixable).toContain('AUDIO_CODEC_UNSUPPORTED');
-    expect(m4a.confirmations).toEqual([]);
+    expect(m4a.unfixable).toEqual([]);
+    expect(m4a.operations).toContain('TRANSCODE_AUDIO');
+    expect(m4a.confirmations.map((item) => item.type)).toEqual(['AUDIO_LOSSY_TRANSCODE']);
     expect(m4a.executable).toBe(false);
+
+    const allowedM4a = createAudioProcessingPlan(metadata({
+      signatureMime: 'audio/mp4', container: 'mp4', codec: 'aac-lc', size: 50_000_000
+    }), rules({ formats: ['audio/mp4'], extensions: ['.m4a'] }));
+    expect(allowedM4a).toMatchObject({ passthrough: true, executable: true });
+    expect(allowedM4a.operations).toEqual([]);
+    expect(allowedM4a.confirmations).toEqual([]);
+  });
+
+  it('prioritizes duration walls before codec work', () => {
+    const plan = createAudioProcessingPlan(metadata({
+      signatureMime: 'audio/mpeg', container: 'mp3', codec: 'mp3', size: 150_000_000,
+      durationMs: 600_001
+    }), rules({ duration: { maxMs: 600_000 } }));
+    expect(plan.unfixable[0]).toBe('AUDIO_DURATION_LIMIT_UNFIXABLE');
+    expect(plan.operations).toEqual([]);
+    expect(plan.confirmations).toEqual([]);
+    expect(plan.executable).toBe(false);
   });
 
   it('promises the frozen encoder output rate at low bitrates', () => {

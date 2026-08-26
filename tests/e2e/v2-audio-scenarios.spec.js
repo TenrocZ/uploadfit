@@ -258,7 +258,7 @@ async function dispose(page) {
 }
 
 test.describe('V2-S4 A01-A18 audio QA matrix', () => {
-  test('Q-S4-P01 [DEBUG_CONTROLLER_REAL_FILE] A02/A04 stop actual over-limit MP3 and valid M4A before processing', async ({ page }) => {
+  test('Q-S4-P01 [DEBUG_CONTROLLER_REAL_FILE] A02/A04 create confirmation-gated compressed plans', async ({ page }) => {
     await open(page);
     for (const source of [
       { kind: 'mp3', options: { frameCount: 330, bitrateIndex: 14 } },
@@ -266,12 +266,14 @@ test.describe('V2-S4 A01-A18 audio QA matrix', () => {
     ]) {
       await install(page);
       await select(page, source.kind, source.options);
-      await waitFor(page, () => __v2S4.controller.getSnapshot().activeTask?.status === 'STOPPED');
+      await waitFor(page, () => __v2S4.controller.getSnapshot().activeTask?.status === 'NEEDS_CONFIRMATION');
       const result = await page.evaluate(() => {
         const task = __v2S4.controller.getSnapshot().activeTask;
         return {
           status: task?.status,
           errorCode: task?.errorCode,
+          operations: task?.plan?.operations ?? [],
+          confirmations: task?.plan?.confirmations?.map((item) => item.type) ?? [],
           sameFile: __v2S4.input.files[0] === __v2S4.originalFile,
           workerStarts: __v2S4.workerStarts,
           processStarts: __v2S4.logger.getEntries()
@@ -280,13 +282,17 @@ test.describe('V2-S4 A01-A18 audio QA matrix', () => {
           inputType: __v2S4.input.files[0]?.type ?? null
         };
       });
-      expect(result.status).toBe('STOPPED');
-      expect(result.errorCode).toBe('AUDIO_CODEC_UNSUPPORTED');
+      expect(result.status).toBe('NEEDS_CONFIRMATION');
+      expect(result.errorCode).toBeNull();
+      expect(result.operations).toContain(source.kind === 'mp3' ? 'REENCODE_AUDIO' : 'TRANSCODE_AUDIO');
+      expect(result.confirmations).toContain('AUDIO_LOSSY_TRANSCODE');
       expect(result.sameFile).toBe(true);
       expect(result.workerStarts).toBe(0);
       expect(result.processStarts).toBe(0);
       expect(result.injectionCalls).toBe(0);
       expect(result.inputType).toBe(source.kind === 'mp3' ? 'audio/mpeg' : 'audio/mp4');
+      await confirm(page, false);
+      await waitFor(page, () => __v2S4.controller.getSnapshot().activeTask?.status === 'STOPPED');
       await dispose(page);
     }
   });
@@ -383,7 +389,7 @@ test.describe('V2-S4 A01-A18 audio QA matrix', () => {
     expect(result.errorCode).toBe('PROCESSING_FAILED');
     expect(result.retryCount).toBe(1);
     expect(result.processingStarts).toBe(2);
-    expect(result.workerStarts).toBe(2);
+    expect(result.workerStarts).toBe(4);
     expect(result.retryEvents).toBe(1);
     expect(result.rejectionEvents).toBe(1);
     expect(result.rejectionNodeText).toContain('第二次拒收');
@@ -487,7 +493,7 @@ test.describe('V2-S4 A01-A18 audio QA matrix', () => {
     expect(result.injectionCalls).toBe(2);
     expect(result.injectionReasons).toEqual(['processed', 'restore']);
     expect(result.dataTransferCalls).toBe(2);
-    expect(result.workerStarts).toBe(1);
+    expect(result.workerStarts).toBe(2);
     expect(result.activeWorkers).toBe(0);
     expect(result.processingStarts).toBe(1);
     expect(result.submitEvents).toBe(0);
@@ -516,7 +522,7 @@ test.describe('V2-S4 A01-A18 audio QA matrix', () => {
     await dispose(page);
   });
 
-  test('A02/A04 [DEBUG_PURE_PLAN] unsupported codec plans are non-executable (controller proof is Q-S4-P01)', async ({ page }) => {
+  test('A02/A04 [DEBUG_PURE_PLAN] verified compressed sources require lossy confirmation', async ({ page }) => {
     await open(page);
     for (const source of [
       { kind: 'mp3', metadata: { signatureMime: 'audio/mpeg', container: 'mp3', codec: 'mp3', size: 300_001 } },
@@ -526,7 +532,7 @@ test.describe('V2-S4 A01-A18 audio QA matrix', () => {
         const api = __uploadfit_debug_bundle__;
         const metadata = {
           mediaKind: 'audio', fileType: sourceMetadata.signatureMime,
-          durationMs: 120_000, sampleRate: 44_100, channels: 2, bitDepth: null,
+          durationMs: 10_000, sampleRate: 44_100, channels: 2, bitDepth: null,
           averageBitrate: 128_000, variableBitrate: false, seekable: true,
           inspectedBytes: 64, errorCode: null, warnings: [], ...sourceMetadata
         };
@@ -536,14 +542,16 @@ test.describe('V2-S4 A01-A18 audio QA matrix', () => {
         return {
           executable: plan.executable,
           passthrough: plan.passthrough,
-          confirmations: plan.confirmations.length,
+          operations: plan.operations,
+          confirmations: plan.confirmations.map((item) => item.type),
           stops: plan.unfixable
         };
       }, { sourceMetadata: source.metadata });
       expect(result.executable).toBe(false);
       expect(result.passthrough).toBe(false);
-      expect(result.confirmations).toBe(0);
-      expect(result.stops).toContain('AUDIO_CODEC_UNSUPPORTED');
+      expect(result.operations).toContain(source.kind === 'mp3' ? 'REENCODE_AUDIO' : 'TRANSCODE_AUDIO');
+      expect(result.confirmations).toEqual(['AUDIO_LOSSY_TRANSCODE']);
+      expect(result.stops).toEqual([]);
     }
   });
 
@@ -605,7 +613,8 @@ test.describe('V2-S4 A01-A18 audio QA matrix', () => {
         expect(result.independentValidation.frameValidation.count).toBeGreaterThanOrEqual(2);
         expect(result.independentValidation.representativeFrames).toBeGreaterThanOrEqual(2);
         expect(result.durationDeltaMs).toBeLessThanOrEqual(result.durationToleranceMs);
-        expect(result.workerStarts).toBe(1);
+        // Processing + pipeline output decode + explicit independent decode.
+        expect(result.workerStarts).toBe(3);
         await dispose(page);
       }
     }

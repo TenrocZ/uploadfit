@@ -324,7 +324,9 @@ test.describe('V2-S4 quick audio performance matrix', () => {
     expect(result.completed).toBe(2);
     expect(result.processingStarts).toBe(2);
     expect(result.maxProcessing).toBe(1);
-    expect(result.workerStarts).toBe(2);
+    // Each task uses one processing Worker and one independent final-decode
+    // validation Worker; they remain strictly sequential.
+    expect(result.workerStarts).toBe(4);
     expect(result.maxActiveWorkers).toBe(1);
     expect(result.activeWorkers).toBe(0);
     expect(result.submitEvents).toBe(0);

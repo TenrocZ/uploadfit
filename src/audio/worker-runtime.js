@@ -2,6 +2,7 @@ import {
   AUDIO_CANCEL_DEADLINE_MS,
   AUDIO_INPUT_CHUNK_BYTES,
   AUDIO_PCM_BUFFER_BUDGET,
+  AUDIO_PROCESS_TIMEOUT_MS,
   AUDIO_PROGRESS_INTERVAL_MS
 } from '../config.js';
 import {
@@ -289,7 +290,9 @@ export function createAudioWorkerRuntime(options = {}) {
       };
       timeoutTimer = globalRef.setTimeout(() => {
         fail(workerError('AUDIO_WORKER_UNAVAILABLE', { timeout: true, taskId }));
-      }, Number.isFinite(runOptions.timeoutMs) ? Math.max(1, runOptions.timeoutMs) : 120_000);
+      }, Number.isFinite(runOptions.timeoutMs)
+        ? Math.max(1, runOptions.timeoutMs)
+        : AUDIO_PROCESS_TIMEOUT_MS);
       worker.onmessage = (event) => {
         const message = event?.data;
         if (!message || message.taskId !== taskId) return;

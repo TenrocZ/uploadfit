@@ -146,6 +146,90 @@ function progressEvent(cursor, end, plan) {
   };
 }
 
+/**
+ * Shared bounded PCM -> frozen lamejs session. WAV and S4.1 decoded inputs
+ * use this exact collector/flush path so the encoder contract cannot drift.
+ */
+export function createMp3EncoderSession(options = {}) {
+  const signal = options.signal;
+  const channels = options.channels === 2 ? 2 : 1;
+  const sampleRate = Number(options.sampleRate);
+  const bitrateKbps = Number(options.bitrateKbps);
+  if (![8_000, 11_025, 12_000, 16_000, 22_050, 24_000, 32_000, 44_100, 48_000].includes(sampleRate)
+    || !BITRATE_LADDER.includes(bitrateKbps)) {
+    const error = new Error('AUDIO_CODEC_UNSUPPORTED');
+    error.code = 'AUDIO_CODEC_UNSUPPORTED';
+    throw error;
+  }
+  const maxOutputBytes = Math.min(
+    S0_RESOURCE_LIMITS.hardOutputBytes,
+    Number.isFinite(options.maxOutputBytes) && options.maxOutputBytes > 0
+      ? Math.floor(options.maxOutputBytes)
+      : S0_RESOURCE_LIMITS.hardOutputBytes
+  );
+  const encoder = new Mp3Encoder(channels, sampleRate, bitrateKbps);
+  const collectOutput = options.collectOutput !== false;
+  const chunks = [];
+  const pendingCallbacks = [];
+  let outputBytes = 0;
+  let maxChunkBytes = 0;
+  let finished = false;
+
+  const emit = (encoded) => {
+    if (!encoded?.byteLength) return;
+    const chunk = new Uint8Array(encoded);
+    outputBytes += chunk.byteLength;
+    maxChunkBytes = Math.max(maxChunkBytes, chunk.byteLength);
+    if (outputBytes > maxOutputBytes) {
+      const error = new Error('AUDIO_OUTPUT_SIZE_INVALID');
+      error.code = 'AUDIO_OUTPUT_SIZE_INVALID';
+      throw error;
+    }
+    if (collectOutput) chunks.push(chunk);
+    const callback = options.onChunk?.(chunk);
+    if (callback && typeof callback.then === 'function') pendingCallbacks.push(callback);
+  };
+
+  return Object.freeze({
+    encode(left, right = left) {
+      throwIfAborted(signal);
+      if (finished || !(left instanceof Int16Array) || !(right instanceof Int16Array)
+        || left.length !== right.length) {
+        const error = new Error('AUDIO_ENCODE_FAILED');
+        error.code = 'AUDIO_ENCODE_FAILED';
+        throw error;
+      }
+      emit(encoder.encodeBuffer(left, channels === 2 ? right : left));
+    },
+    async finish() {
+      throwIfAborted(signal);
+      if (finished) {
+        const error = new Error('AUDIO_ENCODE_FAILED');
+        error.code = 'AUDIO_ENCODE_FAILED';
+        throw error;
+      }
+      finished = true;
+      emit(encoder.flush());
+      if (pendingCallbacks.length) await Promise.all(pendingCallbacks);
+      const blob = collectOutput ? new Blob(chunks, { type: 'audio/mpeg' }) : null;
+      if (collectOutput && (!blob.size || blob.size !== outputBytes)) {
+        const error = new Error('AUDIO_ENCODE_FAILED');
+        error.code = 'AUDIO_ENCODE_FAILED';
+        throw error;
+      }
+      return {
+        blob,
+        outputBytes,
+        bufferedOutputBytes: collectOutput ? outputBytes : maxChunkBytes
+      };
+    },
+    get outputBytes() { return outputBytes; },
+    get channels() { return channels; },
+    get sampleRate() { return sampleRate; },
+    get bitrateKbps() { return bitrateKbps; }
+  });
+}
+
 /** Encode a PCM WAV through bounded slices. It does not create a Worker itself. */
 export async function encodeWavToMp3(file, options = {}) {
   const signal = options.signal;
@@ -166,9 +250,7 @@ export async function encodeWavToMp3(file, options = {}) {
   const bytesPerSample = PCM_BYTES_PER_SAMPLE[signature.bitDepth];
   const blockAlign = signature.channels * bytesPerSample;
   const chunkBytes = Math.max(blockAlign, inputChunkBytes - (inputChunkBytes % blockAlign));
-  const encoder = new Mp3Encoder(targetChannels, signature.sampleRate, plan.bitrateKbps);
   const collectOutput = options.collectOutput !== false;
-  const chunks = [];
   let outputBytes = 0;
   let peakBufferedBytes = 0;
   let peakPcmBytes = 0;
@@ -179,18 +261,15 @@ export async function encodeWavToMp3(file, options = {}) {
     lastProgressAt = now;
     await options.onProgress?.(event);
   };
-  const emit = async (encoded) => {
-    if (!encoded?.byteLength) return;
-    const chunk = new Uint8Array(encoded);
-    outputBytes += chunk.byteLength;
-    if (collectOutput) {
-      chunks.push(chunk);
-      peakBufferedBytes = Math.max(peakBufferedBytes, outputBytes);
-    } else {
-      peakBufferedBytes = Math.max(peakBufferedBytes, chunk.byteLength);
-    }
-    await options.onChunk?.(chunk);
-  };
+  const session = createMp3EncoderSession({
+    channels: targetChannels,
+    sampleRate: signature.sampleRate,
+    bitrateKbps: plan.bitrateKbps,
+    signal,
+    maxOutputBytes: S0_RESOURCE_LIMITS.hardOutputBytes,
+    collectOutput,
+    onChunk: options.onChunk
+  });
 
   let cursor = signature.audioOffset;
   const end = signature.audioOffset + signature.audioBytes;
@@ -204,14 +283,20 @@ export async function encodeWavToMp3(file, options = {}) {
     const pcm = convertPcmChunk(raw, signature.channels, signature.bitDepth, targetChannels);
     peakPcmBytes = Math.max(peakPcmBytes, raw.byteLength + pcm.left.byteLength + (targetChannels === 2 ? pcm.right.byteLength : 0));
     peakBufferedBytes = Math.max(peakBufferedBytes, peakPcmBytes + (collectOutput ? outputBytes : 0));
-    await emit(encoder.encodeBuffer(pcm.left, pcm.right));
+    session.encode(pcm.left, pcm.right);
+    outputBytes = session.outputBytes;
+    peakBufferedBytes = Math.max(
+      peakBufferedBytes,
+      collectOutput ? outputBytes : Math.max(pcm.left.byteLength, pcm.right.byteLength)
+    );
     cursor = next;
     await report({
       ...progressEvent(cursor, end, { ...plan, audioOffset: signature.audioOffset, audioBytes: signature.audioBytes }),
       peakPcmBytes
     });
   }
-  await emit(encoder.flush());
+  const encodedResult = await session.finish();
+  outputBytes = encodedResult.outputBytes;
   await report(progressEvent(end, end, plan), true);
   if (!collectOutput) {
     return {
@@ -224,7 +309,7 @@ export async function encodeWavToMp3(file, options = {}) {
       encodePasses: 1
     };
   }
-  const blob = new Blob(chunks, { type: 'audio/mpeg' });
+  const blob = encodedResult.blob;
   // A caller-supplied page max is deliberately optional for the S2 adapter;
   // the pipeline owns that decision.  The frozen S0 hard ceiling remains a
   // memory/output safety bound even when page-max enforcement is disabled.

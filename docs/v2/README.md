@@ -12,7 +12,7 @@ V2 在已验收的图片上传适配基线上增加一个收缩后的音频 MVP�
 4. [work-orders/01-共享契约与接口基线.md](work-orders/01-共享契约与接口基线.md)
 5. 当前领取阶段的任务书
 
-当前状态：**V2-S0、V2-S1、V2-S2、V2-S3 已验收，V2-S4 前置已满足、可以开工，V2-S5 HOLD**。工作区 production IIFE 已包含冻结范围内的音频 controller/UI/DataTransfer 闭环，但真实 Tabbit、200MB 慢速门禁、安全性能与发布仍由 S4/S5 完成；在 S5 前不得对外宣称 V2 已发布。状态和证据见 `work-orders/90-需求追踪矩阵.md`、`../handoffs/V2-S3-final-acceptance.md`、`../evidence/V2-S3/README.md`。
+当前状态：**V2-S0 至 V2-S4.1 已验收，发布前最终代码审计通过，V2-S5 可以开工**。工作区 production IIFE 已包含冻结范围内的图片与 MP3/M4A/WAV 本地适配闭环；公开发布仍须由 S5 统一版本、bytes/SHA、候选清单、安装/更新烟测和发布材料。代码审计见 `../handoffs/V2-final-code-audit.md`，S4.1 证据见 `../handoffs/V2-S4.1-final-acceptance.md` 与 `../evidence/V2-S4.1/README.md`。
 
 ## 历史基线
 

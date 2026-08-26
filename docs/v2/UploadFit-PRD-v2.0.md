@@ -2,7 +2,7 @@
 
 - 文档状态：施工基线
 - 版本：2.0
-- 日期：2026-08-20
+- 日期：2026-08-20；S4.1 产品修订：2026-08-25
 - 目标环境：Tabbit PC Browser 1.10.16.0 或后续兼容版本
 - 代码仓库：`C:\Users\蔡天乐\Desktop\黑客松\main`
 - 上游基线：V1 S0–S5 已验收，提交 `5979dec`
@@ -19,6 +19,8 @@ V2 只新增一个音频场景：
 
 V2 必须继续满足：单个可粘贴 IIFE、无 ESM 运行时加载、无远程依赖、音频内容不离开本机、AI 不接触音频数据、不自动点击提交、无法安全处理时停止并解释。
 
+2026-08-25 S4.1 修订确认：超限 MP3→MP3 重编码、常见 M4A/AAC-LC→MP3 转换属于 Must，不再作为 V2.1 延期项；短生命周期英文 toast 拒收和英文大小/时长规则属于上传墙发现闭环的一部分。此前阶段因 ADR-005 仅有编码器而实施的安全停止仍是正确历史行为，但不能作为最终产品能力边界。
+
 ## 1. 文档权威与继承关系
 
 1. 本文是 V2 产品范围、安全边界和验收事实源。
@@ -26,6 +28,7 @@ V2 必须继续满足：单个可粘贴 IIFE、无 ESM 运行时加载、无远�
 3. 本文未明确修改的 V1 图片行为、安全不变量、一次页面重试、文件回填和 UI 可访问性要求继续有效。
 4. V2 任务书只负责把本文拆成工程施工步骤，不得通过修改任务书降低本文门槛。
 5. 新增依赖、许可、媒体契约或体积策略必须留 ADR；突破安全红线的 ADR 无效。
+6. `V2-S4.1` 是 2026-08-25 授权的产品修订阶段；其施工单可在新 ADR 和真实门禁成立后解禁 ADR-005 的解码边界，但不得降低隐私、资源、时长墙或最终复检要求。
 
 ## 2. 背景与问题
 
@@ -55,14 +58,18 @@ V2 必须继续满足：单个可粘贴 IIFE、无 ESM 运行时加载、无远�
 
 - 识别普通及动态新增的单文件音频上传控件。
 - 只在页面明确允许 MP3 且存在可信 `maxBytes` 时形成可执行音频计划。
-- 检查 MP3、M4A/AAC、WAV 的签名、容器/编码、字节数、时长、采样率和声道数；S0 可行性门禁决定实际可支持的编码子集。
+- 检查 MP3、M4A/AAC、WAV 的签名、容器/编码、字节数、时长、采样率和声道数；S0 编码器门禁与 S4.1 ADR-006 真实解码门禁共同决定实际可支持的编码子集。
 - 合规文件原样放行，不重编码。
+- 合法超限 MP3 在页面明确允许 MP3且有可信字节上限时，经确认重新编码为更小 MP3。
+- 常见非加密、非 fragmented 的 AAC-LC M4A 在需要跨越格式墙或体积墙时，经确认转换为 MP3；页面允许 M4A且文件合规时保持原 File passthrough。
 - 超限文件按页面上限、时长和安全余量计算 MP3 目标码率。
 - 所有音频转码、重新编码和单声道化均在执行前确认。
 - 使用有界内存的流式或分块管线，不得把长文件完整展开为内存 PCM。
 - 最终输出通过 MIME/签名、字节数和可解码性复检后才可回填。
 - DataTransfer 回填失败时提供下载和人工上传指引。
 - 同一页面任务最多一次由明确新拒收触发的自动重试；不得自动提交。
+- 在有界等待窗口内识别与上传器相关的错误节点，以及唯一活跃上传任务对应的 transient toast/snackbar/notification；中文和英文明确拒收都必须经过本地规则解析后才能触发处理。
+- 确定性解析常见中英文大小与时长表达；同一句 `Max 10 MB and 10 minutes` 必须同时形成字节上限和时长上限。
 - 用实际 200MB 级非敏感合成录音证明可压到 100MB 硬上限以内。
 
 ### 4.2 Should 目标
@@ -79,6 +86,7 @@ V2 必须继续满足：单个可粘贴 IIFE、无 ESM 运行时加载、无远�
 - 批量、多文件合并、拆分、裁剪、静音删除、变速或时长修改。
 - 降噪、人声增强、响度标准化、声纹、说话人分析或内容理解。
 - AMR、FLAC、AIFF、WMA 等格式；未来版本另行评估。
+- HE-AAC/HE-AACv2、ALAC、加密/DRM M4A、fragmented MP4、raw ADTS AAC 默认不在 S4.1 子集；只有新 ADR 和真实门禁可扩展。
 - 解决账户额度、网络中断、登录权限、官方审核工具或服务端故障。
 - 页面只有时长限制时自动分段或裁剪。
 - 页面未明确上限时猜测目标大小。
@@ -94,6 +102,7 @@ V2 必须继续满足：单个可粘贴 IIFE、无 ESM 运行时加载、无远�
 - `accept` 包含 `audio/*`、`audio/mpeg`、`audio/mp3`、`.mp3`、`.m4a`、`.aac` 或 `.wav`；
 - 与上传框可访问关联的 label/help/error 文本明确说明上传录音或音频；
 - 同一上传器的明确拒收文本指出音频格式或文件大小问题。
+- 在恰好一个可观察音频任务时，页面全局 transient toast/snackbar/notification 明确指出文件格式、大小或时长拒收；多任务无法唯一关联时不得猜测。
 
 单独出现“音频”“录音”字样、页面全局营销文案或隐藏的无关联 file input 不足以成立。
 
@@ -107,16 +116,20 @@ V2 必须继续满足：单个可粘贴 IIFE、无 ESM 运行时加载、无远�
 6. 计算所得参数不低于绝对质量底线；
 7. 不存在格式/大小冲突、语义安全停止或官方工具要求。
 
+S4.1 已验收输入集合至少包括：有效 MP3 Layer III，以及 ISO BMFF/M4A 内 AAC-LC `mp4a.40.2` 的 mono/stereo 常见 32/44.1/48kHz 子集。精确 container/profile、sample table 和布局边界由 ADR-006 与真实 Tabbit Worker 解码证据冻结。
+
 ### 5.3 必须停止并解释
 
 - 只有时长上限、没有可执行体积方案：`AUDIO_DURATION_LIMIT_UNFIXABLE`。
 - 需要低于 48kbps 单声道才能满足目标：`AUDIO_TARGET_UNSAFE`。
-- 无法确认源编码或解码器不支持：`AUDIO_CODEC_UNSUPPORTED`。
+- 无法确认源编码、profile 不在 S4.1 子集或真实 Worker decoder 不支持：`AUDIO_CODEC_UNSUPPORTED`。
 - 文件损坏、时长为零/非有限数：`AUDIO_DECODE_FAILED`。
 - 页面不允许 MP3：`AUDIO_OUTPUT_FORMAT_NOT_ALLOWED`。
 - 页面大小上限缺失、模糊或冲突：沿用规则不足/冲突错误，不执行。
 - 需要完整加载或预计内存超过安全预算：`AUDIO_MEMORY_BUDGET_EXCEEDED`。
 - 页面要求原始文件、证据原件、无损音频或官方工具：按语义安全规则停止。
+
+停止条件存在优先级：若文件已超过可信 `duration.maxMs`，必须显示 `AUDIO_DURATION_LIMIT_UNFIXABLE`；不能因同一文件还需要重编码而用 `AUDIO_CODEC_UNSUPPORTED` 覆盖真实时长墙。
 
 ## 6. 规则来源与优先级
 
@@ -131,6 +144,8 @@ V2 必须继续满足：单个可粘贴 IIFE、无 ESM 运行时加载、无远�
 时长、采样率、声道、位深等文本可以进入 advisory 或明确不可修复提示，但 V2.0 不据此生成额外专业格式方案。AI 只能帮助把相关页面文本结构化；音频文件、文件名、二进制、Base64、频谱、时长等不发送给 AI。AI 候选必须经过与 V1 相同的本地数字证据溯源和冲突校验。
 
 如果 `accept` 允许 MP3，但附近更高语义文本明确禁止或限定另一格式，应产生冲突并停止，不使用低优先级规则覆盖。
+
+英文规则至少覆盖 `max/maximum/up to/under/no more than/exceeds/too large/limit` 与 `second/minute/hour` 常见变体。拒收 observer 可以把清洗后、最多 600 字符的 transient error/toast 作为 `rejection` 来源，但不得抓取或保存完整页面文本；成功、复制、保存和套餐营销 toast 必须忽略。
 
 ## 7. 文件预检
 
@@ -161,6 +176,7 @@ V2 必须继续满足：单个可粘贴 IIFE、无 ESM 运行时加载、无远�
 - 元数据探测累计读取默认不超过 1MiB；超过必须有格式特定理由并记录。
 - 不信任文件扩展名或 `File.type`，必须核对签名/容器。
 - `durationMs` 必须有限且大于零；对 VBR 文件应使用容器索引或受控扫描，不用首帧码率直接冒充精确时长。
+- MP3/M4A 的可执行转码必须在 production 等价 Blob Worker 中投递真实 encoded chunks 并获得真实 `AudioData`；`isConfigSupported()` 单独为 true 不是支持证据。
 - 不把文件名写入产品日志、截图或 AI 输入；测试只使用明确非敏感生成名。
 
 ## 8. 处理规划
@@ -205,6 +221,8 @@ rawTargetBitrate = floor((safeTargetBytes × 8 - containerReserveBits) / duratio
 - 第一次编码复检仍超限时，允许在回填前降一个码率档再编码一次。
 - 两次均失败则停止；不得无限搜索，也不得先把失败文件注入页面。
 
+S4.1 实现不得先删除 planner 停止分支再补 decoder。必须先完成 ADR-006、真实 Tabbit Worker 的 MP3/AAC-LC 解码、资源/许可门禁，再让合法 MP3/M4A 形成可执行计划。不在冻结子集的 codec/profile 继续诚实停止。
+
 ## 9. 处理管线与资源约束
 
 目标管线：
@@ -227,6 +245,7 @@ File.stream / bounded slice
 - 单块输入建议不超过 4MiB；并发未释放 PCM 预算建议不超过 32MiB。
 - 编解码在 Blob Worker 或等效后台执行路径中运行，主线程负责 UI、取消和状态。
 - 每个解码帧/AudioData/临时缓冲必须在使用后及时 `close` 或释放引用。
+- MP3 帧残留、M4A sample table、AudioDecoder queue 和未释放 PCM 必须分别有硬上界；M4A sample offset 必须落在文件及合法 `mdat` 范围内。
 - 同时只处理一个音频任务；新任务进入有界队列。
 - 取消后 1 秒内停止产生新工作，并清理 Worker、对象 URL、缓冲和监听器。
 - 浏览器能力、内存预算或 Worker 不成立时诚实停止，不在主线程退化处理 200MB 文件。
@@ -296,6 +315,8 @@ V2 新增错误码至少包括：
 
 错误码必须进入共享白名单、UI 文案、单元测试和诊断映射。
 
+S4.1 验收后，合法且位于支持子集内的超限 MP3 或 AAC-LC M4A 不得再仅因“源文件是压缩格式”返回 `AUDIO_CODEC_UNSUPPORTED`；该错误只表示真实 profile/container/capability 不支持。
+
 ## 15. 诊断与可观察性
 
 允许记录：媒体类型、容器/编码枚举、近似时长区间、输入/输出字节、目标码率、声道数、处理阶段、耗时、workerUsed、重试次数、错误码、清理结果、生产包 bytes/SHA。
@@ -321,6 +342,8 @@ AUDIO_RESOURCES_CLEANED
 - 合规 MP3 原样放行，字节与 File 身份不被替换。
 - MP3 允许且超限：形成音频计划，确认后输出不超过硬上限。
 - M4A/AAC 与 WAV：在页面允许 MP3 时形成转码计划。
+- 英文 `Max 10 MB and 10 minutes` 同时解析大小/时长；超过时长时即使能压小也停止。
+- `File exceeds 25 MB limit.` 等 transient toast 被识别为明确拒收，只在规则更严格且任务唯一关联时进入最多一次重试。
 - 页面没有 maxBytes、没有允许 MP3、规则冲突、只有时长限制时均不执行。
 - 48kbps 以下才可满足时停止。
 - 取消、输入被移除、页面关闭、处理错误后资源清理。
@@ -371,6 +394,7 @@ AUDIO_RESOURCES_CLEANED
 | V2-S2 | 规划、流式处理、最终复检 | 处理引擎独立通过 200→100 自动化/人工证据 |
 | V2-S3 | controller、确认 UI、回填与拒收闭环 | 本地 A–H 场景通过，图片无回归 |
 | V2-S4 | 全量 QA、安全、性能、Tabbit 实机 | 真实单 IIFE 核心闭环与清理通过 |
+| V2-S4.1 | 超限 MP3 重编码、AAC-LC M4A 转 MP3、英文规则与 transient 拒收修复 | 两类真实 decoder 在 Tabbit Worker 成立；Podcastools/VocaText/稳定 M4A 门禁通过；图片/WAV 无回归 |
 | V2-S5 | 发布材料、演示与最终候选包 | 安装、说明、演示、矩阵和最终验收齐全 |
 
 S0 是强制停止线。外部 Agent 不得以短文件 `decodeAudioData` demo、Node 原生 ffmpeg、远程服务、Playwright Chromium 或 mock 编码器替代 Tabbit 真实可行性。
@@ -381,6 +405,8 @@ S0 是强制停止线。外部 Agent 不得以短文件 `decodeAudioData` demo�
 |---|---|
 | Tabbit 无 MP3 编码能力 | 内嵌轻量编码器；若许可/体积/性能不成立则停止 V2 |
 | M4A 解复用复杂 | S0 锁定 AAC-LC 子集和 demux 方案；不承诺所有 M4A |
+| WebCodecs 只报告支持但实际解码失败 | S4.1 必须在 production 等价 Worker 投递真实 MP3/AAC chunk 并获得 AudioData；否则对应格式阻塞 |
+| transient toast 太短或误关联 | 有界 MutationObserver + 英文 classifier；全局提示仅单活跃任务可关联；成功 toast 忽略 |
 | 200MB 内存爆炸 | 流式分块、Worker、有界 PCM；禁止完整 decodeAudioData |
 | 输出大小不可预测 | CBR/离散阶梯、5% 余量、最多一次本地纠偏、最终复检 |
 | 人声质量下降 | 48kbps 绝对底线、单声道明确确认、不承诺音乐 |
@@ -392,7 +418,7 @@ S0 是强制停止线。外部 Agent 不得以短文件 `decodeAudioData` demo�
 
 只有同时满足以下条件，V2 才能声明完成：
 
-- V2-S0 至 S5 均有独立验收结论和可复核证据；
+- V2-S0 至 S5（包括产品修订阶段 V2-S4.1）均有独立验收结论和可复核证据；
 - 核心场景在当前 Tabbit 真实单 IIFE 中通过；
 - 200MB 级输入到 100MB 硬上限实测通过；
 - 合规文件原样放行，停止条件没有越界处理；

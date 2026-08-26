@@ -84,7 +84,9 @@ function collectFieldEntries(candidates, field, getValue) {
       evidence: candidate.evidence,
       value: getValue(candidate.rules[field], candidate.rules)
     }))
-    .filter((entry) => entry.value !== null && entry.value !== undefined);
+    .filter((entry) => entry.value !== null
+      && entry.value !== undefined
+      && (!Array.isArray(entry.value) || entry.value.length > 0));
 }
 
 function chooseScalar(entries, field, conflicts) {

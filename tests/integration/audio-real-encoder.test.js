@@ -264,11 +264,11 @@ test.describe('S2 audio engine with the real frozen lamejs Worker', () => {
     expect(outcome.second.validationValid).toBe(true);
   });
 
-  test('stops an M4A source as codec-unsupported instead of promising a transcode', async ({ page }) => {
+  test('plans AAC-LC M4A but rejects a truncated container during real Worker decode', async ({ page }) => {
     await installRunner(page, await implementationSource());
     const result = await page.evaluate(() => window.__s2Run(window.__s2FakeMp4(), 1_000_000, {
-      // Fully-parsed M4A metadata: the stop must come from the frozen-subset
-      // gate, not from a metadata parse error on the truncated fixture.
+      // Fully-parsed metadata reaches the S4.1 plan; the intentionally
+      // truncated file itself must then fail bounded demux/decode.
       metadataOverride: {
         mediaKind: 'audio',
         fileType: 'audio/mp4',
@@ -276,7 +276,7 @@ test.describe('S2 audio engine with the real frozen lamejs Worker', () => {
         container: 'mp4',
         codec: 'aac-lc',
         size: 64,
-        durationMs: 120_000,
+        durationMs: 2_000,
         sampleRate: 44_100,
         channels: 2,
         bitDepth: null,
@@ -289,11 +289,11 @@ test.describe('S2 audio engine with the real frozen lamejs Worker', () => {
       }
     }));
     expect(result.ok).toBe(false);
-    expect(result.plan.unfixable).toContain('AUDIO_CODEC_UNSUPPORTED');
-    expect(result.plan.executable).toBe(false);
-    expect(result.plan.operations).toEqual([]);
-    expect(result.plan.confirmations).toEqual([]);
-    expect(result.errorCode).toBe('AUDIO_CODEC_UNSUPPORTED');
+    expect(result.plan.unfixable).toEqual([]);
+    expect(result.plan.executable).toBe(true);
+    expect(result.plan.operations).toContain('TRANSCODE_AUDIO');
+    expect(result.plan.confirmations).toEqual(['AUDIO_LOSSY_TRANSCODE']);
+    expect(result.errorCode).toBe('AUDIO_DECODE_FAILED');
   });
 
   test('cancels a real encode promptly and reports the stable cancellation code', async ({ page }) => {

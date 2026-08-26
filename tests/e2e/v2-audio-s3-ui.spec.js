@@ -32,7 +32,7 @@ async function openAudioUi(page) {
           }]
         },
         plan: {
-          mediaKind: 'audio', targetMime: 'audio/mpeg', targetBitrateKbps: 64,
+          mediaKind: 'audio', sourceContainer: 'wav', targetMime: 'audio/mpeg', targetBitrateKbps: 64,
           targetChannels: 1, estimatedOutputBytes: { min: 100000, max: 120000 },
           operations: ['TRANSCODE_AUDIO', 'DOWNMIX_MONO'],
           confirmations: [
@@ -137,6 +137,8 @@ test('V2-S3 audio UI renders evidence, independent confirmations, accessible pro
   expect(initial.text).toContain('MP3 (audio/mpeg)');
   expect(initial.text).toContain('64 kbps');
   expect(initial.text).toContain('100000 字节 – 120000 字节');
+  expect(initial.text).toContain('250000 字节');
+  expect(initial.text).toContain('将 PCM WAV 转为 MP3');
   expect(initial.text).toContain('单声道（会改变声道数）');
   expect(initial.text).toContain('有损处理，可能影响音质');
   expect(initial.evidenceText).toContain('<img src=x onerror=alert(1)>');
@@ -147,6 +149,26 @@ test('V2-S3 audio UI renders evidence, independent confirmations, accessible pro
   expect(initial.focusedStart).toBe(true);
   expect(initial.confirmationType).toBe('confirm-audio');
   expect(initial.processCalls).toBe(0);
+
+  const m4aCopy = await page.evaluate(() => {
+    const harness = globalThis.__audioUi;
+    harness.task.current.mime = 'audio/mp4';
+    harness.task.plan.sourceContainer = 'mp4';
+    harness.controller.setSnapshot({
+      sessionState: 'NEEDS_CONFIRMATION', uploaderCount: 1,
+      activeTask: harness.task, pageCard: null
+    });
+    const shadow = document.querySelector('[data-uploadfit-ui-host]').shadowRoot;
+    const text = shadow.querySelector('.uf-card')?.textContent ?? '';
+    harness.task.current.mime = 'audio/wav';
+    harness.task.plan.sourceContainer = 'wav';
+    harness.controller.setSnapshot({
+      sessionState: 'NEEDS_CONFIRMATION', uploaderCount: 1,
+      activeTask: harness.task, pageCard: null
+    });
+    return text;
+  });
+  expect(m4aCopy).toContain('将 M4A 转为 MP3');
 
   const afterCancel = await page.evaluate(() => {
     const host = document.querySelector('[data-uploadfit-ui-host]');

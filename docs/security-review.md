@@ -1,5 +1,20 @@
 # UploadFit V2-S4 安全复核（Phase 1 + Phase 2A1）
 
+## 发布前最终代码审计增量（2026-08-25）
+
+- 修复跨异步 handler 边界的 stale task 竞态；取消、换文件或 input 脱离后，旧任务不能再释放事件、请求确认、入队或回填结果。
+- production 静态复扫未发现 fetch/XHR/WebSocket/EventSource/sendBeacon、storage/cookie、动态代码或动态 HTML 注入路径；业务网页提交仍不会被自动点击。
+- production 依赖树仅为精确锁定的 `lamejs@1.2.1` 与其 `use-strict@1.0.1`；使用 npm 官方 registry 执行 `npm audit --omit=dev`，当前已知漏洞为 0。
+- 最终 production bytes/SHA 为 446,208 / `C7E3D59FA0B44B0EC2104B34AE7FFB040A577B6E8A8B18F6DB4F79241D5C79A8`。Podcastools 文件名解析修复只改变本地规则过滤，没有新增网络、存储或动态代码路径。V2-S5 仍须随候选包提供 ADR-005 冻结的 NOTICE、完整许可证与 relinking/source 材料。
+
+## V2-S4.1 安全增量（2026-08-25）
+
+- 新生产依赖为 0；继续使用 ADR-005 冻结的 `lamejs@1.2.1`。内部 MP3/M4A demux、`AudioDecoder` 与最终代表帧验证均在本地 Blob Worker，不增加远程 codec/runtime。
+- MP3 residual 4KiB、decode queue 8、PCM 32MiB、M4A `moov` 8MiB/表预算 16MiB/每类 1,000,000 entries 均有硬上界和 safe-integer/file-range 校验。
+- 真实 gate 未关闭 `AudioData=0`；取消后 Worker/Blob URL/queue 清理；证据不含 PCM、Base64、路径、文件名、私有脚本 ID或账号。
+- Podcastools MP3/M4A 与 VocaText 实机 submit=0；未观察到 UploadFit 音频外传，capability gate external audio requests=0，未新增 storage 路径。
+- 最终 full static-check PASS；生产 IIFE 未发现 fetch/XHR/WebSocket/EventSource/sendBeacon、远程 runtime、持久化音频或业务 `.click()`。详见 `docs/evidence/V2-S4.1/`。
+
 ## 当前施工状态
 
 状态为 `CORE_FIX_PASS_OFFICIAL_REINSTALL_REQUIRED`。Phase 1 定向 runner `31/31`、最终全量 E2E `193/193`；Phase 2A1 的 Tabbit LR3 实测 UploadFit external requests=0、敏感 payload marker=0、business submit click=0、持久化前后无变化。2026-08-25 两项修复未增加网络 API：VocaText 只调整上传器分类，Zent 只让 multiple-capable input 的单文件进入既有 controller；实际多文件仍在 controller 前置停止。当前生产产物 bytes/SHA 为 421,333 / `98BD12C651C2801E2E2E8BC9C2A006057024AA26E2D916B33899487B9A0F1A68`。

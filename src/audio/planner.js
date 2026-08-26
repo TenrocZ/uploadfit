@@ -70,6 +70,13 @@ function sourceAllowed(metadata, rules) {
   return Boolean(extension && extensions.includes(extension));
 }
 
+function supportedAudioSource(metadata) {
+  const mime = normalizeMime(metadata?.signatureMime ?? metadata?.mime);
+  return (mime === MP3_MIME && metadata?.container === MP3_CONTAINER && metadata?.codec === MP3_CODEC)
+    || (mime === 'audio/mp4' && metadata?.container === 'mp4' && metadata?.codec === 'aac-lc')
+    || (mime === 'audio/wav' && metadata?.container === 'wav' && metadata?.codec === 'pcm');
+}
+
 function warning(code, details = {}) {
   return { code, ...details };
 }
@@ -159,11 +166,7 @@ function metadataProblems(metadata) {
   const problems = [];
   if (!isRecord(metadata)) return ['AUDIO_METADATA_INVALID'];
   if (metadata.mediaKind && metadata.mediaKind !== 'audio') problems.push('AUDIO_CODEC_UNSUPPORTED');
-  if (!['audio/mpeg', 'audio/mp4', 'audio/wav'].includes(normalizeMime(metadata.signatureMime))) {
-    problems.push('AUDIO_CODEC_UNSUPPORTED');
-  }
-  if (!['mp3', 'mp4', 'wav'].includes(metadata.container)) problems.push('AUDIO_CODEC_UNSUPPORTED');
-  if (!metadata.codec) problems.push('AUDIO_CODEC_UNSUPPORTED');
+  if (!supportedAudioSource(metadata)) problems.push('AUDIO_CODEC_UNSUPPORTED');
   if (!finitePositive(metadata.size)) problems.push('AUDIO_METADATA_INVALID');
   if (!finitePositive(metadata.durationMs)) problems.push('AUDIO_METADATA_INVALID');
   if (!finitePositive(metadata.sampleRate)) problems.push('AUDIO_METADATA_INVALID');
@@ -251,7 +254,6 @@ export function createAudioProcessingPlan(metadata, rules, options = {}) {
     pushUnique(plan.unfixable, 'RULES_INSUFFICIENT');
     return plan;
   }
-  if (!explicitMp3Allowed(rules)) pushUnique(plan.unfixable, 'AUDIO_OUTPUT_FORMAT_NOT_ALLOWED');
 
   const maxBytes = rules.maxBytes;
   const reserve = AUDIO_CONTAINER_RESERVE_BYTES;
@@ -277,10 +279,8 @@ export function createAudioProcessingPlan(metadata, rules, options = {}) {
   const sourceMime = normalizeMime(metadata?.signatureMime);
   const strategy = qualityStrategy(options);
   const baseCompliant = problems.length === 0
-    && explicitMp3Allowed(rules)
-    && sourceMime === MP3_MIME
-    && metadata.container === MP3_CONTAINER
-    && metadata.codec === MP3_CODEC
+    && supportedAudioSource(metadata)
+    && (sourceMime !== 'audio/wav' || explicitMp3Allowed(rules))
     && metadata.size <= maxBytes
     && sourceAllowed(metadata, rules);
 
@@ -316,14 +316,13 @@ export function createAudioProcessingPlan(metadata, rules, options = {}) {
       && plan.targetBitrateKbps < strategy.minimumStereo));
   const compliant = baseCompliant && !qualityNeedsMono;
 
-  // ADR-005 froze an encode-only lamejs: only PCM WAV sources can be
-  // transcoded.  An over-limit MP3 or an M4A source would need a decoder that
-  // was never validated, so the planner stops honestly instead of promising a
-  // transcode the worker cannot perform.  Compliant MP3 passthrough above is
-  // unaffected.
-  const encodableSource = sourceMime === 'audio/wav'
-    && metadata?.container === 'wav'
-    && metadata?.codec === 'pcm';
+  // ADR-006 unlocks the verified Worker decode subset: MPEG Layer III,
+  // AAC-LC in non-fragmented M4A, and the existing PCM WAV path.  A compliant
+  // source that the page already allows remains an identity passthrough.
+  const encodableSource = supportedAudioSource(metadata);
+  if (!compliant && problems.length === 0 && !explicitMp3Allowed(rules)) {
+    pushUnique(plan.unfixable, 'AUDIO_OUTPUT_FORMAT_NOT_ALLOWED');
+  }
   if (!compliant && problems.length === 0 && !encodableSource) {
     pushUnique(plan.unfixable, 'AUDIO_CODEC_UNSUPPORTED');
   }
@@ -461,7 +460,8 @@ export {
   MINIMUM_USABLE_MAX_BYTES,
   explicitMp3Allowed,
   lowerBitrate,
-  sourceAllowed
+  sourceAllowed,
+  supportedAudioSource
 };
 
 export const createAudioPlan = createAudioProcessingPlan;

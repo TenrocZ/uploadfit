@@ -1,5 +1,17 @@
 # UploadFit V2-S4 测试结果（Phase 1 + Phase 2A1）
 
+## 发布前最终代码审计（2026-08-25）
+
+状态 `CORE_CODE_ACCEPTED_S5_REQUIRED`。最终审计修复异步 `validate/plan/validateOutput` 返回后的 stale task 竞态，避免快速连续选文件时旧任务释放新事件或把旧音频结果覆盖到新选择；同时修复大 CBR MP3 在没有 `TAG` 时仍扣除 128-byte ID3v1 的时长偏差。
+
+当前 `npm run check` PASS：25 files / 252 tests；production 为 446,208 bytes，SHA-256 `C7E3D59FA0B44B0EC2104B34AE7FFB040A577B6E8A8B18F6DB4F79241D5C79A8`；static-check、`git diff --check`、源码语法检查均通过。Tabbit Chrome 151 定向验证旧图片校验不会释放第二次选择事件、旧音频最终复检不会回填，production IIFE 启动、动态上传框发现及重复加载幂等通过；Podcastools 的文件名规则冲突已修复，5 分钟超体积 MP3 实站重编码通过。完整记录见 [`handoffs/V2-final-code-audit.md`](handoffs/V2-final-code-audit.md) 与 [`handoffs/V2-podcastools-mp3-filename-fix.md`](handoffs/V2-podcastools-mp3-filename-fix.md)。
+
+## V2-S4.1 最终验收（2026-08-25）
+
+状态 `ACCEPTED`。当前 production 为 444,989 bytes，SHA-256 `EB77F23278CBCEB739376671D0C1AEEEAC417309DD346EB40CEC2FE99729E030`，相对 S4.1 开工 +23,656 bytes。真实 Tabbit Worker MP3/AAC-LC decode、32/44.1/48kHz mono/stereo、M4A layout/table/negative matrix、英文规则、transient observer 与 ≥30MiB MP3/M4A 门禁均通过。
+
+最终源码状态：`npm run check` PASS（25 files / 250 tests），完整 E2E 204/204 PASS，static-check 与 `git diff --check` PASS。Podcastools 的 MP3/M4A 正例与 VocaText 25MB toast→一次重试均由当前 production IIFE 在 Tabbit 实测通过。详见 [`evidence/V2-S4.1/README.md`](evidence/V2-S4.1/README.md) 和 [`handoffs/V2-S4.1-final-acceptance.md`](handoffs/V2-S4.1-final-acceptance.md)。
+
 ## 当前施工状态
 
 本阶段状态为 `CORE_FIX_PASS_OFFICIAL_REINSTALL_REQUIRED`，不是最终 `ACCEPTED`。当前 production `dist/uploadfit.js` 为 421,333 bytes，SHA-256 为 `98BD12C651C2801E2E2E8BC9C2A006057024AA26E2D916B33899487B9A0F1A68`。此前 421,347-byte SHA 的官方保存、LR1/LR3 为历史实测；当前 SHA 需要重新粘贴保存后再补轻量安装检查。

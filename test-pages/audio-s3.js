@@ -17,10 +17,10 @@
       hint: '推荐生成 4 秒 PCM 16-bit mono WAV（源文件超过 250KB），确认后应只处理一次并回填 audio/mpeg。'
     },
     C: {
-      title: 'M4A/AAC 与超限 MP3 安全停止',
-      rule: '音频上传仅支持 MP3，文件最大 250KB。超限 MP3 不可转码。',
+      title: 'M4A/AAC 与超限 MP3 确认计划',
+      rule: '音频上传仅支持 MP3，文件最大 250KB。超限 MP3 可在确认后重新编码。',
       accept: 'audio/mpeg',
-      hint: '在本页生成超限 MP3，或选择/生成有效 M4A/AAC-LC fixture；两者都应 AUDIO_CODEC_UNSUPPORTED，Worker/process=0。'
+      hint: '生成超限 MP3 或 AAC-LC 元数据 fixture；预期分别出现“重新编码 MP3”或“将 M4A 转为 MP3”确认，确认前 Worker/process=0。'
     },
     D: {
       title: '无 maxBytes 规则安全停止',
@@ -107,7 +107,7 @@
     scenario === 'A' ? '生成本页合规 MP3' : '复用当前页最近 MP3'
   );
   const largeButton = addControl('audio-s3-large-mp3', '生成超限 MP3');
-  const m4aButton = addControl('audio-s3-generate-m4a', '生成本页 M4A/AAC-LC fixture');
+  const m4aButton = addControl('audio-s3-generate-m4a', '生成本页 M4A/AAC-LC 元数据 fixture');
   const declineButton = addControl('audio-s3-decline', '拒绝当前确认');
   const cancelButton = addControl('audio-s3-cancel', '取消当前任务');
   const detachButton = addControl('audio-s3-detach', '移除输入（脱离）');
@@ -234,9 +234,9 @@
     });
   }
 
-  // This is the same small ISO-BMFF/AAC-LC metadata fixture used by the
-  // signature unit tests, kept inline so the production page has no test
-  // module or network dependency.
+  // This small ISO-BMFF/AAC-LC metadata fixture is intentionally not a decode
+  // success fixture.  The real S4.1 decode fixture lives on the capability
+  // page and contains complete sample tables plus real AAC access units.
   function createM4aFixture() {
     const text = (value) => new Uint8Array([...value].map((char) => char.charCodeAt(0)));
     const box = (type, payload) => {

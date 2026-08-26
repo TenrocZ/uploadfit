@@ -6,8 +6,8 @@ async function open(page) {
   await page.evaluate(() => globalThis.__uploadfit_debug_bundle__.cleanupSession());
 }
 
-test.describe('V2-S4 media regression and frozen contract', () => {
-  test('A01/A03/A04 [DEBUG_PURE_PLAN]: supported PCM variants, passthrough and codec stops', async ({ page }) => {
+test.describe('V2-S4 media regression and S4.1 migration contract', () => {
+  test('A01/A03/A04 [DEBUG_PURE_PLAN]: PCM variants, passthrough and compressed plans', async ({ page }) => {
     await open(page);
     const result = await page.evaluate(async () => {
       const api = __uploadfit_debug_bundle__;
@@ -27,14 +27,19 @@ test.describe('V2-S4 media regression and frozen contract', () => {
           variants.push({ bitDepth, channels, operation: plan.operations[0], targetMime: plan.targetMime });
         }
       }
-      const unsupported = [
-        metadata({ signatureMime: 'audio/mpeg', container: 'mp3', codec: 'mp3', size: 300_001 }),
-        metadata({ signatureMime: 'audio/mp4', container: 'mp4', codec: 'aac-lc' })
+      const compressed = [
+        metadata({ signatureMime: 'audio/mpeg', container: 'mp3', codec: 'mp3', size: 300_001, durationMs: 10_000 }),
+        metadata({ signatureMime: 'audio/mp4', container: 'mp4', codec: 'aac-lc', durationMs: 10_000 })
       ].map((item) => api.createAudioProcessingPlan(item, rules));
       return {
         compliant: { passthrough: compliant.passthrough, confirmations: compliant.confirmations.length },
         variants,
-        unsupported: unsupported.map((plan) => ({ executable: plan.executable, stops: plan.unfixable }))
+        compressed: compressed.map((plan) => ({
+          executable: plan.executable,
+          operations: plan.operations,
+          confirmations: plan.confirmations.map((item) => item.type),
+          stops: plan.unfixable
+        }))
       };
     });
     expect(result.compliant).toEqual({ passthrough: true, confirmations: 0 });
@@ -43,10 +48,14 @@ test.describe('V2-S4 media regression and frozen contract', () => {
       expect(variant.operation).toBe('TRANSCODE_AUDIO');
       expect(variant.targetMime).toBe('audio/mpeg');
     }
-    for (const stopped of result.unsupported) {
-      expect(stopped.executable).toBe(false);
-      expect(stopped.stops).toContain('AUDIO_CODEC_UNSUPPORTED');
-    }
+    expect(result.compressed[0]).toMatchObject({
+      executable: false, operations: expect.arrayContaining(['REENCODE_AUDIO']),
+      confirmations: ['AUDIO_LOSSY_TRANSCODE'], stops: []
+    });
+    expect(result.compressed[1]).toMatchObject({
+      executable: false, operations: expect.arrayContaining(['TRANSCODE_AUDIO']),
+      confirmations: ['AUDIO_LOSSY_TRANSCODE'], stops: []
+    });
   });
 
   test('A05-A10 [DEBUG_PURE_PLAN]: all planning stops and independent confirmations are deterministic', async ({ page }) => {

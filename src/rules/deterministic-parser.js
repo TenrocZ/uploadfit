@@ -15,6 +15,8 @@ import {
 
 const BYTE_PATTERN = /(\d+(?:[.,]\d+)?)\s*(mib|mb|m\b|kib|kb|k\b|字节|bytes?|b)(?=\s|$|[^a-z0-9])/gi;
 const BYTE_RANGE_PATTERN = /(\d+(?:[.,]\d+)?)\s*(?:(mib|mb|m\b|kib|kb|k\b|字节|bytes?|b)\s*)?(?:-|至|到)\s*(\d+(?:[.,]\d+)?)\s*(mib|mb|m\b|kib|kb|k\b|字节|bytes?|b)(?=\s|$|[^a-z0-9])/i;
+const FILE_TOKEN_DELIMITER = /[\s"'“”‘’()[\]{}（）,，;；:：。!！？]/;
+const FILE_TOKEN_EXTENSION = /\.(?:jpg|jpeg|png|webp|mp3|m4a|aac|wav|webm)(?:[?#][^\s]*)?\.?$/i;
 const DIMENSION_PAIR_PATTERN = /(\d+(?:[.,]\d+)?)\s*x\s*(\d+(?:[.,]\d+)?)(?:\s*(像素|px|厘米|公分|毫米|英寸|寸|cm|mm|inch|in))?/gi;
 const AXIS_PATTERN = /(宽(?:度)?|高(?:度)?)\s*(?:[:：]\s*)?(?:(不低于|至少|不超过|最多|最低|最高|>=|<=|≥|≤)\s*)?(\d+(?:[.,]\d+)?)(?:\s*(?:至|到|-)\s*(\d+(?:[.,]\d+)?))?(?:\s*(?:像素|px))?/gi;
 const FORMAT_PATTERN = /(?:image\/(?:jpeg|png|webp)|audio\/(?:mpeg|mp3|mp4|aac|wav|x-wav|webm)|\.?\b(?:jpg|jpeg|png|webp|mp3|m4a|aac|wav|webm)\b)/gi;
@@ -29,10 +31,14 @@ const FORMAT_NEGATIVE_PREFIX_CONTEXT = /(?:不支持|不允许|禁止(?:使用)?
 const FORMAT_NEGATIVE_SUFFIX_CONTEXT = /^\s*(?:等)?[\s,，、]*(?:(?:图片|图像)?格式)?\s*(?:不支持|不允许|禁止(?:使用)?|禁用|不能(?:使用|用)?|拒绝|不接受|不接收|排除)/;
 const FORMAT_EXAMPLE_CONTEXT = /示例|样例|文件名|文件路径|路径|下载|链接|网址|\burl\b|\b(?:avatar|photo|image|file|record|audio)[-_\w]*\.(?:jpg|jpeg|png|webp|mp3|m4a|aac|wav)\b/i;
 const FORMAT_LIST_NEGATED_SUFFIX = /(?:等)?\s*(?:图片|图像)?格式\s*(?:不支持|不允许|禁止(?:使用)?|禁用|不能(?:使用|用)?|拒绝|不接受|不接收|排除)/;
+const BYTE_MIN_QUALIFIER = /(?:至少|不低于|大于|最低|最小|>=|≥|at\s+least|minimum|\bmin\b)/i;
+const BYTE_MAX_QUALIFIER = /(?:最多|不超过|不能超过|不得|小于|低于|最高|最大|上限|限制|max(?:imum)?|up\s+to|under|no\s+more\s+than|must\s+not\s+exceed|exceeds?|too\s+large|limit|<=|≤)/i;
 const PHYSICAL_DIMENSION_UNIT = /^(?:厘米|公分|毫米|英寸|寸|cm|mm|inch|in)$/i;
 const PIXEL_DIMENSION_UNIT = /^(?:像素|px)$/i;
 const DIMENSION_PAIR_CONTEXT = /(?:图片|图像|照片|证件照|头像)?\s*(?:尺寸|像素尺寸|宽高)|(?:不低于|至少|最低|不超过|最多|最高|>=|<=|≥|≤)\s*$/;
-const DURATION_PATTERN = /(?:时长|长度|录音|音频).{0,8}?(?:(不超过|最多|最高|<=|≤|小于)\s*)?(\d+(?:[.,]\d+)?)\s*(毫秒|ms|秒|s|分钟|分|min|小时|时|h)/gi;
+const DURATION_PATTERN = /(\d+(?:[.,]\d+)?)\s*(milliseconds?|msecs?|ms|seconds?|secs?|sec|s|minutes?|mins?|min|hours?|hrs?|hr|h|毫秒|秒|分钟|分|小时|时)(?=\s|$|[^a-z0-9])/gi;
+const DURATION_RULE_CONTEXT = /(?:时长|长度|录音|音频|时间|上限|限制|duration|length|audio|recording|time\s+limit)/i;
+const DURATION_MAX_QUALIFIER = /(?:不超过|最多|最高|<=|≤|小于|max(?:imum)?|up\s+to|under|no\s+more\s+than|must\s+not\s+exceed|not\s+exceed|exceeds?|limit)/i;
 const SAMPLE_RATE_PATTERN = /(\d+(?:[.,]\d+)?)\s*(khz|赫兹|hz)/gi;
 const CHANNEL_PATTERN = /(?:单声道|单通道|mono|1\s*声道|1\s*通道|双声道|双通道|stereo|2\s*声道|2\s*通道)/gi;
 const BIT_DEPTH_PATTERN = /(\d+)\s*位(?:深度)?/gi;
@@ -120,10 +126,24 @@ function parseFormats(text, rules) {
   rules.extensions.push(...formats.extensions.filter((value) => !rules.extensions.includes(value)));
 }
 
+function matchInsideFilenameToken(text, index, length) {
+  if (!Number.isInteger(index) || index < 0 || !Number.isInteger(length) || length <= 0) return false;
+  let start = index;
+  let end = index + length;
+  while (start > 0 && !FILE_TOKEN_DELIMITER.test(text[start - 1])) start -= 1;
+  while (end < text.length && !FILE_TOKEN_DELIMITER.test(text[end])) end += 1;
+  const token = text.slice(start, end);
+  return token.length <= 180 && FILE_TOKEN_EXTENSION.test(token);
+}
+
 function parseBytes(text, rules, audioContext = false) {
   const byteLimit = audioContext || AUDIO_FORMAT_CONTEXT.test(text) ? AUDIO_MAX_RULE_BYTES : undefined;
   const shorthandRange = text.match(BYTE_RANGE_PATTERN);
-  if (shorthandRange) {
+  if (shorthandRange && !matchInsideFilenameToken(
+    text,
+    shorthandRange.index ?? -1,
+    shorthandRange[0].length
+  )) {
     const firstUnit = shorthandRange[2] ?? shorthandRange[4];
     const secondUnit = shorthandRange[4] ?? shorthandRange[2];
     rules.minBytes = toBytes(shorthandRange[1], firstUnit, 'min', byteLimit);
@@ -131,7 +151,11 @@ function parseBytes(text, rules, audioContext = false) {
     return;
   }
 
-  const matches = [...text.matchAll(BYTE_PATTERN)];
+  const matches = [...text.matchAll(BYTE_PATTERN)].filter((match) => !matchInsideFilenameToken(
+    text,
+    match.index ?? -1,
+    match[0].length
+  ));
   if (matches.length >= 2 && /(?:-|至|到)/.test(text.slice(matches[0].index + matches[0][0].length, matches[1].index))) {
     rules.minBytes = toBytes(matches[0][1], matches[0][2], 'min', byteLimit);
     rules.maxBytes = toBytes(matches[1][1], matches[1][2], 'max', byteLimit);
@@ -139,29 +163,38 @@ function parseBytes(text, rules, audioContext = false) {
   }
 
   for (const match of matches) {
-    const prefix = text.slice(Math.max(0, match.index - 18), match.index);
-    const isMin = /至少|不低于|大于|最低|最小|>=|≥/.test(prefix);
-    const isMax = /最多|不超过|不能超过|不得|小于|低于|最高|最大|上限|max|limit|<=|≤/.test(prefix);
+    const prefix = text.slice(Math.max(0, match.index - 48), match.index);
+    const suffixStart = match.index + match[0].length;
+    const suffix = text.slice(suffixStart, suffixStart + 32);
+    const isMin = BYTE_MIN_QUALIFIER.test(prefix) || BYTE_MIN_QUALIFIER.test(suffix);
+    const isMax = BYTE_MAX_QUALIFIER.test(prefix) || BYTE_MAX_QUALIFIER.test(suffix);
     if (isMin) rules.minBytes = toBytes(match[1], match[2], 'min', byteLimit);
     if (isMax) rules.maxBytes = toBytes(match[1], match[2], 'max', byteLimit);
   }
 }
 
-function parseDuration(text, rules) {
+function parseDuration(text, rules, audioContext = false) {
   for (const match of text.matchAll(DURATION_PATTERN)) {
-    const value = Number.parseFloat(match[2].replace(',', '.'));
+    const prefix = text.slice(Math.max(0, match.index - 64), match.index);
+    const suffixStart = match.index + match[0].length;
+    const suffix = text.slice(suffixStart, suffixStart + 24);
+    const maxQualified = DURATION_MAX_QUALIFIER.test(prefix) || DURATION_MAX_QUALIFIER.test(suffix);
+    if (!DURATION_RULE_CONTEXT.test(`${prefix}${suffix}`) && !maxQualified) continue;
+    const value = Number.parseFloat(match[1].replace(',', '.'));
     if (!Number.isFinite(value) || value <= 0) continue;
-    const unit = match[3].toLowerCase();
-    const multiplier = /毫秒|^ms$/.test(unit)
+    const unit = match[2].toLowerCase();
+    const multiplier = /毫秒|^m(?:illi)?s(?:ec(?:ond)?s?)?$/.test(unit)
       ? 1
-      : /秒|^s$/.test(unit)
+      : /秒|^s$|^sec(?:ond)?s?$/.test(unit)
         ? 1000
-        : /分钟|^分$|^min$/.test(unit)
+        : /分钟|^分$|^min(?:ute)?s?$/.test(unit)
           ? 60_000
           : 3_600_000;
     const duration = Math.round(value * multiplier);
     if (!Number.isSafeInteger(duration) || duration <= 0) continue;
-    if (match[1]) rules.duration.maxMs = duration;
+    if (maxQualified) {
+      rules.duration.maxMs = duration;
+    }
     else rules.duration.exactMs = duration;
   }
 }
@@ -256,7 +289,7 @@ function parseClause(clause, sourceType, sentenceSafetyFlags, audioContext = fal
   parseFormats(text, rules);
   parseBytes(text, rules, audioContext);
   if (audioContext && !rules.mediaKind) rules.mediaKind = 'audio';
-  parseDuration(text, rules);
+  parseDuration(text, rules, audioContext);
   parseAudioConstraints(text, rules);
   parseDimensions(text, rules);
   parseRatio(text, rules);
@@ -276,13 +309,13 @@ function parseClause(clause, sourceType, sentenceSafetyFlags, audioContext = fal
   });
 }
 
-function parseText(text, sourceType) {
+function parseText(text, sourceType, inheritedAudioContext = false) {
   const safeText = sanitizeEvidenceText(text);
   if (!safeText) return [];
   const candidates = [];
   for (const sentence of safeText.split(/[。！？!?]+/).filter(Boolean)) {
     const safetyFlags = extractSafetyFlags(normalizeRuleText(sentence));
-    const audioContext = AUDIO_FORMAT_CONTEXT.test(sentence);
+    const audioContext = inheritedAudioContext || AUDIO_FORMAT_CONTEXT.test(sentence);
     for (const clause of sentence.split(/[，,；;]/).filter(Boolean)) {
       const candidate = parseClause(clause, sourceType, safetyFlags, audioContext);
       if (candidate) candidates.push(candidate);
@@ -350,10 +383,11 @@ export function parseRulesDeterministically(context = {}) {
   const candidates = [];
   const acceptCandidate = parseAcceptAttribute(context.attributes?.accept);
   if (acceptCandidate) candidates.push(acceptCandidate);
+  const audioContext = acceptCandidate?.rules?.mediaKind === 'audio';
 
   const bounded = getBoundedSourceTexts(context);
-  for (const text of bounded.nearby) candidates.push(...parseText(text, 'nearby-text'));
-  for (const text of bounded.alert) candidates.push(...parseText(text, 'rejection'));
-  for (const text of bounded.selected) candidates.push(...parseText(text, 'selected-text'));
+  for (const text of bounded.nearby) candidates.push(...parseText(text, 'nearby-text', audioContext));
+  for (const text of bounded.alert) candidates.push(...parseText(text, 'rejection', audioContext));
+  for (const text of bounded.selected) candidates.push(...parseText(text, 'selected-text', audioContext));
   return candidates;
 }

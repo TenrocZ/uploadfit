@@ -54,11 +54,19 @@ const OPERATION_TEXTS = {
 };
 
 const AUDIO_OPERATION_TEXTS = {
-  TRANSCODE_AUDIO: '将 PCM WAV 转为 MP3',
-  REENCODE_AUDIO: '重新编码音频',
+  TRANSCODE_AUDIO: '转为 MP3',
+  REENCODE_AUDIO: '重新编码 MP3',
   RESAMPLE_AUDIO: '调整采样率',
   DOWNMIX_MONO: '改为单声道'
 };
+
+function audioOperationText(operation, plan) {
+  if (operation === 'TRANSCODE_AUDIO') {
+    if (plan?.sourceContainer === 'mp4') return '将 M4A 转为 MP3';
+    if (plan?.sourceContainer === 'wav') return '将 PCM WAV 转为 MP3';
+  }
+  return AUDIO_OPERATION_TEXTS[operation] ?? OPERATION_TEXTS[operation] ?? operation;
+}
 
 const SOURCE_LABELS = Object.freeze({
   adapter: '页面适配器',
@@ -254,7 +262,7 @@ export function createTaskCardView({ documentRef, callbacks }) {
     section.append(el('div', 'uf-label', '将执行的动作：'));
     const items = el('ul', 'uf-rule-list');
     for (const operation of operations) {
-      items.append(el('li', null, `· ${AUDIO_OPERATION_TEXTS[operation] ?? OPERATION_TEXTS[operation] ?? operation}`));
+      items.append(el('li', null, `· ${audioOperationText(operation, plan)}`));
     }
     section.append(items);
     card.append(section);
@@ -480,7 +488,7 @@ export function createTaskCardView({ documentRef, callbacks }) {
         : '已适配并放回上传框'));
     const metadata = task.result?.metadata ?? task.current ?? {};
     const operations = (task.result?.operations ?? [])
-      .map((operation) => AUDIO_OPERATION_TEXTS[operation] ?? OPERATION_TEXTS[operation] ?? operation).join('、');
+      .map((operation) => audioOperationText(operation, task.plan)).join('、');
     const section = el('div', 'uf-section');
     section.append(list([
       ['输出格式', metadata.mime ?? '未知'],

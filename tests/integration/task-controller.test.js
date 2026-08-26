@@ -548,6 +548,208 @@ test('L08: a rapid second selection cancels the stale task before it can inject'
   await page.evaluate(() => globalThis.__s3Controller.dispose());
 });
 
+test('L08 regression: stale async validation cannot release the next selection event', async ({ page }) => {
+  await openController(page);
+  await page.evaluate(() => {
+    const api = globalThis.__uploadfit_debug_bundle__;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/jpeg';
+    document.body.append(input);
+    const rules = {
+      mediaKind: 'image',
+      formats: ['image/jpeg'], extensions: ['jpg', 'jpeg'], minBytes: null, maxBytes: 120_000,
+      width: { exact: null, min: null, max: null },
+      height: { exact: null, min: null, max: null },
+      aspectRatio: null, dpi: null, count: { max: 1 }, background: null,
+      semanticRequirements: [], confidence: 0.95,
+      sources: [{ type: 'accept-attribute', priority: 500, evidence: ['accept: image/jpeg'], confidence: 0.95 }],
+      conflicts: [], advisories: [], safetyFlags: [], actionable: true
+    };
+    globalThis.__s3Input = input;
+    globalThis.__s3ValidationResolvers = [];
+    globalThis.__s3Changes = 0;
+    input.addEventListener('change', () => { globalThis.__s3Changes += 1; });
+    const imageHandler = {
+      kind: 'image',
+      supports: () => true,
+      inspect: async (file) => ({
+        mediaKind: 'image', mime: file.type, signatureMime: file.type,
+        size: file.size, width: 390, height: 567, marker: file.name, errorCode: null
+      }),
+      validate: (metadata) => new Promise((resolve) => {
+        globalThis.__s3ValidationResolvers.push({
+          marker: metadata.marker,
+          resolve: () => resolve({ valid: true, violations: [], warnings: [] })
+        });
+      }),
+      plan: () => ({ executable: false, passthrough: true, operations: [], confirmations: [], unfixable: [] }),
+      resolveConfirmation: (plan) => plan,
+      process: async () => { throw new Error('PROCESS_SHOULD_NOT_RUN'); },
+      validateOutput: () => ({ valid: true, violations: [] }),
+      dispose() {}
+    };
+    globalThis.__s3Controller = api.createTaskController({
+      documentRef: document,
+      globalRef: window,
+      imageHandler,
+      parseRulesFn: () => [],
+      resolveRulesFn: () => rules
+    });
+    globalThis.__s3Controller.start();
+  });
+
+  const select = (name) => page.evaluate((selectedName) => {
+    const transfer = new DataTransfer();
+    transfer.items.add(new File(['content'], selectedName, { type: 'image/jpeg' }));
+    globalThis.__s3Input.files = transfer.files;
+    globalThis.__s3Input.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+  }, name);
+
+  await select('first.jpg');
+  await expect.poll(() => page.evaluate(() => globalThis.__s3ValidationResolvers.length)).toBe(1);
+  await select('second.jpg');
+  await expect.poll(() => page.evaluate(() => globalThis.__s3ValidationResolvers.length)).toBe(2);
+  await page.evaluate(() => globalThis.__s3ValidationResolvers[0].resolve());
+  await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 0)));
+  expect(await page.evaluate(() => globalThis.__s3Changes)).toBe(0);
+
+  await page.evaluate(() => globalThis.__s3ValidationResolvers[1].resolve());
+  await expect.poll(
+    () => page.evaluate(() => globalThis.__s3Controller.getSnapshot().activeTask?.status)
+  ).toBe('PASSTHROUGH');
+  const result = await page.evaluate(() => ({
+    changes: globalThis.__s3Changes,
+    currentName: globalThis.__s3Input.files[0].name,
+    tasks: [...globalThis.__s3Controller.tasks.values()].map((task) => ({
+      status: task.status,
+      errorCode: task.errorCode ?? null
+    }))
+  }));
+  expect(result).toEqual({
+    changes: 1,
+    currentName: 'second.jpg',
+    tasks: [
+      { status: 'STOPPED', errorCode: 'USER_CANCELLED' },
+      { status: 'PASSTHROUGH', errorCode: null }
+    ]
+  });
+  await page.evaluate(() => globalThis.__s3Controller.dispose());
+});
+
+test('L08 regression: stale async audio output validation cannot inject over a new file', async ({ page }) => {
+  await openController(page);
+  await page.evaluate(() => {
+    const api = globalThis.__uploadfit_debug_bundle__;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'audio/mpeg';
+    document.body.append(input);
+    const rules = {
+      mediaKind: 'audio', formats: ['audio/mpeg'], extensions: ['mp3'],
+      minBytes: null, maxBytes: 10, duration: null,
+      audio: { codecs: ['mp3'], sampleRates: [], channels: null, bitrateKbps: null },
+      width: {}, height: {}, aspectRatio: null, dpi: null, count: { max: 1 }, background: null,
+      semanticRequirements: [], confidence: 0.95,
+      sources: [{ type: 'nearby-text', priority: 400, evidence: ['MP3 最大 10 字节'], confidence: 0.95 }],
+      conflicts: [], advisories: [], safetyFlags: [], actionable: true
+    };
+    globalThis.__s3Input = input;
+    globalThis.__s3OutputResolvers = [];
+    globalThis.__s3InjectNames = [];
+    const audioHandler = {
+      kind: 'audio',
+      supports: () => true,
+      inspect: async (file) => ({
+        mediaKind: 'audio', mime: 'audio/mpeg', fileType: 'audio/mpeg', signatureMime: 'audio/mpeg',
+        container: 'mp3', codec: 'mp3', size: file.size, durationMs: 1000,
+        sampleRate: 44100, channels: 1, averageBitrate: 128000, marker: file.name, errorCode: null
+      }),
+      validate: () => ({ valid: false, violations: [{ code: 'AUDIO_FILE_TOO_LARGE' }], warnings: [], unfixable: [] }),
+      plan: () => ({
+        mediaKind: 'audio', sourceContainer: 'mp3', sourceCodec: 'mp3',
+        targetMime: 'audio/mpeg', targetContainer: 'mp3', targetCodec: 'mp3',
+        targetMaxBytes: 10, safeTargetBytes: 9, targetBitrateKbps: 64,
+        targetSampleRate: 44100, targetChannels: 1,
+        operations: ['REENCODE_AUDIO'], confirmations: [], estimatedOutputBytes: { min: 1, max: 9 },
+        encodePassLimit: 1, executable: true, passthrough: false, unfixable: [], warnings: []
+      }),
+      resolveConfirmation: (plan) => plan,
+      process: async (file) => {
+        const output = new File(['ok'], `processed-${file.name}`, { type: 'audio/mpeg' });
+        return {
+          file: output,
+          metadata: {
+            mediaKind: 'audio', mime: 'audio/mpeg', fileType: 'audio/mpeg', signatureMime: 'audio/mpeg',
+            container: 'mp3', codec: 'mp3', size: output.size, durationMs: 1000,
+            sampleRate: 44100, channels: 1, averageBitrate: 64000, frameCount: 3, errorCode: null
+          },
+          validation: { valid: true, violations: [] }, operations: ['REENCODE_AUDIO'],
+          durationMs: 1, outputBytes: output.size, inputBytesRead: file.size,
+          encodePasses: 1, workerUsed: true, warnings: [], passthrough: false
+        };
+      },
+      validateOutput: () => new Promise((resolve) => {
+        globalThis.__s3OutputResolvers.push(() => resolve({ valid: true, violations: [], warnings: [] }));
+      }),
+      dispose() {}
+    };
+    const discovery = { start() {}, cleanup() {} };
+    globalThis.__s3Controller = api.createTaskController({
+      documentRef: document, globalRef: window, discovery, audioHandler,
+      parseRulesFn: () => [], resolveRulesFn: () => rules,
+      injectFileFn: (target, file) => {
+        globalThis.__s3InjectNames.push(file.name);
+        const transfer = new DataTransfer();
+        transfer.items.add(file);
+        target.files = transfer.files;
+        return { ok: true, inputFilesVerified: true, eventsDispatched: [], fallback: null, errorCode: null };
+      }
+    });
+    globalThis.__s3Controller.registerUploader({
+      input, uploaderId: 'race-audio', mediaKind: 'audio', multiple: false,
+      acceptTokens: ['audio/mpeg'], nearbyTexts: ['MP3 最大 10 字节'], alertTexts: []
+    });
+    globalThis.__s3Controller.start();
+  });
+
+  const select = (name) => page.evaluate((selectedName) => {
+    const transfer = new DataTransfer();
+    transfer.items.add(new File(['01234567890123456789'], selectedName, { type: 'audio/mpeg' }));
+    globalThis.__s3Input.files = transfer.files;
+    globalThis.__s3Input.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+  }, name);
+
+  await select('first.mp3');
+  await expect.poll(() => page.evaluate(() => globalThis.__s3OutputResolvers.length)).toBe(1);
+  await select('second.mp3');
+  await page.evaluate(() => globalThis.__s3OutputResolvers[0]());
+  await expect.poll(() => page.evaluate(() => globalThis.__s3OutputResolvers.length)).toBe(2);
+  expect(await page.evaluate(() => globalThis.__s3InjectNames)).toEqual([]);
+
+  await page.evaluate(() => globalThis.__s3OutputResolvers[1]());
+  await expect.poll(
+    () => page.evaluate(() => globalThis.__s3Controller.getSnapshot().activeTask?.status)
+  ).toBe('SUCCESS');
+  const result = await page.evaluate(() => ({
+    injectNames: globalThis.__s3InjectNames,
+    currentName: globalThis.__s3Input.files[0].name,
+    tasks: [...globalThis.__s3Controller.tasks.values()].map((task) => ({
+      status: task.status,
+      errorCode: task.errorCode ?? null
+    }))
+  }));
+  expect(result).toEqual({
+    injectNames: ['processed-second.mp3'],
+    currentName: 'processed-second.mp3',
+    tasks: [
+      { status: 'STOPPED', errorCode: 'USER_CANCELLED' },
+      { status: 'SUCCESS', errorCode: null }
+    ]
+  });
+  await page.evaluate(() => globalThis.__s3Controller.dispose());
+});
+
 test('L10: DataTransfer failure stops without claiming a successful upload', async ({ page }) => {
   await openController(page);
   await page.evaluate(() => {

@@ -28,5 +28,22 @@ describe('S3 rejection classifier', () => {
     expect(result.kind).toBe('ambiguous');
     expect(result.candidates).toEqual([]);
   });
-});
 
+  it('S4.1 R02 classifies an English byte-limit toast as an explicit rejection', () => {
+    const result = classifyRejectionText('File exceeds 25 MB limit.');
+    expect(result).toMatchObject({ kind: 'explicit', reason: 'STRUCTURED_FILE_RULE' });
+    expect(result.candidates.some((candidate) => candidate.rules?.maxBytes === 25_000_000))
+      .toBe(true);
+  });
+
+  it.each([
+    'Uploaded successfully',
+    'Upload complete',
+    'Copied',
+    'Saved',
+    'Transcription complete',
+    'Pro plan: 25 MB for $10'
+  ])('S4.1 R04 ignores success and marketing notifications: %s', (text) => {
+    expect(classifyRejectionText(text)).toMatchObject({ kind: 'irrelevant', candidates: [] });
+  });
+});

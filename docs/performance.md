@@ -1,5 +1,11 @@
 # UploadFit V2-S4 性能记录（Phase 1 + Phase 2A1）
 
+## V2-S4.1 压缩输入增量（2026-08-25）
+
+31,458,240-byte 真 MP3 → 22,021,440-byte MP3：最终全量处理 45,279.2ms，heartbeat 最大 41ms，peak buffered 26,216,128 bytes，最大 residual 448 bytes、decode queue 8，单次编码，输出时长误差 22.63ms，最终首/中/尾代表窗口 3/3 真解码，未关闭 `AudioData=0`。处理中取消 3.3ms。
+
+31,818,912-byte M4A 含 31,457,453-byte 真实 AAC payload、90,215 access units，验证 `co64`、`moov` after `mdat` 与有界 batch 读取；输出 23,095,584-byte MP3，总处理 135,104.5ms，heartbeat 最大 20.4ms，max slice 4,194,099 bytes，decode queue 8，未关闭 `AudioData=0`。M4A 取消 2.7ms；随后任务复用成功；active Worker 最大 1、结束 0。P02/P03/P04 均 PASS。
+
 ## 快速自动化
 
 状态为 `IN_PROGRESS`。四文件 Phase 1 定向 runner 本轮实测 `31/31` 通过（workers=1）。`v2-audio-performance.spec.js` 的 P01/P02/P03 与 Q-S4-P06/P07 均通过；P03 原用例明确是 sequential cleanup harness，Q-S4-P07 才是同页 TaskController 排队证据：两个任务完成，`maxProcessing=1`、`maxActiveWorkers=1`、结束后 active Workers=0。

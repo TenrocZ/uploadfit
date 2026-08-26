@@ -178,7 +178,7 @@ test.describe('S2 audio pipeline harness', () => {
         code: 'AUDIO_CODEC_UNSUPPORTED',
         metadata: {
           ...metadata,
-          signatureMime: 'audio/mpeg', container: 'mp3', codec: 'mp3', size: 150_000_000
+          signatureMime: 'audio/mp4', container: 'mp4', codec: 'alac', size: 10_000_000
         },
         rules
       }

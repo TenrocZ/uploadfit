@@ -1,5 +1,184 @@
 import { expect, test } from '@playwright/test';
 
+test('S4.1 VocaText size rejection preserves accept formats and becomes actionable', async ({ page }) => {
+  await page.goto('/test-pages/probe.html');
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
+  const result = await page.evaluate(() => {
+    const api = globalThis.__uploadfit_debug_bundle__;
+    const previousCandidates = api.parseRulesDeterministically({
+      attributes: { accept: '.mp3,.m4a,.wav,audio/*' },
+      nearbyTexts: [],
+      alertTexts: []
+    });
+    const previous = api.resolveRules(previousCandidates);
+    const rejection = api.classifyRejectionText('File exceeds 25 MB limit.');
+    const next = api.resolveRules([...previousCandidates, ...rejection.candidates]);
+    return {
+      rejectionKind: rejection.kind,
+      maxBytes: next.maxBytes,
+      formats: next.formats,
+      extensions: next.extensions,
+      mediaKind: next.mediaKind,
+      actionable: next.actionable,
+      conflicts: next.conflicts,
+      stricter: api.isStrictlyMoreSpecificAudioRejection(previous, next)
+    };
+  });
+
+  expect(result.rejectionKind).toBe('explicit');
+  expect(result.maxBytes).toBe(25_000_000);
+  expect(result.mediaKind).toBe('audio');
+  expect(result.formats).toEqual(expect.arrayContaining(['audio/mpeg', 'audio/mp4', 'audio/wav']));
+  expect(result.extensions).toEqual(expect.arrayContaining(['.mp3', '.m4a', '.wav']));
+  expect(result.actionable).toBe(true);
+  expect(result.conflicts).not.toContainEqual(expect.objectContaining({ field: 'formats' }));
+  expect(result.conflicts).not.toContainEqual(expect.objectContaining({ field: 'extensions' }));
+  expect(result.stricter).toBe(true);
+});
+
+test('S4.1 R03 captures a pre-existing hidden toast after text and visibility change', async ({ page }) => {
+  await page.goto('/test-pages/probe.html');
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
+  const result = await page.evaluate(async () => {
+    const api = globalThis.__uploadfit_debug_bundle__;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'audio/mpeg';
+    const toast = document.createElement('div');
+    toast.id = 'toast';
+    toast.hidden = true;
+    document.body.append(input, toast);
+    const task = { taskId: 'toast-task', inputElement: input };
+    const detections = [];
+    const stop = api.observeRejection(task, { input }, {
+      debounceMs: 0,
+      windowMs: 2_000,
+      getActiveTasks: () => [task],
+      onRejection: (detail) => detections.push({
+        kind: detail.kind,
+        text: detail.text,
+        taskId: detail.task?.taskId ?? null,
+        related: detail.related,
+        errorCode: detail.errorCode
+      })
+    });
+    toast.textContent = 'File exceeds 25 MB limit.';
+    toast.hidden = false;
+    toast.className = 'toast show';
+    const deadline = Date.now() + 1_000;
+    while (!detections.length && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    const active = stop.active();
+    stop();
+    input.remove();
+    toast.remove();
+    return { detections, active };
+  });
+
+  expect(result.detections).toEqual([{
+    kind: 'explicit',
+    text: 'File exceeds 25 MB limit.',
+    taskId: 'toast-task',
+    related: true,
+    errorCode: null
+  }]);
+  expect(result.active).toBe(false);
+});
+
+test('S4.1 R05 reports ambiguity for a global toast with two active uploaders', async ({ page }) => {
+  await page.goto('/test-pages/probe.html');
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
+  const result = await page.evaluate(async () => {
+    const api = globalThis.__uploadfit_debug_bundle__;
+    const first = document.createElement('input');
+    const second = document.createElement('input');
+    first.type = second.type = 'file';
+    first.accept = second.accept = 'audio/mpeg';
+    document.body.append(first, second);
+    const firstTask = { taskId: 'first-toast-task', inputElement: first };
+    const secondTask = { taskId: 'second-toast-task', inputElement: second };
+    const detections = [];
+    const stop = api.observeRejection(firstTask, { input: first }, {
+      debounceMs: 0,
+      windowMs: 2_000,
+      getActiveTasks: () => [firstTask, secondTask],
+      onRejection: (detail) => detections.push({
+        taskId: detail.task?.taskId ?? null,
+        related: detail.related,
+        errorCode: detail.errorCode
+      })
+    });
+    const toast = document.createElement('div');
+    toast.className = 'snackbar notification';
+    toast.textContent = 'File exceeds 25 MB limit.';
+    document.body.append(toast);
+    const deadline = Date.now() + 1_000;
+    while (!detections.length && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    stop();
+    first.remove();
+    second.remove();
+    toast.remove();
+    return detections;
+  });
+
+  expect(result).toEqual([{
+    taskId: null,
+    related: false,
+    errorCode: 'AMBIGUOUS_REJECTION_ASSOCIATION'
+  }]);
+});
+
+test('S4.1 R07 timeout and pagehide disconnect observers and suppress later mutations', async ({ page }) => {
+  await page.goto('/test-pages/probe.html');
+  await page.addScriptTag({ url: '/dist/uploadfit.test.js' });
+  const result = await page.evaluate(async () => {
+    const api = globalThis.__uploadfit_debug_bundle__;
+    const input = document.createElement('input');
+    input.type = 'file';
+    document.body.append(input);
+    const task = { taskId: 'cleanup-task', inputElement: input };
+    let timeoutCalls = 0;
+    let rejectionCalls = 0;
+    const timeoutStop = api.observeRejection(task, { input }, {
+      debounceMs: 0,
+      windowMs: 20,
+      getActiveTasks: () => [task],
+      onTimeout: () => { timeoutCalls += 1; },
+      onRejection: () => { rejectionCalls += 1; }
+    });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const timeoutActive = timeoutStop.active();
+    const pagehideStop = api.observeRejection(task, { input }, {
+      debounceMs: 0,
+      windowMs: 2_000,
+      getActiveTasks: () => [task],
+      onRejection: () => { rejectionCalls += 1; }
+    });
+    window.dispatchEvent(new Event('pagehide'));
+    const pagehideActive = pagehideStop.active();
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.textContent = 'File exceeds 25 MB limit.';
+    document.body.append(toast);
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    timeoutStop();
+    pagehideStop();
+    input.remove();
+    toast.remove();
+    return { timeoutCalls, rejectionCalls, timeoutActive, pagehideActive };
+  });
+
+  expect(result).toEqual({
+    timeoutCalls: 1,
+    rejectionCalls: 0,
+    timeoutActive: false,
+    pagehideActive: false
+  });
+});
+
 test('L05: ambiguous upload failure stops safely without processing or retry', async ({ page }) => {
   await page.goto('/test-pages/probe.html');
   await page.addScriptTag({ url: '/dist/uploadfit.test.js' });

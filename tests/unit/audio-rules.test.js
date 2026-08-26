@@ -43,6 +43,67 @@ describe('audio rule normalization and parsing', () => {
     expect(rules.actionable).toBe(true);
   });
 
+  it('S4.1 R01 parses English byte and duration ceilings from the same uploader rule', () => {
+    const rules = resolve('Max 10 MB and 10 minutes.', { accept: 'audio/mpeg' });
+    expect(rules).toMatchObject({
+      mediaKind: 'audio',
+      maxBytes: 10_000_000,
+      duration: { maxMs: 600_000 },
+      actionable: true
+    });
+  });
+
+  it.each([
+    ['Files up to 25 MB.', 25_000_000],
+    ['Maximum file size: 100 MB.', 100_000_000],
+    ['File must be under 20MB.', 20_000_000],
+    ['File exceeds 25 MB limit.', 25_000_000]
+  ])('S4.1 parses an English file byte ceiling: %s', (text, expected) => {
+    expect(resolve(text, { accept: 'audio/mpeg' }).maxBytes).toBe(expected);
+  });
+
+  it('S4.1 parses English duration units and qualifiers', () => {
+    expect(resolve('Audio length must not exceed 2 hours.', { accept: 'audio/mpeg' }).duration)
+      .toMatchObject({ maxMs: 7_200_000 });
+  });
+
+  it('does not treat audio-page control timing as an upload duration rule', () => {
+    const resolved = resolveRules(parseRulesDeterministically({
+      attributes: { accept: 'audio/mpeg' },
+      nearbyTexts: [
+        '音频上传仅支持 MP3，文件最大 250KB。',
+        '生成 18 秒 PCM WAV',
+        '看到 PROCESSING 后立即取消；预期 1 秒内 STOPPED。'
+      ]
+    }));
+    expect(resolved.maxBytes).toBe(250_000);
+    expect(resolved.duration).toMatchObject({ exactMs: null, minMs: null, maxMs: null });
+    expect(resolved.conflicts.filter((item) => item.field === 'duration')).toEqual([]);
+  });
+
+  it('does not parse a displayed MP3 filename as a byte range', () => {
+    const filenameOnly = resolve('uploadfit-mp3-30MB-320k.mp3', {
+      accept: 'audio/*,.mp3,.wav,.m4a'
+    });
+    expect(filenameOnly.maxBytes).toBeNull();
+    expect(filenameOnly.minBytes).toBeNull();
+    expect(filenameOnly.conflicts).toEqual([]);
+
+    const podcastools = resolveRules(parseRulesDeterministically({
+      attributes: { accept: 'audio/*,.mp3,.wav,.m4a' },
+      nearbyTexts: [
+        'Max 10 MB and 10 minutes. Supported: MP3, WAV, M4A.',
+        'uploadfit-mp3-30MB-320k.mp3'
+      ]
+    }));
+    expect(podcastools).toMatchObject({
+      maxBytes: 10_000_000,
+      duration: { maxMs: 600_000 },
+      actionable: true,
+      conflicts: []
+    });
+  });
+
   it('keeps duration-only and semantic-stop pages non-actionable', () => {
     expect(resolve('音频时长不超过 2 小时')).toMatchObject({ mediaKind: 'audio', actionable: false });
     expect(resolve('仅支持 MP3')).toMatchObject({ mediaKind: 'audio', actionable: false });

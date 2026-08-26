@@ -3,7 +3,8 @@ import { classifyRejectionText } from './rejection-classifier.js';
 import { findAssociatedErrorNodes } from './context-extractor.js';
 import { sanitizeEvidenceText } from '../utils/text.js';
 
-const ERROR_SELECTOR = '[role="alert"], [aria-live], [data-error], .error, .invalid-feedback, [class*="error"], [class*="invalid"]';
+const TRANSIENT_SELECTOR = '[id*="toast"], [class*="toast"], [data-toast], [id*="snackbar"], [class*="snackbar"], [data-snackbar], [id*="notification"], [class*="notification"], [data-notification]';
+const ERROR_SELECTOR = `[role="alert"], [aria-live], [data-error], .error, .invalid-feedback, [class*="error"], [class*="invalid"], ${TRANSIENT_SELECTOR}`;
 const NOOP = () => {};
 
 function ownerDocument(input) {
@@ -27,6 +28,17 @@ function isErrorNode(node) {
 
 function textOf(node) {
   return sanitizeEvidenceText(node?.textContent ?? '').slice(0, 600);
+}
+
+function isVisibleFeedback(node) {
+  if (!isElement(node) || node.hidden || node.getAttribute?.('aria-hidden') === 'true') return false;
+  try {
+    const style = node.ownerDocument?.defaultView?.getComputedStyle?.(node);
+    if (style && (style.display === 'none' || style.visibility === 'hidden')) return false;
+  } catch {
+    return false;
+  }
+  return true;
 }
 
 function describedNodes(input) {
@@ -83,7 +95,7 @@ function currentCandidates(node) {
   const values = [];
   if (isErrorNode(node)) values.push(node.closest?.(ERROR_SELECTOR) ?? node);
   node?.querySelectorAll?.(ERROR_SELECTOR)?.forEach((item) => values.push(item));
-  return [...new Set(values)].filter((item) => textOf(item));
+  return [...new Set(values)].filter((item) => isVisibleFeedback(item) && textOf(item));
 }
 
 function collectActiveTasks(task, getActiveTasks) {
@@ -162,7 +174,7 @@ export function observeRejection(task, uploaderContext, options = {}) {
 
       const tasks = activeTasks();
       const direct = directlyAssociated(candidateNode, input);
-      const globalFeedback = candidateNode.matches?.('[role="alert"], [aria-live]');
+      const globalFeedback = candidateNode.matches?.(`[role="alert"], [aria-live], ${TRANSIENT_SELECTOR}`);
       if (direct) {
         onRejection({
           kind: classification.kind,
@@ -247,7 +259,9 @@ export function observeRejection(task, uploaderContext, options = {}) {
           if (node.nodeType === 1) nodes.push(node);
           if (node.parentElement) nodes.push(node.parentElement);
         }
+        continue;
       }
+      if (record.type === 'attributes' && record.target?.nodeType === 1) nodes.push(record.target);
     }
     schedule(nodes);
   };
@@ -259,7 +273,9 @@ export function observeRejection(task, uploaderContext, options = {}) {
       observer.observe(root, {
         subtree: true,
         childList: true,
-        characterData: true
+        characterData: true,
+        attributes: true,
+        attributeFilter: ['class', 'hidden', 'aria-hidden']
       });
       observers.push(observer);
     } catch {

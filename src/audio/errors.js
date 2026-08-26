@@ -23,14 +23,14 @@ export const AUDIO_ERROR_CODES = Object.freeze([
 ]);
 
 export const AUDIO_ERROR_MESSAGES = Object.freeze({
-  AUDIO_CODEC_UNSUPPORTED: '当前音频编码不在本版本支持范围内；请使用合规 MP3，或选择 PCM WAV 让 UploadFit 转为 MP3。',
+  AUDIO_CODEC_UNSUPPORTED: '当前音频编码或容器不在支持范围内；支持 MP3、AAC-LC M4A 与 PCM WAV。',
   AUDIO_METADATA_INVALID: '无法安全读取音频元数据，请检查源文件。',
   AUDIO_DECODE_FAILED: '音频文件损坏或无法解码，原文件未被修改。',
   AUDIO_ENCODE_FAILED: '音频处理失败，原文件未被修改。',
   AUDIO_TARGET_UNSAFE: '满足页面大小上限需要低于安全音质底线，未执行处理。',
   AUDIO_OUTPUT_TOO_LARGE: '生成的 MP3 仍超过页面大小上限，未回填文件。',
   AUDIO_OUTPUT_FORMAT_NOT_ALLOWED: '当前页面没有明确允许 MP3，未执行音频处理。',
-  AUDIO_DURATION_LIMIT_UNFIXABLE: '当前限制是音频时长，不裁剪或分段文件。',
+  AUDIO_DURATION_LIMIT_UNFIXABLE: '音频时长超过页面限制；压缩不会缩短时长，UploadFit 不裁剪/分段。',
   AUDIO_MEMORY_BUDGET_EXCEEDED: '浏览器无法在安全内存预算内检查该音频。',
   AUDIO_WORKER_UNAVAILABLE: '后台音频处理能力不可用，未在主线程处理长文件。',
   AUDIO_PROCESSING_CANCELLED: '音频处理已取消，原文件保持不变。',

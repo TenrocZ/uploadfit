@@ -31,6 +31,10 @@ export const AUDIO_MIN_BITRATE_KBPS = 48;
 export const AUDIO_ENCODE_PASS_LIMIT = 2;
 export const AUDIO_PROGRESS_INTERVAL_MS = 100;
 export const AUDIO_CANCEL_DEADLINE_MS = 1000;
+// Long speech recordings can legitimately require several minutes of local
+// decode/re-encode work. Cancellation remains bounded separately at 1 second;
+// this ceiling only prevents a healthy long task from being killed at 2 min.
+export const AUDIO_PROCESS_TIMEOUT_MS = 15 * 60 * 1000;
 export const AUDIO_BITRATE_LADDER_KBPS = Object.freeze([
   320, 256, 224, 192, 160, 128, 112, 96, 80, 64, 56, 48
 ]);

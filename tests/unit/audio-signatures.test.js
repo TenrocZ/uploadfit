@@ -194,6 +194,30 @@ describe('audio signature readers', () => {
     expect(parseM4aSignature(m4aFixture({ duration: 1000, sampleRate: 48000, channels: 1 }), 172))
       .toMatchObject({ codec: 'aac-lc', sampleRate: 48000, channels: 1, durationMs: 1000 });
   });
+
+  it('finds a complete tail moov when bounded slices begin inside zero-filled payload', () => {
+    const bytes = m4aFixture({ duration: 1000, sampleRate: 48000, channels: 1 });
+    const ftypBytes = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(0, false);
+    const head = concatBytes(bytes.slice(0, ftypBytes), new Uint8Array(128));
+    const tail = concatBytes(new Uint8Array(128), bytes.slice(ftypBytes));
+    expect(parseM4aSignature({ head, tail }, 30 * 1024 * 1024)).toMatchObject({
+      signatureMime: 'audio/mp4',
+      container: 'mp4',
+      codec: 'aac-lc',
+      sampleRate: 48000,
+      channels: 1,
+      durationMs: 1000
+    });
+  });
+
+  it('rejects a truncated top-level box when the complete M4A is already in memory', () => {
+    const truncatedMdat = new Uint8Array(12);
+    const view = new DataView(truncatedMdat.buffer);
+    view.setUint32(0, 16, false);
+    truncatedMdat.set([0x6d, 0x64, 0x61, 0x74], 4);
+    const bytes = concatBytes(m4aFixture(), truncatedMdat);
+    expect(parseM4aSignature(bytes, bytes.length).errorCode).toBe('AUDIO_DECODE_FAILED');
+  });
 });
 
 export { m4aFixture, mp3Fixture, mp3VbrFixture, wavFixture };

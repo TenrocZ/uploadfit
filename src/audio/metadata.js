@@ -132,10 +132,22 @@ function scanMp3Frames(bytes, firstFrame, fileSize) {
   return { complete, frameCount, samples, bitrates, lastEnd };
 }
 
+function hasTrailingId3v1(readResult, fileSize) {
+  if (!Number.isFinite(fileSize) || fileSize < 128) return false;
+  const source = readResult.bytes ?? readResult.tail;
+  if (!(source instanceof Uint8Array) || source.length < 128) return false;
+  const offset = source.length - 128;
+  return source[offset] === 0x54
+    && source[offset + 1] === 0x41
+    && source[offset + 2] === 0x47;
+}
+
 function enrichMp3Metadata(file, readResult, signature, warnings) {
   const bytes = readResult.bytes ?? readResult.head;
+  const fileSize = safeSize(file) ?? 0;
+  const trailingId3Bytes = hasTrailingId3v1(readResult, fileSize) ? 128 : 0;
   const frame = signature.firstFrame;
-  const scan = scanMp3Frames(bytes, frame, safeSize(file));
+  const scan = scanMp3Frames(bytes, frame, fileSize);
   const indexedFrames = signature.xing?.frames ?? signature.vbri?.frames ?? null;
   const isVbr = Boolean(signature.variableBitrate || scan.bitrates.length > 1);
   let durationMs = null;
@@ -144,10 +156,7 @@ function enrichMp3Metadata(file, readResult, signature, warnings) {
   } else if (scan.complete && scan.samples > 0) {
     durationMs = (scan.samples / frame.sampleRate) * 1000;
   } else if (!isVbr && frame.bitrateKbps > 0) {
-    const trailingId3 = safeSize(file) >= 128 && (safeSize(file) ?? 0) > bytes.length
-      ? 128
-      : 0;
-    const audioBytes = Math.max(0, (safeSize(file) ?? 0) - signature.audioOffset - trailingId3);
+    const audioBytes = Math.max(0, fileSize - signature.audioOffset - trailingId3Bytes);
     durationMs = (audioBytes * 8 / (frame.bitrateKbps * 1000)) * 1000;
   } else {
     warnings.push('MP3_VBR_INDEX_UNAVAILABLE');
@@ -155,7 +164,7 @@ function enrichMp3Metadata(file, readResult, signature, warnings) {
   if (!Number.isFinite(durationMs) || durationMs <= 0) {
     return { errorCode: 'AUDIO_METADATA_INVALID' };
   }
-  const audioBytes = Math.max(0, (safeSize(file) ?? 0) - signature.audioOffset);
+  const audioBytes = Math.max(0, fileSize - signature.audioOffset - trailingId3Bytes);
   const averageBitrate = Math.round((audioBytes * 8 * 1000) / durationMs);
   return {
     ...signature,

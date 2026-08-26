@@ -1013,6 +1013,11 @@ export class TaskController {
       const validation = await handler.validate(metadata, task.rules, {
         signal: task.abortController.signal
       });
+      if (task.abortController.signal.aborted || record.currentTask !== task) return;
+      if (!this._inputConnected(task)) {
+        this._stopTask(task, 'INPUT_DETACHED');
+        return;
+      }
       task.validation = validation;
       this._logValidation(task, metadata, validation);
 
@@ -1032,6 +1037,11 @@ export class TaskController {
       const plan = await handler.plan(metadata, task.rules, {
         signal: task.abortController.signal
       });
+      if (task.abortController.signal.aborted || record.currentTask !== task) return;
+      if (!this._inputConnected(task)) {
+        this._stopTask(task, 'INPUT_DETACHED');
+        return;
+      }
       task.policyConfirmation = null;
       if (task.rules.confidence >= CONFIRM_RULE_CONFIDENCE
         && task.rules.confidence < AUTO_RULE_CONFIDENCE) {
@@ -1339,6 +1349,11 @@ export class TaskController {
             allowSingleFrame: true
           }
         );
+        if (task.abortController.signal.aborted || record.currentTask !== task) return;
+        if (!this._inputConnected(task)) {
+          this._stopTask(task, 'INPUT_DETACHED');
+          return;
+        }
         task.outputValidation = outputValidation;
         this._audioLog(task, 'OUTPUT_VALIDATED', {
           mime: result?.metadata?.mime,
@@ -1649,13 +1664,24 @@ export class TaskController {
         return;
       }
       task.metadata = metadata;
-      task.validation = await handler.validate(metadata, task.rules, {
+      const validation = await handler.validate(metadata, task.rules, {
         signal: task.abortController.signal
       });
-      this._logValidation(task, metadata, task.validation);
+      if (task.abortController.signal.aborted || record.currentTask !== task) return;
+      if (!this._inputConnected(task)) {
+        this._stopTask(task, 'INPUT_DETACHED');
+        return;
+      }
+      task.validation = validation;
+      this._logValidation(task, metadata, validation);
       const plan = await handler.plan(metadata, task.rules, {
         signal: task.abortController.signal
       });
+      if (task.abortController.signal.aborted || record.currentTask !== task) return;
+      if (!this._inputConnected(task)) {
+        this._stopTask(task, 'INPUT_DETACHED');
+        return;
+      }
       task.policyConfirmation = null;
       if (task.rules.confidence >= CONFIRM_RULE_CONFIDENCE
         && task.rules.confidence < AUTO_RULE_CONFIDENCE) {

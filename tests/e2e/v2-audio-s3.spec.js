@@ -202,14 +202,14 @@ test('V2-S3 local A-H page exposes production audio orchestration and accessible
   await page.evaluate(() => window.__uploadfit_session__?.cleanup?.());
 });
 
-test('V2-S3 stable page C rejects real M4A/AAC-LC and over-limit MP3 before Worker processing', async ({ page }) => {
+test('V2-S4.1 stable page C exposes M4A transcode and MP3 reencode confirmations before Worker processing', async ({ page }) => {
   await page.goto('/test-pages/audio-s3.html?scenario=C');
   await expect.poll(() => page.evaluate(() => Boolean(window.__uploadfitAudioS3?.controller))).toBe(true);
 
   for (const control of ['#audio-s3-generate-m4a', '#audio-s3-large-mp3']) {
     await page.click(control);
     await expect.poll(() => page.evaluate(() => (
-      window.__uploadfitAudioS3.controller.getSnapshot().activeTask?.status === 'STOPPED'
+      window.__uploadfitAudioS3.controller.getSnapshot().activeTask?.status === 'NEEDS_CONFIRMATION'
     )), { timeout: 20_000 }).toBe(true);
     const result = await page.evaluate(() => {
       const state = window.__uploadfitAudioS3;
@@ -222,7 +222,11 @@ test('V2-S3 stable page C rejects real M4A/AAC-LC and over-limit MP3 before Work
         submitControls: document.querySelectorAll('button[type="submit"], input[type="submit"]').length
       };
     });
-    expect(result.task.errorCode).toBe('AUDIO_CODEC_UNSUPPORTED');
+    expect(result.task.errorCode).toBeNull();
+    expect(result.task.plan.operations).toContain(control.includes('m4a')
+      ? 'TRANSCODE_AUDIO'
+      : 'REENCODE_AUDIO');
+    expect(result.task.plan.confirmations.map((item) => item.type)).toContain('AUDIO_LOSSY_TRANSCODE');
     expect(result.task.result).toBeNull();
     expect(result.file.bytes).toBeGreaterThan(0);
     expect(result.summary.summary.processingStarts).toBe(0);
@@ -231,6 +235,20 @@ test('V2-S3 stable page C rejects real M4A/AAC-LC and over-limit MP3 before Work
     expect(result.submitControls).toBe(0);
     if (control.includes('m4a')) expect(result.file.type).toBe('audio/mp4');
     else expect(result.file.type).toBe('audio/mpeg');
+    await page.evaluate(() => {
+      const controller = window.__uploadfitAudioS3.controller;
+      const task = controller.getSnapshot().activeTask;
+      const pending = task.plan.confirmations.find((item) => item.required && !item.resolved);
+      return controller.confirmTask(task.taskId, {
+        id: pending.id,
+        type: pending.type,
+        accepted: false,
+        payload: pending.suggestedPayload
+      });
+    });
+    await expect.poll(() => page.evaluate(() => (
+      window.__uploadfitAudioS3.controller.getSnapshot().activeTask?.status === 'STOPPED'
+    )), { timeout: 20_000 }).toBe(true);
   }
   await page.evaluate(() => window.__uploadfit_session__?.cleanup?.());
 });

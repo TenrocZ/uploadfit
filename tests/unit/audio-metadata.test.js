@@ -66,6 +66,23 @@ describe('bounded audio metadata inspection', () => {
     });
   });
 
+  it('does not subtract an ID3v1 block from a large CBR MP3 unless TAG is present', async () => {
+    const audio = mp3Fixture({ frames: 3000 });
+    const withoutTag = fileFromBytes(audio, 'audio/mpeg', 'large-no-tag.mp3');
+    const tag = new Uint8Array(128);
+    tag.set([0x54, 0x41, 0x47]);
+    const withTag = fileFromBytes(new Blob([audio, tag]), 'audio/mpeg', 'large-with-tag.mp3');
+
+    const plain = await inspectAudio(withoutTag);
+    const tagged = await inspectAudio(withTag);
+    const expectedMs = (audio.byteLength * 8 / 128_000) * 1000;
+
+    expect(withoutTag.size).toBeGreaterThan(1024 * 1024);
+    expect(plain.durationMs).toBeCloseTo(expectedMs, 8);
+    expect(tagged.durationMs).toBeCloseTo(expectedMs, 8);
+    expect(tagged.averageBitrate).toBe(128_000);
+  });
+
   it('honours AbortSignal before a second bounded read', async () => {
     const controller = new AbortController();
     controller.abort();

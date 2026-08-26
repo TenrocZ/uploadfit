@@ -1,0 +1,60 @@
+{
+  "stage": "V2-S4.1",
+  "taskName": "UploadFit-S4-1-Acceptance",
+  "finished": true,
+  "production": {
+    "bytes": 444989,
+    "sha256": "EB77F23278CBCEB739376671D0C1AEEEAC417309DD346EB40CEC2FE99729E030"
+  },
+  "matrix": [
+    {
+      "id": "D0-worker-codecs",
+      "site": "local secure capability page",
+      "status": "PASS",
+      "evidence": "Real MP3 and AAC-LC access units produced AudioData in a Dedicated Blob Worker; cancel/error/reuse/close passed"
+    },
+    {
+      "id": "Podcastools-rules",
+      "site": "https://www.podcastools.com/podcast-transcript",
+      "status": "PASS",
+      "evidence": { "maxBytes": 10000000, "durationMaxMs": 600000, "formats": ["audio/mp4", "audio/mpeg", "audio/wav"] }
+    },
+    {
+      "id": "Podcastools-mp3-positive",
+      "site": "https://www.podcastools.com/podcast-transcript",
+      "status": "PASS",
+      "evidence": { "inputBytes": 12000000, "inputDurationMs": 299996.8, "outputBytes": 8400672, "outputDurationMs": 300019.43, "workerUsed": true, "encodePasses": 1, "submitClicks": 0 }
+    },
+    {
+      "id": "Podcastools-m4a-positive",
+      "site": "https://www.podcastools.com/podcast-transcript",
+      "status": "PASS_AFTER_RECEIPT_CHECKPOINT",
+      "evidence": { "inputBytes": 10194008, "aacPayloadBytes": 10100125, "inputDurationMs": 497536, "outputBytes": 7961088, "outputDurationMs": 497560, "workerUsed": true, "encodePasses": 1, "submitClicks": 0, "processingMs": 138649 }
+    },
+    {
+      "id": "Podcastools-duration-stop",
+      "site": "https://www.podcastools.com/podcast-transcript",
+      "status": "PASS",
+      "evidence": { "inputBytes": 30481920, "durationMs": 762044.8, "errorCode": "AUDIO_DURATION_LIMIT_UNFIXABLE", "workerUsed": false, "retryCount": 0, "submitClicks": 0, "inputPreserved": true }
+    },
+    {
+      "id": "VocaText-toast-retry",
+      "site": "https://vocatext.com/",
+      "status": "PASS",
+      "evidence": { "inputBytes": 30000000, "rejectionMaxBytes": 25000000, "outputBytes": 6251520, "outputType": "audio/mpeg", "retryCount": 1, "submitClicks": 0, "finalStatus": "SUCCESS" }
+    },
+    {
+      "id": "local-production-large-m4a",
+      "site": "http://127.0.0.1:8765",
+      "status": "PASS",
+      "evidence": { "inputBytes": 31818912, "aacPayloadBytes": 31457453, "outputBytes": 23095584, "unclosedAudioData": 0, "maxActiveWorkers": 1 }
+    }
+  ],
+  "privacy": {
+    "sensitiveAudio": false,
+    "pcmOrBase64Returned": false,
+    "privateScriptIdRecorded": false,
+    "accountRecorded": false,
+    "businessSubmitClicks": 0
+  }
+}

@@ -1,5 +1,11 @@
 # Tabbit 能力探针记录
 
+## V2-S4.1 Worker codec gate（2026-08-25）
+
+Tabbit Chromium 151、本地安全上下文、Dedicated Blob Worker 中，真实 MP3 与 AAC-LC chunks 均产生可验证 `AudioData`；MP3 33 outputs/38,016 frames，M4A 48 outputs/49,152 frames，48kHz mono。两类均复用成功、decoder closed、未关闭 `AudioData=0`；取消无迟到消息；external requests=0。MP3/M4A production matrix 另覆盖 32/44.1/48kHz mono/stereo。当前 production 为 444,989 bytes / SHA `EB77F23278CBCEB739376671D0C1AEEEAC417309DD346EB40CEC2FE99729E030`。
+
+Podcastools 当前 production IIFE 的规则、时长停止、MP3 正例与 M4A 正例均通过；VocaText 25MB transient toast、压缩与一次重试闭环通过，业务 submit=0。验收 task 已按技能要求唯一 `finish` 一次。细节见 `docs/evidence/V2-S4.1/tabbit-matrix.json`。
+
 本文件是 S0 能力探针的持续记录。只有完成实际复现并保留证据后，能力才可标记为 `PASS`；当前未测试项目保持 `UNKNOWN`。
 
 ## V2-S4 Phase 2A1 状态

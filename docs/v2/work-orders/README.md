@@ -1,14 +1,15 @@
 # UploadFit V2 开发任务书
 
-本目录把 [V2 PRD](../UploadFit-PRD-v2.0.md) 拆成可以逐阶段交给外部 Agent 执行和独立验收的施工包。V2 不是重写 V1；图片能力是已验收基线，新增范围仅为长语音转写上传的 MP3/体积适配。
+本目录把 [V2 PRD](../UploadFit-PRD-v2.0.md) 拆成可以逐阶段交给外部 Agent 执行和独立验收的施工包。V2 不是重写 V1；图片能力是已验收基线，新增范围仅为长语音转写上传的 MP3/M4A/WAV 格式墙与体积墙适配。
 
 ## 1. 当前放行状态
 
-- 已验收：`V2-S0`、`V2-S1`、`V2-S2`、`V2-S3`
-- 当前可施工：`V2-S4`
-- 当前禁止施工：`V2-S5`（必须等待 V2-S4 独立验收）
-- 放行依据：V2-S3 返工后独立验收为 `ACCEPTED`，见 `docs/handoffs/V2-S3-final-acceptance.md` 与 `docs/evidence/V2-S3/result.json`
-- 编码器边界：S3–S5 只接入/验证合规 MP3 passthrough 与 PCM WAV→MP3；超限 MP3、M4A/AAC 归 V2.1，不得在当前施工中扩写
+- 已验收：`V2-S0`、`V2-S1`、`V2-S2`、`V2-S3`、`V2-S4`、`V2-S4.1`
+- 发布前最终代码审计：`CORE_CODE_ACCEPTED`，见 `docs/handoffs/V2-final-code-audit.md`
+- 当前可施工：`V2-S5`（候选包、版本、发布材料与安装/更新烟测）
+- 当前禁止：在 V2-S5 退出标准完成前公开分发或宣称 V2 正式发布
+- 放行依据：V2-S4.1 独立验收为 `ACCEPTED`，最终代码审计又关闭连续选文件异步竞态与大 CBR MP3 ID3v1 时长偏差
+- 编解码边界：ADR-005 的 `lamejs@1.2.1` 编码器继续冻结；ADR-006 冻结超限 MP3 解码重编码与 AAC-LC M4A→MP3 子集，未列入子集的 codec/container 继续安全停止
 - 施工 Agent 只能写 `READY_FOR_ACCEPTANCE`，不得自行宣布阶段通过
 
 ## 2. 必读顺序
@@ -32,6 +33,7 @@ V2-S0 编解码与 Tabbit 可行性探针
   -> V2-S2 规划、流式处理与最终复检
   -> V2-S3 编排、确认 UI 与回填闭环
   -> V2-S4 全量 QA、安全、性能与 Tabbit 实机
+  -> V2-S4.1 超限 MP3/M4A 转码与 transient 拒收修复
   -> V2-S5 发布材料、演示与候选包
   -> 主验收 Agent 最终验收
 ```
@@ -49,6 +51,7 @@ V2-S0 编解码与 Tabbit 可行性探针
 | `30-V2-S2-音频规划流式处理与复检.md` | S2 Agent | 码率规划、worker 管线、有界内存、输出复检 |
 | `40-V2-S3-编排确认UI与回填闭环.md` | S3 Agent | 媒体 handler 路由、有损确认、进度/取消、回填/一次重试 |
 | `50-V2-S4-全量QA安全性能与Tabbit实机.md` | S4 Agent | A–H 稳定场景、安全性能、200MB 实机、图片回归 |
+| `55-V2-S4.1-MP3-M4A转码与拒收监听修复.md` | S4.1 Agent | MP3 重编码、AAC-LC M4A 转 MP3、英文规则与 transient toast 拒收闭环 |
 | `60-V2-S5-发布材料演示与候选包.md` | S5 Agent | README、说明页、安装/更新、演示、最终候选产物 |
 | `90-需求追踪矩阵.md` | 阶段 Agent更新、主验收复核 | PRD 到代码、测试、证据闭环 |
 | `99-最终验收手册.md` | 主验收 Agent | 干净基线复验、放行和返工报告模板 |

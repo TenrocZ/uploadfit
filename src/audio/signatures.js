@@ -399,7 +399,7 @@ function parseEsds(bytes, start, end) {
   return null;
 }
 
-function parseM4aBuffer(bytes, state, requireFtyp = true) {
+function parseM4aBuffer(bytes, state, requireFtyp = true, allowPartialTopLevel = false) {
   const value = asBytes(bytes);
   if (!value || value.length < 8) return false;
   let hasFtyp = false;
@@ -440,16 +440,23 @@ function parseM4aBuffer(bytes, state, requireFtyp = true) {
     }
   };
   let found = walkBoxes(value, 0, value.length, visit);
-  if (!found && !requireFtyp) {
+  if (!requireFtyp && !state.sampleEntry) {
     // A tail slice can begin in the middle of mdat.  Locate a complete moov
-    // header inside the bounded slice and parse only that box.
+    // header inside the bounded slice and parse only that box.  Do this based
+    // on the required sample entry rather than walkBoxes' boolean: arbitrary
+    // payload bytes (notably zero-filled free boxes) can resemble a size-zero
+    // unknown box and make a top-level walk appear complete.
     const marker = findAscii(value, 'moov');
     if (marker >= 4) {
       const candidate = boxHeader(value, marker - 4, value.length);
       if (candidate?.type === 'moov') found = walkBoxes(value, candidate.offset, candidate.end, visit);
     }
   }
-  return found && (!requireFtyp || hasFtyp);
+  // A bounded head slice may contain a complete ftyp followed by only the
+  // header of a very large free/mdat box.  The tail slice can still carry the
+  // complete moov; do not discard the already-verified ftyp solely because
+  // the next top-level box extends beyond this bounded window.
+  return (found || (allowPartialTopLevel && hasFtyp)) && (!requireFtyp || hasFtyp);
 }
 
 export function parseM4aSignature(buffers, fileSize = asBytes(buffers)?.length ?? 0) {
@@ -457,7 +464,11 @@ export function parseM4aSignature(buffers, fileSize = asBytes(buffers)?.length ?
   const head = value ?? asBytes(buffers?.head);
   const tail = value ? null : asBytes(buffers?.tail);
   const state = { mdhd: [], mdatBytes: 0, sampleEntry: null };
-  const headHasFtyp = head ? parseM4aBuffer(head, state, true) : false;
+  // Only tolerate an incomplete top-level box when `head` is genuinely a
+  // bounded prefix of a larger file.  A complete in-memory file whose final
+  // box extends past EOF is corrupt and must not inherit the same tolerance.
+  const headIsBoundedPrefix = !value && head && Number.isFinite(fileSize) && head.length < fileSize;
+  const headHasFtyp = head ? parseM4aBuffer(head, state, true, headIsBoundedPrefix) : false;
   if (tail) parseM4aBuffer(tail, state, false);
   if (!headHasFtyp && !tail) {
     if (head && head.length >= 5 && sameAscii(head, 4, 'ftyp')) return { errorCode: 'AUDIO_DECODE_FAILED' };

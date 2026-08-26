@@ -888,3 +888,9 @@ V2 产品范围已收缩为唯一音频场景：长语音录音上传转写时�
 主验收 Agent 随后独立执行：`npm run check` 25 文件 / 229 项通过；S3 controller/UI/stable-page 定向 E2E 15/15；返工后全量 E2E 162/162（一次）；production/debug IIFE 构建、static-check、diff check 和调试残留扫描均通过。最终 production 为 421348 bytes，SHA-256 `ABFA41EBB606CA0E7ED84F8DEE2F17783CAF0BDFA11CE777FB1BAEFBD173D18A`，产物提交 `092ac48`。
 
 最终报告：`docs/handoffs/V2-S3-final-acceptance.md`；结构化证据：`docs/evidence/V2-S3/result.json`。S3 未执行真实 Tabbit 或 200MB 慢速门禁，两项仍是 S4 强制门禁，不能用本次 Chromium 或 S2 旧证据替代。
+
+## 2026-08-25：发布前最终代码审计
+
+状态：`CORE_CODE_ACCEPTED_S5_REQUIRED`。S4.1 验收后继续全量审计主代码，发现并关闭两项：`TaskController` 在异步 validate/plan/final output validation 后缺少 stale task 门禁，可能让已取消任务释放新选择事件或覆盖新文件；大 CBR MP3 在没有 ID3v1 时仍无条件扣除 128 bytes，造成小时长偏差。
+
+修复后 `npm run check` 25 files / 252 tests、production/static-check、`git diff --check` 和 npm 官方 production audit 均通过。当前 IIFE 为 446,208 bytes，SHA-256 `C7E3D59FA0B44B0EC2104B34AE7FFB040A577B6E8A8B18F6DB4F79241D5C79A8`。Tabbit Chrome 151 直接验证两项竞态回归，以及 production 启动、动态 input 发现和重复加载幂等。Podcastools 额外修复“文件名中的 30MB-320k 被误解析为体积区间”：5 分钟超体积 MP3 可正常重编码，30,481,920-byte 样本则因约 12.7 分钟超过站点 10 分钟上限而正确停止。代码可进入 V2-S5；因候选清单、`2.0.0-rc.1` 版本统一和最终安装/更新发布材料尚未完成，不能提前裁决为公开发布版。详见 `docs/handoffs/V2-final-code-audit.md` 和 `docs/handoffs/V2-podcastools-mp3-filename-fix.md`。

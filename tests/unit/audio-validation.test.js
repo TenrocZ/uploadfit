@@ -53,14 +53,12 @@ describe('audio validation boundaries', () => {
     expect(isAudioPassthrough(metadata, rules(), result)).toBe(true);
   });
 
-  it('requires lossy confirmation for over-limit WAV and stops over-limit MP3 as unsupported', () => {
-    // ADR-005 froze an encode-only lamejs: an over-limit MP3 needs a decoder,
-    // so it must stop instead of promising a re-encode auto-fix.
+  it('requires lossy confirmation for verified MP3, WAV and AAC-LC M4A processing', () => {
     const overMp3 = validateAudioMetadata(mp3Metadata({ size: 4_000_000 }), rules());
     expect(overMp3.valid).toBe(false);
-    expect(overMp3.safeAutoFixes).not.toContain('REENCODE_AUDIO');
-    expect(overMp3.requiredConfirmations).toEqual([]);
-    expect(overMp3.unfixable).toContain('AUDIO_CODEC_UNSUPPORTED');
+    expect(overMp3.safeAutoFixes).toContain('REENCODE_AUDIO');
+    expect(overMp3.requiredConfirmations.map((item) => item.type)).toContain('AUDIO_LOSSY_TRANSCODE');
+    expect(overMp3.unfixable).not.toContain('AUDIO_CODEC_UNSUPPORTED');
     const wav = validateAudioMetadata(mp3Metadata({
       signatureMime: 'audio/wav', container: 'wav', codec: 'pcm', size: 4_000_000
     }), rules());
@@ -75,9 +73,19 @@ describe('audio validation boundaries', () => {
     const m4a = validateAudioMetadata(mp3Metadata({
       signatureMime: 'audio/mp4', container: 'mp4', codec: 'aac-lc', size: 4_000_000
     }), rules());
-    expect(m4a.safeAutoFixes).not.toEqual(expect.arrayContaining(['REENCODE_AUDIO', 'TRANSCODE_AUDIO']));
-    expect(m4a.requiredConfirmations).toEqual([]);
-    expect(m4a.unfixable).toContain('AUDIO_CODEC_UNSUPPORTED');
+    expect(m4a.safeAutoFixes).toContain('TRANSCODE_AUDIO');
+    expect(m4a.requiredConfirmations.map((item) => item.type)).toContain('AUDIO_LOSSY_TRANSCODE');
+    expect(m4a.unfixable).not.toContain('AUDIO_CODEC_UNSUPPORTED');
+  });
+
+  it('passes through allowed AAC-LC M4A and does not require MP3 output', () => {
+    const metadata = mp3Metadata({
+      fileType: 'audio/mp4', signatureMime: 'audio/mp4', container: 'mp4', codec: 'aac-lc'
+    });
+    const pageRules = rules({ formats: ['audio/mp4'], extensions: ['.m4a'] });
+    const result = validateAudioMetadata(metadata, pageRules);
+    expect(result).toMatchObject({ valid: true, violations: [], requiredConfirmations: [], unfixable: [] });
+    expect(isAudioPassthrough(metadata, pageRules, result)).toBe(true);
   });
 
   it('stops when MP3/maxBytes are not explicit or when duration is the blocker', () => {

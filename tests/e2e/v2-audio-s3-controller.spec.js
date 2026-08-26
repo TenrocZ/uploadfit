@@ -204,7 +204,7 @@ async function waitFor(page, predicate, timeout = 20_000) {
   await expect.poll(() => page.evaluate(predicate), { timeout }).toBe(true);
 }
 
-test('V2-S3 unsupported MP3/M4A and duration constraints stop before process', async ({ page }) => {
+test('V2-S4.1 MP3/M4A plans wait for confirmation while duration stops before process', async ({ page }) => {
   await open(page);
   for (const [mode, type, name] of [
     ['over-limit', 'audio/mpeg', 'secret-over-limit.mp3'],
@@ -213,17 +213,24 @@ test('V2-S3 unsupported MP3/M4A and duration constraints stop before process', a
   ]) {
     await installSynthetic(page, mode);
     await selectFile(page, type, name, mode === 'over-limit' ? 300_000 : 100);
-    await waitFor(page, () => __syntheticAudio.controller.getSnapshot().activeTask?.status === 'STOPPED');
+    const expectedStatus = mode === 'duration' ? 'STOPPED' : 'NEEDS_CONFIRMATION';
+    await expect.poll(() => page.evaluate((status) => (
+      __syntheticAudio.controller.getSnapshot().activeTask?.status === status
+    ), expectedStatus), { timeout: 20_000 }).toBe(true);
     const result = await page.evaluate(() => ({
+      status: __syntheticAudio.controller.getSnapshot().activeTask?.status,
       errorCode: __syntheticAudio.controller.getSnapshot().activeTask?.errorCode,
+      operations: __syntheticAudio.controller.getSnapshot().activeTask?.plan?.operations ?? [],
+      confirmations: __syntheticAudio.controller.getSnapshot().activeTask?.plan?.confirmations?.map((item) => item.type) ?? [],
       process: __syntheticAudio.stats.process,
       entries: __syntheticAudio.logger.getEntries()
     }));
-    expect(result.errorCode).toBe(
-      mode === 'duration'
-        ? 'AUDIO_DURATION_LIMIT_UNFIXABLE'
-        : 'AUDIO_CODEC_UNSUPPORTED'
-    );
+    expect(result.status).toBe(expectedStatus);
+    expect(result.errorCode).toBe(mode === 'duration' ? 'AUDIO_DURATION_LIMIT_UNFIXABLE' : null);
+    if (mode !== 'duration') {
+      expect(result.operations).toContain(mode === 'over-limit' ? 'REENCODE_AUDIO' : 'TRANSCODE_AUDIO');
+      expect(result.confirmations).toContain('AUDIO_LOSSY_TRANSCODE');
+    }
     expect(result.process).toBe(0);
     expect(result.entries.some((entry) => entry.event === 'AUDIO_PROCESSING_STARTED')).toBe(false);
     await page.evaluate(() => __syntheticAudio.controller.dispose());

@@ -1,5 +1,18 @@
 # UploadFit 公开站点测试清单
 
+## Podcastools MP3 文件名回归（2026-08-25）
+
+- 已修复页面回显 `uploadfit-mp3-30MB-320k.mp3` 时把 `30MB-320k` 误解析为反向体积区间的问题。
+- 修复版 production 在真实页面把 12,000,000-byte / 300,000ms MP3 重编码为 8,400,672-byte MP3；不点击业务提交。
+- 30,481,920-byte 测试 MP3 约 762,048ms，超过网站 600,000ms 上限；修复版会正确报 `AUDIO_DURATION_LIMIT_UNFIXABLE`。该样本不能用纯体积压缩变为合规，需另行裁剪或分段，而这不在当前产品范围。
+- 当前 production：446,208 bytes；SHA-256 `C7E3D59FA0B44B0EC2104B34AE7FFB040A577B6E8A8B18F6DB4F79241D5C79A8`。人工复验前必须重新粘贴保存本地 `dist/uploadfit.js`。
+
+## V2-S4.1（2026-08-25）
+
+- Podcastools `https://www.podcastools.com/podcast-transcript`：当前 production 发现 1 个 uploader；`Max 10 MB and 10 minutes` 同时解析为 10,000,000 bytes / 600,000ms。12MB/300秒 MP3 正例输出 8,400,672 bytes；10,194,008-byte/497,536ms AAC-LC M4A 正例输出 7,961,088-byte MP3；submit=0。30,481,920-byte、762,044.8ms MP3 时长负例仍在 Worker 前停止。
+- VocaText `https://vocatext.com/`：30,000,000-byte WAV 触发 `File exceeds 25 MB limit.`，插件保留 accept 格式、输出 6,251,520-byte MP3并只重试一次；submit=0。
+- S4.1 验收基线 production：444,989 bytes；SHA `EB77F23278CBCEB739376671D0C1AEEEAC417309DD346EB40CEC2FE99729E030`。逐项状态见 `docs/evidence/V2-S4.1/tabbit-matrix.json`；当前产物以本页上一节为准。
+
 自动化测试使用本地最小 DOM 夹具，避免公网波动改变 CI 结果；原网址用于发布前人工复核。
 
 ## V2-S4 音频 Phase 1 + Phase 2A1

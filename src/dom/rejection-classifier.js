@@ -4,9 +4,10 @@ import { sanitizeEvidenceText } from '../utils/text.js';
 
 const MAX_REJECTION_TEXT = 600;
 
-const REJECTION_SIGNAL = /(?:拒绝|支持|不符合|不支持|不允许|无法上传|上传失败|上传不成功|提交失败|验证失败|格式错误|尺寸错误|大小错误|必须|要求|限制|超过|低于|少于|不低于|不超过|需为|应为|请上传|请选择)/i;
-const FILE_SEMANTIC = /(?:文件|图片|图像|照片|证件照|头像|封面|扫描件|格式|类型|大小|容量|像素|尺寸|宽|高|比例|分辨率|dpi|jpg|jpeg|png|webp|image|photo)/i;
-const AMBIGUOUS_FAILURE = /(?:上传失败|上传不成功|文件不合法|未知错误|服务异常|系统繁忙|操作失败|网络|超时|权限|登录|审核|内容不符合|图片不清晰|清晰度|身份不一致|官方工具)/i;
+const REJECTION_SIGNAL = /(?:拒绝|支持|不符合|不支持|不允许|无法上传|上传失败|上传不成功|提交失败|验证失败|格式错误|尺寸错误|大小错误|必须|要求|限制|超过|低于|少于|不低于|不超过|需为|应为|请上传|请选择|unsupported|not\s+allowed|cannot\s+upload|upload\s+failed|invalid|exceeds?|too\s+large|maximum|limit|must|required)/i;
+const FILE_SEMANTIC = /(?:文件|图片|图像|照片|证件照|头像|封面|扫描件|格式|类型|大小|容量|像素|尺寸|宽|高|比例|分辨率|dpi|jpg|jpeg|png|webp|image|photo|files?|uploads?|audio|recordings?|formats?|types?|sizes?|duration|length|mp3|m4a|aac|wav)/i;
+const AMBIGUOUS_FAILURE = /(?:上传失败|上传不成功|文件不合法|未知错误|服务异常|系统繁忙|操作失败|网络|超时|权限|登录|审核|内容不符合|图片不清晰|清晰度|身份不一致|官方工具|upload\s+failed|invalid\s+file|unknown\s+error|network|timed?\s*out|permission|sign\s*in|review)/i;
+const SUCCESS_NOTIFICATION = /(?:uploaded?\s+successfully|upload\s+complete(?:d)?|copied|saved|transcription\s+complete(?:d)?|上传成功|上传完成|复制成功|已复制|保存成功|转写完成)/i;
 
 function structuredRule(candidate) {
   if (!candidate || candidate.advisoryOnly) return false;
@@ -48,6 +49,15 @@ export function classifyRejectionText(value, { parseRules = parseRulesDeterminis
       text: '',
       candidates: [],
       reason: 'EMPTY'
+    };
+  }
+
+  if (SUCCESS_NOTIFICATION.test(text)) {
+    return {
+      kind: 'irrelevant',
+      text,
+      candidates: [],
+      reason: 'SUCCESS_NOTIFICATION'
     };
   }
 
