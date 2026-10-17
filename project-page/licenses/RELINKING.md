@@ -1,73 +1,56 @@
-# Codec replacement and relinking instructions
+# Codec replacement and relinking
 
-## Distribution model
+UploadFit's original application code is MIT licensed. The bundled encoder is
+`lamejs@1.2.1` under its own upstream terms (package-declared LGPL-3.0).
+Recipients may modify and rebuild the application and encoder, including
+reverse-engineering the combined work to debug modifications to the LGPL part.
 
-UploadFit uses the `lamejs@1.2.1` encoder only under a relinkable source
-release model. A release that embeds it must include, in the same downloadable
-release package or stable public source snapshot:
+## Complete distribution
 
-1. the complete UploadFit `src/`, `scripts/`, `test-pages/`, `package.json`,
-   `package-lock.json`, build configuration and tests needed to rebuild;
-2. this directory, including complete GNU license texts and third-party
-   notices;
-3. the exact generated IIFE bytes/SHA and the source revision used;
-4. the unmodified encoder source coordinates and integrity values below; and
-5. permission for recipients to modify/reverse-engineer the Combined Work as
-   necessary to replace the LGPL component and debug those modifications.
+Distribute the same-version application source (`src/`, `scripts/`,
+`esbuild.config.js`, `package.json`, `package-lock.json` and `project-page/`),
+`dist/uploadfit.js`, `LICENSE`, `NOTICE`, this `licenses/` directory and
+`vendor/lamejs-1.2.1.tgz` together. The vendor archive is the unmodified npm
+source package and includes the upstream JavaScript sources. Its integrity is
+recorded in `provenance.json`. `npm run release` includes these materials in a source ZIP (requires a clean, committed Git checkout).
 
-For UploadFit copies distributed with `lamejs`, the project owner permits a
-recipient to reproduce and modify the provided Corresponding Application Code
-as needed to replace/relink `lamejs` with a compatible modified build, and to
-reverse-engineer the Combined Work for debugging those modifications. This
-limited permission does not relicense `lamejs`, which remains under its own
-upstream terms, and does not grant unrelated rights in UploadFit.
+The source repository is https://github.com/TenrocZ/uploadfit. When distributing
+a binary/script, provide its matching complete source package alongside it;
+a bare script or a Tabbit share link is not the full distribution. A source
+package must remain accessible to recipients even if the repository is private.
+Record the source revision and the SHA-256 of the distributed script in the
+release notes or accompanying checksum file.
 
-If a distributor removes this source/relink package or the above permission,
-they must remove the encoder from the distributed IIFE or obtain a separate
-license. A bare Tabbit share URL without the accompanying stable source and
-license location is not an acceptable public release.
+## Rebuild the locked version
 
-## Exact upstream material
+Using Node.js 22.20.0+ and npm 10.9.3+ in the complete source directory:
 
-- npm package: `lamejs@1.2.1` (exact, not a semver range)
-- npm integrity: `sha1-D5LThykhPxBtShne0ggh2n6JyOQ=`
-- upstream tag: <https://github.com/zhuker/lamejs/tree/v1.2.1>
-- package entry used by the build: `node_modules/lamejs/lame.min.js`
-- `lame.min.js` SHA-256:
-  `15D285E2587B3BDBFD18A68DE6CE07CC074F7480A82C3815DA2DC1C348EC6DF4`
-- UploadFit modification to upstream source: none
-
-## Rebuild with the locked encoder
-
-From a clean release-source checkout using the supported Node/npm versions:
-
-```powershell
+```sh
 npm ci
-npm run audio:probe:build
 npm run check
 ```
 
-The S0 probe reads `node_modules/lamejs/lame.min.js` at build time and embeds
-it into the main/Worker IIFE. It performs no runtime fetch or dynamic import.
+The build reads `node_modules/lamejs/lame.min.js` and embeds it in a local Blob
+Worker. There is no runtime download of the encoder. `npm ci` needs registry
+access for build dependencies; the original encoder source is also bundled in
+`vendor/` for preservation and modification.
 
-## Replace the encoder for relinking
+## Replace the encoder
 
-1. Obtain or build an interface-compatible `lame.min.js` exposing
-   `lamejs.Mp3Encoder`.
-2. Replace the locked package locally, or replace
-   `node_modules/lamejs/lame.min.js` in an installed clean checkout.
-3. Record the replacement source, license, version and SHA-256.
-4. Run `npm run audio:probe:build` (and, once S2 integrates the codec,
-   `npm run build`).
-5. Run `npm run check` and the audio codec gates before distribution.
+1. Extract `vendor/lamejs-1.2.1.tgz`, modify its upstream source, and produce a
+   compatible `lame.min.js` exposing `lamejs.Mp3Encoder`. The package includes
+   its upstream build files and JavaScript source under `src/js/`.
+2. Run `npm ci`, then replace `node_modules/lamejs/lame.min.js` with your build.
+   Do not rerun `npm ci` after replacement; it would restore the locked version.
+3. If your API or rate behavior changes, adapt `src/audio/encoder.js`,
+   `src/audio/worker-adapter.js` and `src/audio/encoder-contract.js` as needed.
+4. Run `npm run check`. The build has no hash gate preventing a modified encoder.
+5. Verify real encoding, output properties, cancellation and cleanup in the
+   target browser. Static checks alone cannot validate codec correctness.
+6. Ship your modified encoder source, retain upstream license/attribution,
+   update provenance and modification notices, and compute new script hashes.
 
-The generated artifact changes when the encoder changes. The replacement must
-not reuse the old 200MB evidence or SHA.
-
-## Public-release handoff
-
-S5 must replace any internal-only source location with a stable public source
-or release-package location and verify that the prominent IIFE notice points
-recipients to it. Until then, the current files authorize engineering and
-private Tabbit verification, not publication of a detached script without its
-source/license package.
+UploadFit's build replaces two inert upstream URL strings with
+`embedded://lamejs`, strips trailing whitespace and bundles/minifies the code.
+The vendor source archive itself is unmodified. These transformations are
+visible in `esbuild.config.js` and do not fetch remote code.

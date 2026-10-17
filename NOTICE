@@ -1,0 +1,11 @@
+UploadFit / 传送门
+Copyright (c) 2026 TenrocZ. Original project code is licensed under MIT.
+
+The production script includes lamejs 1.2.1, whose npm package declares
+LGPL-3.0. Third-party code is NOT relicensed by the project's MIT license.
+Preserve licenses/, LICENSE, NOTICE, the buildable application source,
+package-lock.json and vendor/lamejs-1.2.1.tgz when distributing the bundle.
+See licenses/NOTICE.md and licenses/RELINKING.md for details.
+
+Source repository: https://github.com/TenrocZ/uploadfit
+No affiliation with or endorsement by Tabbit or the referenced websites is implied.

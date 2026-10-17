@@ -1,6 +1,6 @@
 # UploadFit third-party codec notice
 
-This notice applies to every UploadFit probe or production build that embeds
+This notice applies to every UploadFit production build that embeds
 the MP3 encoder described below. It must travel with the build and the build
 must retain the short prominent notice emitted by the bundler.
 
@@ -12,8 +12,9 @@ must retain the short prominent notice emitted by the bundler.
 - npm coordinates: `lamejs@1.2.1`
 - Package integrity: `sha1-D5LThykhPxBtShne0ggh2n6JyOQ=`
 - Package-declared SPDX identifier: `LGPL-3.0`
-- Local source changes: none; esbuild transforms/bundles the published
-  `lame.min.js` as part of the generated JavaScript artifact
+- The vendor source archive is unmodified. The build bundles/minifies
+  `lame.min.js`, normalizes whitespace and replaces two inert URL strings;
+  see `RELINKING.md` and `esbuild.config.js`.
 - Published `lame.min.js` SHA-256:
   `15D285E2587B3BDBFD18A68DE6CE07CC074F7480A82C3815DA2DC1C348EC6DF4`
 - Published `lame.all.js` SHA-256:
@@ -52,3 +53,6 @@ if they cannot, the build containing this encoder must not be published.
 
 This package is a transitive build dependency of `lamejs@1.2.1` and is locked
 by `package-lock.json`.
+
+The complete original npm source package is included as `vendor/lamejs-1.2.1.tgz`.
+UploadFit original code is MIT licensed; see the root `LICENSE` and `NOTICE`.
