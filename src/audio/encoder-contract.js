@@ -8,8 +8,8 @@ export const AUDIO_ENCODER_DESCRIPTOR = Object.freeze({
   version: '1.2.1',
   source: 'upstream/lamejs@1.2.1 (S0 accepted provenance)',
   licenseSpdx: 'LGPL-3.0',
-  licenseNotice: 'docs/evidence/V2-S0/licenses/lamejs-1.2.1-LICENSE.txt',
-  dependencyNotice: 'docs/evidence/V2-S0/licenses/use-strict-1.0.1-LICENSE.txt',
+  licenseNotice: 'licenses/lamejs-1.2.1-LICENSE.txt',
+  dependencyNotice: 'licenses/use-strict-1.0.1-LICENSE.txt',
   api: 'Mp3Encoder.encodeBuffer(Int16Array[, Int16Array]) + flush()',
   streaming: true,
   workerCompatible: true
@@ -30,7 +30,7 @@ export function isFrozenAudioEncoderDescriptor(value) {
  * 64kbps comes back as 24kHz).  The planner must promise the rate the encoder
  * will actually emit, otherwise every low-bitrate plan fails output
  * validation.  Empirically frozen on 2026-08-21 against lamejs@1.2.1 via
- * scripts/audio-probe/build-s2-adapter.mjs (48 combinations, all 44.1/48kHz
+ * scripts/build-audio.mjs (48 combinations, all 44.1/48kHz
  * ladder points, stereo and mono).  Unlisted combinations are not forecast;
  * the independent output validator remains the backstop for them.
  */
