@@ -15,6 +15,8 @@ mkdirSync(releaseDir, { recursive: true });
 git('archive', '--format=zip', '--prefix=uploadfit/', '-o', path.join(releaseDir, name), 'HEAD');
 const hash = (file) => createHash('sha256').update(readFileSync(file)).digest('hex');
 writeFileSync(path.join(releaseDir, 'SHA256SUMS.txt'),
-  `${hash(path.join(releaseDir, name))}  ${name}\n${hash(path.join(root, 'dist/uploadfit.js'))}  dist/uploadfit.js\n`);
+  `${hash(path.join(releaseDir, name))}  ${name}\n` +
+  ['uploadfit.user.js', 'uploadfit.meta.js', 'uploadfit.js'].map((file) =>
+    `${hash(path.join(root, 'dist', file))}  dist/${file}\n`).join(''));
 writeFileSync(path.join(releaseDir, 'SOURCE.txt'), `Repository: https://github.com/TenrocZ/uploadfit\nRevision: ${revision}\nVersion: ${pkg.version}\n`);
 console.log(`Complete source distribution: release/${name}\nRevision: ${revision}`);

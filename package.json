@@ -1,8 +1,8 @@
 {
   "name": "uploadfit",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "license": "MIT",
-  "description": "Local image and audio adaptation for browser upload controls in Tabbit Browser.",
+  "description": "Cross-browser userscript for local image and audio adaptation to upload requirements.",
   "type": "module",
   "engines": {
     "node": ">=22.20.0",
@@ -30,7 +30,9 @@
     "url": "https://github.com/TenrocZ/uploadfit/issues"
   },
   "keywords": [
-    "tabbit",
+    "userscript",
+    "tampermonkey",
+    "violentmonkey",
     "upload",
     "image",
     "audio",

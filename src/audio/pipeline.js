@@ -361,6 +361,9 @@ export async function processAudio(file, plan, options = {}) {
         });
       }
       const tooLarge = outputFile.size > executablePlan.targetMaxBytes;
+      if (outputValidation?.frameValidation?.decoderUnavailable) {
+        throw new AudioProcessingError('AUDIO_DECODER_UNAVAILABLE');
+      }
       const valid = outputValidation?.valid === true && !tooLarge;
       if (valid) {
         if (outputFile.size > executablePlan.safeTargetBytes) warnings.push({ code: 'AUDIO_SAFETY_MARGIN_MISSED' });

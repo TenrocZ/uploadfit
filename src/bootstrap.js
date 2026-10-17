@@ -2,7 +2,6 @@ import { createRandomId } from './utils/ids.js';
 import { createLogger } from './utils/logger.js';
 import { clearInjectionGuard } from './injection/injection-guard.js';
 import { createTaskController } from './core/task-controller.js';
-import { createTabbitAiProvider } from './providers/tabbit-ai.js';
 import { createUploadFitUi } from './ui/host.js';
 
 export const SESSION_KEY = '__uploadfit_session__';
@@ -81,7 +80,9 @@ export function bootstrap({
     globalRef,
     logger,
     sessionId: session.sessionId,
-    ruleProvider: ruleProvider ?? createTabbitAiProvider({ globalRef, logger })
+    // Local rules are the default. Platform-specific AI is explicitly injected
+    // by its entry point, never discovered from an arbitrary website global.
+    ruleProvider
   });
 
   if (ui) {

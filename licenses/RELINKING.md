@@ -9,7 +9,7 @@ reverse-engineering the combined work to debug modifications to the LGPL part.
 
 Distribute the same-version application source (`src/`, `scripts/`,
 `esbuild.config.js`, `package.json`, `package-lock.json` and `project-page/`),
-`dist/uploadfit.js`, `LICENSE`, `NOTICE`, this `licenses/` directory and
+`dist/uploadfit.user.js` and the optional `dist/uploadfit.js`, `LICENSE`, `NOTICE`, this `licenses/` directory and
 `vendor/lamejs-1.2.1.tgz` together. The vendor archive is the unmodified npm
 source package and includes the upstream JavaScript sources. Its integrity is
 recorded in `provenance.json`. `npm run release` includes these materials in a source ZIP (requires a clean, committed Git checkout).
