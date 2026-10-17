@@ -4,6 +4,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { scriptHashes } from './sync-project-page.mjs';
+import { userscriptHeader } from './userscript-header.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (name) => readFileSync(path.join(root, name), 'utf8');
@@ -27,8 +28,11 @@ for (const [name, value] of Object.entries(lock.packages)) {
   if (value.resolved) assert(value.resolved.startsWith('https://registry.npmjs.org/'), `Non-public registry: ${name}`);
 }
 
-const bundle = read('dist/uploadfit.js');
-assert.equal(read('project-page/uploadfit.js'), bundle, 'Project-page script differs from production');
+const bundle = read('dist/uploadfit.user.js');
+assert.equal(read('dist/uploadfit.meta.js'), userscriptHeader(pkg.version), 'Stale update metadata');
+assert(bundle.startsWith(userscriptHeader(pkg.version)), 'Invalid userscript metadata');
+assert.equal(read('project-page/uploadfit.user.js'), bundle, 'Project-page userscript differs from production');
+assert.equal(read('project-page/uploadfit.js'), read('dist/uploadfit.js'), 'Stale optional Tabbit script');
 const html = read('project-page/index.html');
 const raw = html.match(/<textarea id="source-raw"[^>]*>([\s\S]*?)<\/textarea>/)?.[1];
 assert(raw, 'Missing embedded script');

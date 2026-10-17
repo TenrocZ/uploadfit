@@ -1,54 +1,79 @@
 # 传送门 · UploadFit
 
-**让图片和音频适配网页上传要求，在浏览器本地完成处理。**
+**通用浏览器上传助手：在当前网页本地适配图片和音频。**
 
-[English](README.en.md) · [安装脚本](dist/uploadfit.js) · [反馈问题](https://github.com/TenrocZ/uploadfit/issues) · [MIT 许可证](LICENSE)
+[English](README.en.md) · [安装通用版](https://raw.githubusercontent.com/TenrocZ/uploadfit/main/dist/uploadfit.user.js) · [下载完整源码](https://github.com/TenrocZ/uploadfit/archive/refs/heads/main.zip) · [反馈问题](https://github.com/TenrocZ/uploadfit/issues)
 
-传送门是运行在 **Tabbit Browser 脚本妙招**中的 JavaScript 工具。它读取上传框附近的格式、体积、尺寸等要求，在规则明确时处理用户选择的文件，再回填原上传框。需要裁剪、转码等确认时，会先展示方案；不会代替用户点击最终提交按钮。
+UploadFit **0.2.0** 通过 Tampermonkey 或 Violentmonkey 运行于支持用户脚本的现代浏览器。无需 Tabbit、AI 账号或 API Key，即可读取页面明确的上传规则、本地处理文件并回填。Tabbit AI 单独保留为可选增强版本。
 
-当前版本为 **0.1.0**，仍在早期迭代。网页结构、浏览器编解码能力和站点上传逻辑不同，不能保证适配所有网站。本项目并非 Tabbit 官方产品。
+## 三步开始
 
-## 能做什么
+### 1. 安装一个脚本管理器
 
-| 输入 | 处理能力 | 输出 |
+| 你的浏览器 | Tampermonkey 官方安装入口 | 其他选择 |
 | --- | --- | --- |
-| JPEG、PNG、WebP | 压缩、缩放、格式转换、方向修复；按需确认裁剪、放大或透明背景变化 | JPEG、PNG、WebP |
-| MP3 | 按网页体积上限重新编码 | MP3 |
-| PCM WAV | 网页明确允许 MP3 时转码、压缩 | MP3 |
-| AAC-LC M4A | 支持的非加密、非 fragmented 子集解码、转码 | MP3 |
-| 已符合明确规则的文件 | 保留原文件，不做多余处理 | 原文件 |
+| Chrome、Brave、Vivaldi、Opera 等 Chromium 浏览器 | [Chrome 网上应用店](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo) | [Violentmonkey 官方下载页](https://violentmonkey.github.io/get-it/) |
+| Microsoft Edge | [Edge 扩展商店](https://microsoftedge.microsoft.com/addons/detail/iikmkjmpaadaobahmlepeloendndfphd) | [Violentmonkey 官方下载页](https://violentmonkey.github.io/get-it/) |
+| Firefox | [Firefox 附加组件商店](https://addons.mozilla.org/firefox/addon/tampermonkey/) | [Violentmonkey 官方下载页](https://violentmonkey.github.io/get-it/) |
+| Safari | [Tampermonkey 官方 Safari 入口](https://www.tampermonkey.net/index.php?browser=safari) | 以系统对应 App Store 的可用性与价格为准 |
 
-支持动态出现的上传框、规则证据展示、取消处理与受控重试。规则缺失、冲突或输出复检失败时会停止处理，不猜测规则或承诺上传成功。
+只需选择一个管理器。安装完管理器后，还需要安装下面的 **UploadFit 脚本**。
 
-## 安装与使用
+Chrome/Edge 等 Chromium 浏览器若提示没有脚本运行权限，请在扩展详情中启用 **“允许用户脚本 / Allow User Scripts”**；没有此开关的版本按管理器提示启用开发者模式。具体界面见 [Tampermonkey 官方权限指引](https://www.tampermonkey.net/faq.php?q=Q209)。Safari 还需在浏览器扩展设置中启用管理器并允许访问目标网站。
 
-1. 获取本仓库完整源码包，或克隆仓库；生产脚本位于 [`dist/uploadfit.js`](dist/uploadfit.js)。
-2. 打开该文件，复制全部 JavaScript 内容。
-3. 在 Tabbit 中创建“脚本”妙招，粘贴代码，将生效范围限制为需要使用的网页，保存并启用。
-4. 刷新目标网页，照常选择文件；出现处理方案时，核对规则与预计输出后确认。
-5. 检查回填结果，自行完成网站的后续操作。
+### 2. 安装 UploadFit
 
-更新时重新复制新版本脚本并保存；本地修改或重新构建不会自动更新 Tabbit 中已保存的脚本。停用时关闭该妙招并刷新页面。
+**方式 A：直接安装。** 点击 [安装通用版 uploadfit.user.js](https://raw.githubusercontent.com/TenrocZ/uploadfit/main/dist/uploadfit.user.js)，在脚本管理器弹出的安装页核对名称与权限后点击安装。
 
-不要粘贴 Markdown 围栏或 `src/` 中的 ESM 模块。生产脚本是自包含 IIFE，不需要 CDN 或远程媒体处理服务。转发脚本时请同时提供对应源码和许可证材料，见[分发说明](licenses/RELINKING.md)。
+**方式 B：手动粘贴。** 如果链接只显示代码、GitHub Raw 不可访问，或当前仓库/分支尚未公开：
 
-## 隐私与 AI
+1. 下载你有权限访问的完整源码 ZIP，或打开仓库中的 [`dist/uploadfit.user.js`](dist/uploadfit.user.js)。
+2. 在 Tampermonkey 中选择“添加新脚本”（Violentmonkey 为“新建脚本”）。
+3. 删除编辑器的默认模板，粘贴文件的**全部内容，包括最上方 `// ==UserScript==` 元数据块**，然后保存。
+4. 确认脚本列表中的 UploadFit 已启用。不要只安装 `uploadfit.meta.js`，也不要把普通 `uploadfit.js` 当成通用版。
 
-- 图片、音频的检查和转换在浏览器内存中完成，UploadFit 没有媒体上传服务器。
-- 规则优先由本地代码读取。规则不完整时，可通过 Tabbit 的 `LLMBridge.chat()` 将经过筛选、清洗、长度限制的相关规则文字交给 AI 理解；这一步可能调用 Tabbit 的在线服务。
-- UploadFit 的 AI 请求不附带文件内容、文件名、媒体数据或完整网页；疑似敏感文字会阻止调用。AI 输出还须经过本地结构、数值和证据校验。
-- AI 不可用时继续使用本地规则。无需为本项目填写 API Key。
-- **目标网站可能在选择文件或收到回填事件后自动上传。**“本地处理”不代表目标网站不会接收文件，请只在信任的网站启用。
+直接安装与自动更新地址指向 `main`。本改动尚未合并到主分支、仓库为私有或 Raw 无法访问时，请使用方式 B，不要在脚本中填写访问令牌。
 
-更多边界与漏洞报告方式见 [SECURITY.md](SECURITY.md)。
+### 3. 在目标网站使用
 
-## 支持范围与限制
+1. 在扩展/脚本设置中允许访问目标网站，刷新网页。
+2. 选择一份图片或音频。UploadFit 会读取上传框附近的格式、体积、尺寸或时长要求。
+3. 出现裁剪、转码等确认时，核对方案再确认。处理通过复检后会回填，无法回填时按提示下载并手动选择。
+4. 检查结果，自行完成网站提交。UploadFit 不代点最终提交按钮。
 
-- 主要面向 Tabbit 的 Chromium 运行环境。MP3/M4A 转码依赖浏览器 Worker 中可用的 WebCodecs；受 CSP、浏览器版本和设备能力影响，能力不足时会停止。
-- 图片输入上限为 50 MiB、解码上限为 8,000 万像素；其他资源限制由代码执行，不能据此承诺任意大文件可处理。
-- 不支持批量多文件处理、音频裁剪/分段/降噪、视频抽轨、加密媒体或所有 M4A 编码变体。
-- 压缩不会缩短音频时长。超过网站时长限制时不能靠减小体积解决。
-- 不绕过登录、权限、服务端审核、额度或官方证件照校验。自定义控件、跨域 iframe、封闭 Shadow DOM 等场景可能无法识别或回填。
+默认匹配普通 **HTTP/HTTPS 顶层网页**，不会在浏览器内部页、扩展商店或 PDF 查看器中运行，也不在 iframe 中启动独立实例；顶层脚本可以发现部分同源 iframe 内的上传框。建议通过管理器的“用户匹配/排除规则”或浏览器站点访问权限，只允许需要的网站；这类设置比直接修改脚本头更容易在更新后保留。不要同时启用多份 UploadFit。
+
+## 功能与浏览器边界
+
+| 输入 | 处理能力 | 浏览器条件 |
+| --- | --- | --- |
+| JPEG、PNG、WebP | 压缩、缩放、格式转换、方向修复；按需确认裁剪、放大、透明背景变化 | 现代 Canvas、File、Blob API；输出格式还须被浏览器编码器支持 |
+| PCM WAV | 页面明确允许 MP3 时，本地转码与压缩 | 支持 Blob Worker；输入解码不依赖 WebCodecs，但 MP3 输出复检仍需要 Worker 内 MP3 WebCodecs 解码器 |
+| MP3、受支持的 AAC-LC M4A | 按体积要求重编码/转为 MP3 | **Worker 内支持对应 WebCodecs 解码器**，通常还要求安全上下文（HTTPS） |
+| 已符合明确规则的文件 | 原样保留 | 不为不需要转换的文件强行编码 |
+
+桌面 Chrome、Edge、Firefox 及其他 Chromium 浏览器是主要使用目标；Safari 可通过对应管理器尝试。**管理器可安装不等于每种媒体编码都可用。** 浏览器引擎、操作系统编解码器、网站 CSP 和设备资源会影响能力，缺失时会明确停止，不把文件转交远程服务。移动浏览器还取决于扩展支持，未作为本轮实机验收目标。
+
+0.2.0 已在 Chromium、Firefox、Windows WebKit 验证图片处理、回填和启动生命周期，并完成 Chromium + Tampermonkey 的真实导入与自动运行验证。Chromium/Firefox 的 WAV 转 MP3 已通过；本轮 Windows WebKit 缺少输出复检解码能力，会明确停止并保留原文件。WebKit 自动化结果不代表 Safari 扩展实机验收。
+
+图片上限为 50 MiB、8,000 万解码像素。不支持批量多文件处理、音频裁剪/分段/降噪、视频抽轨、加密媒体或所有 M4A 变体。压缩不会缩短音频时长，也不会绕过服务端审核、权限或额度。自定义上传控件、跨域 iframe、封闭 Shadow DOM 和拦截合成事件的站点可能无法回填。
+
+## 隐私与可选 AI
+
+**通用版 `uploadfit.user.js` 完全使用本地规则，不调用 AI。** 没有 `@require` CDN、远程媒体服务或特权网络接口；`@grant none` 在网页上下文运行。脚本管理器自身的安装/更新检查和隐私政策独立于 UploadFit。
+
+如果使用 Tabbit，并希望在本地规则不足时启用其 AI，可改用 [`dist/uploadfit.js`](dist/uploadfit.js)：将完整内容粘贴到 Tabbit“脚本”妙招，限定网站、保存、刷新。不要与通用版同时启用。只有该版本可能经 `LLMBridge.chat()` 向 Tabbit 在线服务发送经过筛选的规则文字，且仍不附带文件内容、文件名或完整网页；候选规则必须经过本地校验。
+
+两种版本的媒体处理都在浏览器内存中完成。**目标网站可能在选中文件或收到回填事件后自动上传**，本地处理不代表网站不会接收文件，请仅在信任的网站启用。更多内容见 [SECURITY.md](SECURITY.md)。
+
+## 更新、停用与常见问题
+
+- **更新**：通过公开 `main` 地址安装的脚本由管理器检查版本；手动安装且自动更新不可用时，重新打开同一脚本，替换为新版本完整内容并保存。刷新目标网页生效。不要叠加第二份脚本。
+- **停用/卸载**：在管理器中关闭/删除 UploadFit，然后刷新页面。关闭页面内状态条只停止当前页面会话。
+- **安装后没反应**：检查管理器和脚本已启用、允许用户脚本、目标网站权限；刷新普通网页。浏览器内部页、商店页、iframe 不在自动运行范围。严格 CSP 可能阻止脚本或 Worker。
+- **没有 AI 也能用吗？** 可以，通用版仅处理可由本地规则可靠判断的约束；缺失/冲突规则时会停止，不猜测。
+- **音频提示不支持**：先检查是否为 HTTPS 页面、输入是否属于支持格式及编码子集。MP3/M4A 还取决于当前浏览器的 Worker 解码能力；可改用更新的 Chromium 浏览器或手动转换。
+- **网站仍拒收**：本地复检不能替代服务器审核。按提示下载结果后用原上传按钮选择；不要反复重试或绕过网站规则。
 
 ## 从源码构建
 
@@ -61,28 +86,12 @@ npm ci
 npm run check
 ```
 
-- `npm run build`：构建 `dist/uploadfit.js`，同步介绍页脚本、阅读视图及许可证。
-- `npm run static-check`：检查运行时代码和产物中的禁止 API、许可证标记等。
-- `npm run check`：构建并检查静态规则、分发文件和介绍页一致性；**不等同于浏览器功能测试**。
-- `npm run release`：在干净且已提交的 Git 工作区生成 `release/` 中的源码 ZIP、来源记录与 SHA-256 校验文件，包含 lockfile、音频库源码和许可证；不会上传发布。
+`npm run build` 生成通用安装文件 `dist/uploadfit.user.js`、更新元数据 `dist/uploadfit.meta.js`、可选 Tabbit 文件 `dist/uploadfit.js`，并同步介绍页。`npm run check` 检查运行时代码、元数据、许可材料与分发一致性，不等同于浏览器功能测试。`npm run release` 从干净的已提交 Git 工作区生成含完整源码、lockfile、第三方源码和许可证的 ZIP，以及来源与校验记录，不会上传发布。
 
-依赖从公共 npm registry 安装。`lamejs` 固定为 1.2.1，原始源码包保存在 `vendor/`；替换编码器后可自行重新构建，步骤见 [RELINKING.md](licenses/RELINKING.md)。
-
-## 仓库结构
-
-```text
-src/            规则识别、图片/音频处理、交互与文件回填
-scripts/        必要的构建和发布检查脚本
-dist/           可直接安装的生产脚本
-project-page/   项目介绍页及与生产脚本同步的静态文件
-licenses/       第三方声明、完整许可证及替换重建说明
-vendor/         随发行包提供的 lamejs 原始源码包
-```
-
-公开树已移除内部开发文档、测试夹具、探针和验收截图。保留构建所需源文件与依赖锁定，以便从源码重建和替换第三方编码器。
+`src/` 为核心代码，`scripts/` 为构建与分发工具，`project-page/` 为产品介绍与安装页。公开树不携带内部测试和开发档案。原始编码器源码在 `vendor/`，替换重建见 [RELINKING.md](licenses/RELINKING.md)。
 
 ## 参与与许可
 
-欢迎通过 [Issues](https://github.com/TenrocZ/uploadfit/issues) 提交脱敏问题，通过 Pull Request 改进项目。提交前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)；版本变化见 [CHANGELOG.md](CHANGELOG.md)。
+欢迎通过 [Issues](https://github.com/TenrocZ/uploadfit/issues) 或 Pull Request 改进项目，参见 [CONTRIBUTING.md](CONTRIBUTING.md) 和 [CHANGELOG.md](CHANGELOG.md)。
 
-本项目原创代码采用 [MIT](LICENSE)。生产脚本内嵌的 `lamejs@1.2.1` 按其上游许可分发（npm 声明为 LGPL-3.0），不因本项目采用 MIT 而改变。请保留 [NOTICE](NOTICE)、[`licenses/`](licenses/) 和可重建源码，完整要求见[第三方声明](licenses/NOTICE.md)。
+原创代码采用 [MIT](LICENSE)。内嵌的 `lamejs@1.2.1` 保持上游许可（npm 声明为 LGPL-3.0），请连同 [NOTICE](NOTICE)、[`licenses/`](licenses/)、对应可重建源码及第三方源码包一起分发。项目与上述浏览器、脚本管理器无官方隶属关系。

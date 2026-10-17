@@ -1,4 +1,6 @@
 import { bootstrap, cleanupSession } from './bootstrap.js';
+import { createTabbitAiProvider } from './providers/tabbit-ai.js';
+import { startBrowserRuntime } from './browser-runtime.js';
 
 const BUILD_INFO = Object.freeze({
   version: __UPLOADFIT_VERSION__,
@@ -14,6 +16,8 @@ if (typeof globalThis !== 'undefined') {
   });
 }
 
-if (typeof document !== 'undefined') bootstrap();
+if (typeof document !== 'undefined') {
+  startBrowserRuntime({ createRuleProvider: () => createTabbitAiProvider() });
+}
 
 export { BUILD_INFO, bootstrap, cleanupSession };

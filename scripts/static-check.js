@@ -3,10 +3,11 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { AUDIO_LICENSE_BANNER_PREFIX } from './license-banner.mjs';
+import { userscriptHeader } from './userscript-header.mjs';
 
 const rootDir = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const sourceDir = path.join(rootDir, 'src');
-const buildPath = path.join(rootDir, 'dist', 'uploadfit.js');
+const pkg = JSON.parse(readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
 const forbiddenPatterns = [
   { name: 'eval', pattern: /\beval\s*\(/ },
   { name: 'new Function', pattern: /\bnew\s+Function\s*\(/ },
@@ -58,24 +59,31 @@ for (const filePath of listJavaScriptFiles(sourceDir)) {
 
 let artifactBytes = null;
 let artifactSha256 = null;
-if (!existsSync(buildPath)) {
-  violations.push('dist/uploadfit.js is missing');
-} else {
-  // Product decision (2026-08-19): artifact size is informational only. Runtime
-  // safety, a standalone IIFE and direct Tabbit paste/save/run remain hard gates.
-  artifactBytes = statSync(buildPath).size;
-  artifactSha256 = createHash('sha256').update(readFileSync(buildPath)).digest('hex').toUpperCase();
-  const artifact = readFileSync(buildPath, 'utf8');
-  if (!artifact.startsWith(AUDIO_LICENSE_BANNER_PREFIX)) {
-    violations.push('dist/uploadfit.js is missing the required lamejs license banner');
-  }
-  // The validated legal banner contains a source URL, not executable code.
-  const runtimeArtifact = artifact.startsWith(AUDIO_LICENSE_BANNER_PREFIX)
-    ? artifact.slice(AUDIO_LICENSE_BANNER_PREFIX.length) : artifact;
-  for (const forbidden of forbiddenPatterns) {
-    if (forbidden.pattern.test(runtimeArtifact)) {
-      violations.push(`dist/uploadfit.js contains ${forbidden.name}`);
+for (const name of ['uploadfit.js', 'uploadfit.user.js']) {
+  const buildPath = path.join(rootDir, 'dist', name);
+  const expectedPrefix = (name.endsWith('.user.js') ? userscriptHeader(pkg.version) : '') + AUDIO_LICENSE_BANNER_PREFIX;
+  if (!existsSync(buildPath)) {
+    violations.push(`dist/${name} is missing`);
+  } else {
+    // Artifact size is informational; runtime restrictions remain hard gates.
+    artifactBytes = statSync(buildPath).size;
+    artifactSha256 = createHash('sha256').update(readFileSync(buildPath)).digest('hex').toUpperCase();
+    const artifact = readFileSync(buildPath, 'utf8');
+    if (!artifact.startsWith(expectedPrefix)) {
+      violations.push(`dist/${name} has an invalid metadata/license header`);
     }
+    // The validated legal banner contains a source URL, not executable code.
+    const runtimeArtifact = artifact.startsWith(expectedPrefix)
+      ? artifact.slice(expectedPrefix.length) : artifact;
+    for (const forbidden of forbiddenPatterns) {
+      if (forbidden.pattern.test(runtimeArtifact)) {
+        violations.push(`dist/${name} contains ${forbidden.name}`);
+      }
+    }
+    if (name.endsWith('.user.js') && /LLMBridge|TabbitAiProvider/.test(runtimeArtifact)) {
+      violations.push('Universal userscript contains a platform AI dependency');
+    }
+    console.log(`${name}: bytes=${artifactBytes}, SHA-256=${artifactSha256}`);
   }
 }
 

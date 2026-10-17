@@ -429,9 +429,10 @@ function representativeDecodeWorker() {
         decodedAudioData: results.reduce((sum, item) => sum + item.decoded, 0),
         unclosedAudioData
       });
-    } catch {
+    } catch (error) {
       self.postMessage({
         type: 'DECODE_RESULT', valid: false,
+        decoderUnavailable: ['WORKER_WEBCODECS_UNAVAILABLE', 'MP3_CONFIG_UNSUPPORTED'].includes(error?.message),
         decodedWindows: results.length, decodedAudioData: 0, unclosedAudioData
       });
     }
@@ -479,6 +480,7 @@ async function decodeRepresentativeWindows(windows, options = {}) {
         if (event.data?.type !== 'DECODE_RESULT') return;
         finish(resolve, {
           valid: event.data.valid === true,
+          decoderUnavailable: event.data.decoderUnavailable === true,
           decodedWindows: Number.isFinite(event.data.decodedWindows) ? event.data.decodedWindows : 0,
           decodedAudioData: Number.isFinite(event.data.decodedAudioData) ? event.data.decodedAudioData : 0,
           unclosedAudioData: Number.isFinite(event.data.unclosedAudioData) ? event.data.unclosedAudioData : 0,
@@ -569,6 +571,7 @@ async function inspectRepresentativeFrames(file, options = {}) {
     valid: valid && decoded.valid,
     headerValid: valid,
     decodeValid: decoded.valid,
+    decoderUnavailable: decoded.decoderUnavailable === true,
     representativeWindows: windows.length,
     decodedWindows: decoded.decodedWindows,
     decodedAudioData: decoded.decodedAudioData,
